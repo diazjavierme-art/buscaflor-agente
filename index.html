@@ -1074,7 +1074,7 @@ async function callApi(messages){
   if(!apiKey){ alert('Introduce tu API Key en la barra lateral.'); throw new Error('Sin API Key'); }
   var resp = await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},
+    headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
     body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,system:buildSysPrompt(),messages:messages})
   });
   if(!resp.ok){ var err=await resp.json().catch(function(){return {};}); throw new Error(err.error&&err.error.message?err.error.message:'Error HTTP '+resp.status); }
