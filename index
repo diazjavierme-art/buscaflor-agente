@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buscaflor · Agente IA</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --verde:#1a3a2a;--verde-medio:#2d5a3d;--verde-claro:#4a8c5c;
+  --verde-suave:#7ab88a;--crema:#f5f0e8;--crema-oscuro:#e8e0d0;
+  --rosa:#d4847a;--dorado:#c9a84c;--texto:#1a1a1a;
+  --texto-suave:#5a5a4a;--blanco:#ffffff;
+  --sombra:0 4px 24px rgba(26,58,42,0.10);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Sora',sans-serif;background:var(--crema);color:var(--texto);min-height:100vh;display:flex;flex-direction:column;}
+
+/* HEADER */
+header{background:var(--verde);padding:0 18px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 14px rgba(0,0,0,0.18);}
+.logo{display:flex;align-items:center;gap:9px;}
+.logo-icon{width:30px;height:30px;background:var(--dorado);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px;}
+.logo-text{font-family:'DM Serif Display',serif;font-size:19px;color:var(--crema);}
+.logo-text span{color:var(--dorado);}
+.hbadges{display:flex;gap:6px;align-items:center;}
+.hbadge{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:18px;padding:3px 9px;font-size:10.5px;color:var(--verde-suave);cursor:pointer;white-space:nowrap;transition:background 0.2s;}
+.hbadge:hover{background:rgba(255,255,255,0.14);}
+.hbadge.alert{border-color:rgba(212,132,122,0.5);color:var(--rosa);}
+.hdot{width:5px;height:5px;border-radius:50%;background:var(--verde-suave);animation:pulse 2s ease-in-out infinite;flex-shrink:0;}
+.hdot.gold{background:var(--dorado);}
+.hdot.red{background:var(--rosa);}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.8)}}
+
+/* LAYOUT */
+.app-layout{display:flex;flex:1;height:calc(100vh - 54px);overflow:hidden;}
+
+/* SIDEBAR */
+.sidebar{width:242px;background:var(--verde);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
+.sb-inner{padding:14px 0;flex:1;display:flex;flex-direction:column;}
+.sb-sec{padding:0 11px 14px;}
+.sb-lbl{font-size:9.5px;font-weight:600;color:var(--verde-suave);letter-spacing:0.13em;text-transform:uppercase;padding:0 4px;margin-bottom:7px;}
+.sb-div{height:1px;background:rgba(255,255,255,0.07);margin:0 11px 14px;}
+
+/* ACTION CARDS */
+.ac{display:flex;align-items:flex-start;gap:9px;width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);color:var(--crema);padding:10px 11px;border-radius:10px;font-family:'Sora',sans-serif;cursor:pointer;text-align:left;transition:all 0.18s;margin-bottom:7px;}
+.ac:hover{background:rgba(255,255,255,0.13);border-color:var(--verde-suave);transform:translateX(2px);}
+.ac.gold{background:rgba(201,168,76,0.11);border-color:rgba(201,168,76,0.28);}
+.ac.gold:hover{background:rgba(201,168,76,0.2);}
+.ac.alert{background:rgba(212,132,122,0.11);border-color:rgba(212,132,122,0.35);}
+.ac-icon{font-size:19px;flex-shrink:0;margin-top:1px;}
+.ac-title{font-size:12.5px;font-weight:600;color:var(--crema);line-height:1.3;}
+.ac.gold .ac-title{color:var(--dorado);}
+.ac.alert .ac-title{color:var(--rosa);}
+.ac-sub{font-size:10.5px;color:rgba(245,240,232,0.5);margin-top:2px;line-height:1.4;}
+
+/* small btns */
+.qb{display:flex;align-items:center;gap:7px;width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);color:rgba(245,240,232,0.8);padding:7px 10px;border-radius:8px;font-size:11.5px;font-family:'Sora',sans-serif;cursor:pointer;text-align:left;transition:all 0.17s;margin-bottom:4px;}
+.qb:hover{background:rgba(255,255,255,0.1);color:var(--crema);}
+.qb .ic{font-size:13px;width:17px;text-align:center;flex-shrink:0;}
+
+/* MEMORY */
+.mem-panel{padding:0 11px;}
+.mem-card{background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px 10px;margin-bottom:6px;}
+.mem-title{font-size:9.5px;font-weight:600;color:var(--dorado);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;}
+.mem-content{font-size:10px;color:rgba(245,240,232,0.6);line-height:1.5;font-family:'DM Mono',monospace;white-space:pre-wrap;max-height:60px;overflow-y:auto;}
+.mem-empty{font-size:11px;color:rgba(255,255,255,0.24);font-style:italic;text-align:center;padding:6px;}
+.btn-clr{width:100%;background:rgba(212,132,122,0.09);border:1px solid rgba(212,132,122,0.2);color:var(--rosa);padding:5px;border-radius:6px;font-size:10px;font-family:'Sora',sans-serif;cursor:pointer;margin-top:4px;}
+
+/* API */
+.api-zone{padding:11px;margin-top:auto;border-top:1px solid rgba(255,255,255,0.07);}
+.api-lbl{font-size:9.5px;font-weight:600;color:var(--verde-suave);letter-spacing:0.11em;text-transform:uppercase;margin-bottom:5px;display:block;}
+.api-inp{width:100%;background:rgba(0,0,0,0.26);border:1px solid rgba(255,255,255,0.08);color:var(--crema);padding:6px 8px;border-radius:7px;font-size:10.5px;font-family:'DM Mono',monospace;outline:none;}
+.api-inp:focus{border-color:var(--dorado);}
+.api-st{font-size:10px;margin-top:3px;padding:2px 6px;border-radius:4px;display:none;}
+.api-st.ok{background:rgba(74,140,92,0.16);color:var(--verde-suave);display:block;}
+.api-st.err{background:rgba(212,132,122,0.16);color:var(--rosa);display:block;}
+
+/* MAIN */
+.main-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.tabs{display:flex;background:var(--blanco);border-bottom:1px solid var(--crema-oscuro);padding:0 16px;overflow-x:auto;flex-shrink:0;}
+.tab{padding:10px 14px;font-size:12px;font-weight:500;color:var(--texto-suave);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.17s;white-space:nowrap;}
+.tab.active{color:var(--verde);border-bottom-color:var(--verde);}
+.tab:hover:not(.active){color:var(--verde-medio);}
+.tab-badge{background:var(--dorado);color:var(--verde);font-size:9.5px;font-weight:700;padding:1px 5px;border-radius:9px;margin-left:4px;}
+.tab-badge.red{background:var(--rosa);color:white;}
+.tab-home{margin-left:auto;border-left:1px solid var(--crema-oscuro);padding-left:14px;}
+
+/* VIEWS */
+.view{flex:1;display:none;flex-direction:column;overflow:hidden;}
+.view.active{display:flex;}
+
+/* DAILY SUMMARY */
+.daily-summary{background:var(--verde);color:var(--crema);padding:14px 20px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.08);}
+.ds-title{font-size:11px;font-weight:600;color:var(--verde-suave);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;}
+.ds-grid{display:flex;gap:12px;flex-wrap:wrap;}
+.ds-item{display:flex;align-items:center;gap:6px;font-size:12px;}
+.ds-item .ds-icon{font-size:14px;}
+.ds-item .ds-val{font-weight:600;color:var(--dorado);}
+.ds-item .ds-label{color:rgba(245,240,232,0.6);font-size:11px;}
+.ds-alert{background:rgba(212,132,122,0.2);border:1px solid rgba(212,132,122,0.35);border-radius:8px;padding:7px 12px;font-size:11.5px;color:var(--rosa);margin-top:8px;display:flex;align-items:center;gap:7px;cursor:pointer;}
+.ds-alert:hover{background:rgba(212,132,122,0.28);}
+
+/* CHAT */
+.msgs{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:14px;scroll-behavior:smooth;}
+
+/* WELCOME */
+.welcome{text-align:center;padding:18px 14px;max-width:480px;margin:auto;}
+.wf{font-size:38px;margin-bottom:9px;display:block;animation:sway 3s ease-in-out infinite;}
+@keyframes sway{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+.welcome h2{font-family:'DM Serif Display',serif;font-size:21px;color:var(--verde);margin-bottom:5px;}
+.welcome p{color:var(--texto-suave);font-size:12.5px;line-height:1.7;}
+.flow-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;}
+.fc{background:var(--blanco);border:1px solid var(--crema-oscuro);border-radius:12px;padding:13px 12px;cursor:pointer;transition:all 0.18s;text-align:left;box-shadow:0 2px 7px rgba(0,0,0,0.04);}
+.fc:hover{border-color:var(--verde-suave);box-shadow:0 4px 14px rgba(26,58,42,0.12);transform:translateY(-1px);}
+.fc.alert-card{border-color:rgba(212,132,122,0.4);background:rgba(212,132,122,0.04);}
+.fc .fi{font-size:20px;margin-bottom:5px;display:block;}
+.fc .ft{font-size:12px;font-weight:600;color:var(--verde);margin-bottom:2px;}
+.fc.alert-card .ft{color:var(--rosa);}
+.fc .fd{font-size:11px;color:var(--texto-suave);line-height:1.5;}
+
+/* MESSAGES */
+.msg{display:flex;gap:8px;animation:fadeUp 0.2s ease;max-width:700px;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{flex-direction:row-reverse;align-self:flex-end;}
+.msg.assistant{align-self:flex-start;}
+.av{width:29px;height:29px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;margin-top:2px;}
+.av.u{background:var(--dorado);color:var(--verde);font-size:10px;font-weight:700;font-family:'DM Mono',monospace;}
+.av.b{background:var(--verde);color:var(--crema);}
+.bbl{padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.65;max-width:500px;box-shadow:var(--sombra);}
+.msg.user .bbl{background:var(--verde);color:var(--crema);border-bottom-right-radius:3px;}
+.msg.assistant .bbl{background:var(--blanco);color:var(--texto);border-bottom-left-radius:3px;border:1px solid var(--crema-oscuro);}
+.bbl strong{font-weight:600;color:var(--verde-medio);}
+.msg.user .bbl strong{color:var(--dorado);}
+.bbl ul,.bbl ol{margin:5px 0 5px 14px;}
+.bbl li{margin-bottom:2px;}
+.bbl code{font-family:'DM Mono',monospace;font-size:11px;background:var(--crema);padding:1px 4px;border-radius:3px;color:var(--verde-medio);}
+.msg.user .bbl code{background:rgba(255,255,255,0.13);color:var(--crema);}
+
+/* FLOW STEP */
+.flow-step{background:var(--blanco);border:1.5px solid var(--verde-suave);border-radius:12px;padding:14px 16px;animation:fadeUp 0.22s ease;align-self:flex-start;width:100%;max-width:520px;}
+.fs-label{font-size:9.5px;font-weight:600;color:var(--verde-suave);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:5px;}
+.fs-q{font-size:13.5px;font-weight:600;color:var(--verde);margin-bottom:6px;line-height:1.4;}
+.fs-hint{font-size:11.5px;color:var(--texto-suave);margin-bottom:10px;line-height:1.55;}
+
+/* DROP ZONE */
+.dz{border:1.5px dashed var(--verde-suave);border-radius:10px;padding:18px;text-align:center;cursor:pointer;background:rgba(74,140,92,0.03);transition:all 0.2s;margin-bottom:8px;}
+.dz:hover,.dz.over{background:rgba(74,140,92,0.09);border-color:var(--verde-claro);}
+.dz-icon{font-size:24px;margin-bottom:5px;}
+.dz-text{font-size:13px;font-weight:600;color:var(--verde-medio);}
+.dz-hint{font-size:11px;color:var(--texto-suave);margin-top:2px;}
+
+/* FILE PILLS */
+.file-list{display:flex;flex-direction:column;gap:5px;margin-bottom:8px;}
+.file-pill{display:flex;align-items:center;gap:7px;background:rgba(74,140,92,0.07);border:1px solid rgba(74,140,92,0.22);border-radius:7px;padding:6px 11px;}
+.fp-icon{font-size:14px;flex-shrink:0;}
+.fp-name{font-size:12px;color:var(--verde-medio);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fp-remove{background:none;border:none;color:var(--rosa);cursor:pointer;font-size:13px;padding:0;flex-shrink:0;}
+
+/* FLOW BUTTONS */
+.flow-btn{background:var(--verde);color:var(--crema);border:none;padding:9px 16px;border-radius:8px;font-size:12.5px;font-family:'Sora',sans-serif;cursor:pointer;transition:all 0.17s;}
+.flow-btn:hover{background:var(--verde-claro);}
+.flow-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.flow-btn-sec{background:transparent;color:var(--verde-medio);border:1px solid var(--crema-oscuro);padding:9px 14px;border-radius:8px;font-size:12px;font-family:'Sora',sans-serif;cursor:pointer;}
+.flow-inp{width:100%;border:1.5px solid var(--crema-oscuro);border-radius:8px;padding:8px 11px;font-family:'Sora',sans-serif;font-size:13px;outline:none;background:var(--crema);transition:border-color 0.18s;}
+.flow-inp:focus{border-color:var(--verde-claro);}
+.flow-row{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap;}
+
+/* TYPING */
+.typing{display:flex;gap:8px;align-items:center;animation:fadeUp 0.2s ease;}
+.typing-dots{background:var(--blanco);border:1px solid var(--crema-oscuro);padding:10px 14px;border-radius:12px;border-bottom-left-radius:3px;display:flex;gap:4px;align-items:center;}
+.dot{width:5px;height:5px;background:var(--verde-suave);border-radius:50%;animation:bounce 1.2s ease-in-out infinite;}
+.dot:nth-child(2){animation-delay:0.2s}.dot:nth-child(3){animation-delay:0.4s}
+@keyframes bounce{0%,100%{transform:translateY(0);opacity:0.5}50%{transform:translateY(-5px);opacity:1}}
+
+/* INPUT */
+.input-area{padding:10px 20px 13px;background:var(--crema);border-top:1px solid var(--crema-oscuro);flex-shrink:0;}
+.input-wrap{display:flex;gap:6px;align-items:flex-end;background:var(--blanco);border:1.5px solid var(--crema-oscuro);border-radius:12px;padding:8px 9px;box-shadow:0 2px 7px rgba(0,0,0,0.04);}
+.input-wrap:focus-within{border-color:var(--verde-claro);box-shadow:0 0 0 3px rgba(74,140,92,0.08);}
+#userInput{flex:1;border:none;outline:none;background:transparent;font-family:'Sora',sans-serif;font-size:13px;color:var(--texto);resize:none;max-height:95px;line-height:1.5;}
+#userInput::placeholder{color:#bbb;}
+.ibtns{display:flex;gap:5px;align-items:flex-end;}
+.icon-btn{width:33px;height:33px;background:transparent;border:1.5px solid var(--crema-oscuro);border-radius:7px;color:var(--texto-suave);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.17s;flex-shrink:0;}
+.icon-btn:hover{border-color:var(--verde-suave);color:var(--verde);}
+#micBtn.recording{background:var(--rosa);border-color:var(--rosa);color:white;animation:recP 1s ease-in-out infinite;}
+@keyframes recP{0%,100%{box-shadow:0 0 0 0 rgba(212,132,122,0.5)}50%{box-shadow:0 0 0 5px rgba(212,132,122,0)}}
+#sendBtn{width:33px;height:33px;background:var(--verde);border:none;border-radius:7px;color:var(--crema);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.17s;flex-shrink:0;}
+#sendBtn:hover:not(:disabled){background:var(--verde-claro);transform:scale(1.05);}
+#sendBtn:disabled{opacity:0.35;cursor:not-allowed;}
+.mic-st{font-size:10.5px;color:var(--rosa);text-align:center;margin-top:3px;display:none;animation:blink 1s ease-in-out infinite;}
+.mic-st.active{display:block;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.4}}
+.input-hint{font-size:10px;color:#bbb;text-align:center;margin-top:5px;}
+#pdfFileInput{display:none;}
+
+/* SCROLL VIEWS */
+.scroll-view{flex:1;overflow-y:auto;padding:16px 20px;}
+.sv-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
+.sv-title{font-family:'DM Serif Display',serif;font-size:20px;color:var(--verde);}
+.sv-actions{display:flex;gap:6px;}
+.btn-inf{background:var(--verde);color:var(--crema);border:none;padding:7px 13px;border-radius:7px;font-size:11.5px;font-family:'Sora',sans-serif;cursor:pointer;}
+.btn-inf:hover{background:var(--verde-claro);}
+.btn-lmp{background:transparent;color:var(--rosa);border:1px solid rgba(212,132,122,0.3);padding:7px 11px;border-radius:7px;font-size:11.5px;font-family:'Sora',sans-serif;cursor:pointer;}
+.btn-lmp:hover{background:rgba(212,132,122,0.08);}
+.empty-state{text-align:center;padding:44px 18px;color:var(--texto-suave);}
+.empty-state .big{font-size:42px;display:block;margin-bottom:9px;opacity:0.36;}
+.empty-state p{font-size:12.5px;line-height:1.6;}
+
+/* SEARCH BAR */
+.search-bar{display:flex;gap:8px;margin-bottom:14px;}
+.search-inp{flex:1;border:1.5px solid var(--crema-oscuro);border-radius:8px;padding:7px 12px;font-family:'Sora',sans-serif;font-size:12.5px;outline:none;background:var(--blanco);}
+.search-inp:focus{border-color:var(--verde-suave);}
+
+/* VUELO CARDS */
+.vuelo-card{background:var(--blanco);border:1px solid var(--crema-oscuro);border-radius:11px;margin-bottom:12px;overflow:hidden;box-shadow:0 2px 7px rgba(0,0,0,0.04);}
+.vc-head{padding:10px 14px;background:var(--verde);color:var(--crema);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px;}
+.vc-awb{font-weight:600;font-size:13px;}
+.vc-meta{font-size:10.5px;color:rgba(245,240,232,0.65);font-family:'DM Mono',monospace;}
+.vc-status{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;}
+.vc-status.completo{background:rgba(122,184,138,0.3);color:#a8e6b8;}
+.vc-status.pendiente{background:rgba(201,168,76,0.3);color:var(--dorado);}
+.vc-body{padding:10px 14px;}
+.vc-flete{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;padding:7px 10px;background:rgba(26,58,42,0.04);border-radius:7px;}
+.vc-fi{font-size:11px;color:var(--texto-suave);}
+.vc-fi strong{color:var(--verde-medio);font-family:'DM Mono',monospace;}
+.vc-pendiente-aviso{background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.3);border-radius:7px;padding:7px 11px;font-size:11.5px;color:#8a6f1a;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.vc-prov-missing{font-size:11px;color:var(--rosa);margin-bottom:8px;}
+.btn-completar{background:var(--dorado);color:var(--verde);border:none;padding:5px 11px;border-radius:6px;font-size:11px;font-weight:600;font-family:'Sora',sans-serif;cursor:pointer;flex-shrink:0;}
+.btn-completar:hover{background:#e0bc5a;}
+.inv-table{width:100%;border-collapse:collapse;}
+.inv-table th{padding:6px 12px;font-size:10px;font-weight:600;color:var(--texto-suave);text-transform:uppercase;letter-spacing:0.07em;border-bottom:1px solid var(--crema-oscuro);background:var(--crema);text-align:left;}
+.inv-table th:not(:first-child){text-align:right;}
+.inv-table td{padding:6px 12px;font-size:11.5px;border-bottom:1px solid var(--crema-oscuro);}
+.inv-table tr:last-child td{border-bottom:none;}
+.inv-table td:not(:first-child){text-align:right;font-family:'DM Mono',monospace;}
+.td-var{font-weight:500;}
+.td-cant{color:var(--verde-medio);font-weight:600;}
+.td-fob{color:var(--texto-suave);}
+.td-flete{color:var(--dorado);}
+.td-total{color:var(--verde);font-weight:600;}
+.td-pending{color:#bbb;font-style:italic;font-size:10.5px;}
+
+/* PEDIDOS */
+.cg{background:var(--blanco);border:1px solid var(--crema-oscuro);border-radius:10px;margin-bottom:9px;overflow:hidden;}
+.cg-head{padding:9px 13px;background:var(--crema);border-bottom:1px solid var(--crema-oscuro);display:flex;justify-content:space-between;align-items:center;}
+.cg-nombre{font-weight:600;font-size:13px;color:var(--verde);}
+.cg-total{font-family:'DM Mono',monospace;font-size:11px;color:var(--texto-suave);}
+.pr{display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;padding:7px 13px;border-bottom:1px solid var(--crema-oscuro);font-size:12px;}
+.pr:last-child{border-bottom:none;}
+.pr-var{font-weight:500;}
+.pr-cant{font-family:'DM Mono',monospace;color:var(--verde-medio);font-weight:600;}
+.pr-uni{color:var(--texto-suave);font-size:10.5px;}
+.pr-hora{color:#ccc;font-size:10px;font-family:'DM Mono',monospace;}
+.btn-del{background:none;border:none;color:rgba(212,132,122,0.4);cursor:pointer;font-size:12px;}
+.btn-del:hover{color:var(--rosa);}
+
+/* MODAL */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:300;display:none;align-items:center;justify-content:center;padding:18px;}
+.modal-ov.open{display:flex;}
+.modal{background:var(--blanco);border-radius:13px;width:100%;max-width:560px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 55px rgba(0,0,0,0.17);animation:mIn 0.2s ease;}
+@keyframes mIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
+.mh{padding:15px 17px 11px;border-bottom:1px solid var(--crema-oscuro);display:flex;justify-content:space-between;align-items:center;}
+.mh h3{font-family:'DM Serif Display',serif;font-size:18px;color:var(--verde);}
+.mc{background:none;border:none;font-size:17px;cursor:pointer;color:var(--texto-suave);}
+.mb{padding:15px 17px;overflow-y:auto;flex:1;}
+.mb pre{font-family:'DM Mono',monospace;font-size:11.5px;line-height:1.7;color:var(--texto);white-space:pre-wrap;background:var(--crema);padding:11px;border-radius:7px;}
+.mf{padding:11px 17px;border-top:1px solid var(--crema-oscuro);display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap;}
+.btn-pr:hover{background:var(--crema);}
+.btn-cp{background:var(--verde);color:var(--crema);border:none;padding:6px 12px;border-radius:7px;font-size:11.5px;font-family:'Sora',sans-serif;cursor:pointer;}
+.btn-pr{background:transparent;color:var(--verde);border:1px solid var(--crema-oscuro);padding:6px 11px;border-radius:7px;font-size:11.5px;font-family:'Sora',sans-serif;cursor:pointer;transition:background 0.15s;}
+
+/* TOAST */
+.toast{position:fixed;bottom:72px;right:17px;background:var(--verde);color:var(--crema);padding:7px 13px;border-radius:8px;font-size:12px;box-shadow:0 4px 15px rgba(0,0,0,0.15);opacity:0;transform:translateY(6px);transition:all 0.25s;pointer-events:none;z-index:400;}
+.toast.show{opacity:1;transform:translateY(0);}
+
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--crema-oscuro);border-radius:8px;}
+@media(max-width:640px){.sidebar{display:none;}.msgs,.scroll-view{padding:11px;}.input-area{padding:8px 11px 12px;}.flow-grid{grid-template-columns:1fr;}.ds-grid{gap:8px;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🌸</div>
+    <div class="logo-text">Busca<span>flor</span></div>
+  </div>
+  <div class="hbadges">
+    <div class="hbadge" id="hBadgeAlertas" onclick="switchTab('vuelos')" style="display:none;"></div>
+    <div class="hbadge" onclick="switchTab('vuelos')"><div class="hdot gold"></div><span id="hVuelos">0 vuelos</span></div>
+    <div class="hbadge" onclick="switchTab('pedidos')"><div class="hdot"></div><span id="hPed">0 pedidos</span></div>
+  </div>
+</header>
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sb-inner">
+      <div class="sb-sec">
+        <div class="sb-lbl">Importación</div>
+        <button class="ac gold" onclick="startFlow('vuelo')">
+          <div class="ac-icon">✈️</div>
+          <div><div class="ac-title">Nuevo vuelo</div><div class="ac-sub">Guía + facturas → flete, inventario y control de proveedores</div></div>
+        </button>
+        <button class="ac" id="btnCompletarSb" onclick="mostrarVuelosPendientes()" style="display:none;">
+          <div class="ac-icon">⚠️</div>
+          <div><div class="ac-title" style="color:var(--dorado);">Vuelos pendientes</div><div class="ac-sub">Faltan facturas o guía aérea</div></div>
+        </button>
+        <button class="ac" onclick="switchTab('vuelos')">
+          <div class="ac-icon">📦</div>
+          <div><div class="ac-title">Ver vuelos</div><div class="ac-sub">Inventario por AWB con costes</div></div>
+        </button>
+      </div>
+      <div class="sb-div"></div>
+      <div class="sb-sec">
+        <div class="sb-lbl">Pedidos</div>
+        <button class="ac gold" onclick="startFlow('pedido')">
+          <div class="ac-icon">📋</div>
+          <div><div class="ac-title">Anotar pedido</div><div class="ac-sub">Escribe, dicta o pega de WhatsApp</div></div>
+        </button>
+        <button class="ac" onclick="switchTab('pedidos');generarInfPed()">
+          <div class="ac-icon">📊</div>
+          <div><div class="ac-title">Informe pedidos</div><div class="ac-sub">Resumen por cliente y totales</div></div>
+        </button>
+      </div>
+      <div class="sb-div"></div>
+      <div class="sb-sec">
+        <div class="sb-lbl">Chat libre</div>
+        <button class="qb" onclick="sendQuick('Muéstrame todo lo que recuerdas')"><span class="ic">🧠</span> Ver memoria</button>
+        <button class="qb" onclick="sendQuick('Facturas pendientes de pago')"><span class="ic">🧾</span> Facturas pendientes</button>
+        <button class="qb" onclick="sendQuick('Resumen de Floranrosa')"><span class="ic">🇨🇴</span> Floranrosa</button>
+        <button class="qb" onclick="sendQuick('Resumen Rosaprima')"><span class="ic">🇪🇨</span> Rosaprima</button>
+        <button class="qb" onclick="sendQuick('Resumen Benchmark Growers')"><span class="ic">🇨🇴</span> Benchmark</button>
+      </div>
+      <div class="sb-div"></div>
+      <div class="mem-panel">
+        <div class="sb-lbl">🧠 Memoria</div>
+        <div id="memCards"><div class="mem-empty">Sin datos aún</div></div>
+        <button class="btn-clr" onclick="clearMemory()">🗑 Borrar memoria</button>
+      </div>
+      <div class="sb-div"></div>
+      <div class="api-zone">
+        <span class="api-lbl">🔑 API Key</span>
+        <input type="password" class="api-inp" id="apiKey" placeholder="sk-ant-api03-..." oninput="saveApiKey()"/>
+        <div class="api-st" id="apiSt"></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-area">
+    <div class="tabs">
+      <div class="tab active" id="tab-chat" onclick="switchTab('chat')">💬 Agente</div>
+      <div class="tab" id="tab-vuelos" onclick="switchTab('vuelos')">✈️ Vuelos <span class="tab-badge" id="tbVuelos">0</span></div>
+      <div class="tab" id="tab-pedidos" onclick="switchTab('pedidos')">📋 Pedidos <span class="tab-badge" id="tbPed">0</span></div>
+      <div class="tab tab-home" onclick="goHome()">🏠 Inicio</div>
+    </div>
+
+    <!-- CHAT VIEW -->
+    <div class="view active" id="view-chat" style="flex-direction:column;">
+      <div id="dailySummary" style="display:none;"></div>
+      <div class="msgs" id="messages">
+        <div class="welcome" id="welcomeScreen">
+          <span class="wf">🌸</span>
+          <h2>Hola, Javier</h2>
+          <p>Gestión de importación Buscaflor — vuelos, facturas, flete, pedidos.</p>
+          <div class="flow-grid" id="welcomeGrid"></div>
+        </div>
+      </div>
+      <div class="input-area">
+        <div class="input-wrap">
+          <textarea id="userInput" rows="1" placeholder="Escribe, dicta o pega texto de WhatsApp..." onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+          <div class="ibtns">
+            <button class="icon-btn" id="micBtn" onclick="toggleMic()" title="Dictar">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </button>
+            <button id="sendBtn" onclick="sendMessage()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="mic-st" id="micSt">🔴 Escuchando...</div>
+        <div class="input-hint">Enter para enviar · Shift+Enter nueva línea · 🎤 dictar · Pega texto de WhatsApp directamente</div>
+      </div>
+    </div>
+
+    <!-- VUELOS VIEW -->
+    <div class="view" id="view-vuelos">
+      <div class="scroll-view">
+        <div class="sv-header">
+          <div class="sv-title">✈️ Vuelos e inventario</div>
+          <div class="sv-actions">
+            <button class="btn-lmp" onclick="limpiarVuelos()">🗑 Limpiar</button>
+            <button class="btn-inf" onclick="generarInfVuelos()">📊 Informe</button>
+          </div>
+        </div>
+        <div id="vuelosContainer"><div class="empty-state"><span class="big">✈️</span><p>Sin vuelos registrados.<br>Usa <strong>Nuevo vuelo</strong> para empezar.</p></div></div>
+      </div>
+    </div>
+
+    <!-- PEDIDOS VIEW -->
+    <div class="view" id="view-pedidos">
+      <div class="scroll-view">
+        <div class="sv-header">
+          <div class="sv-title">📋 Pedidos del día</div>
+          <div class="sv-actions">
+            <button class="btn-lmp" onclick="limpiarPed()">🗑 Limpiar</button>
+            <button class="btn-inf" onclick="generarInfPed()">📊 Informe</button>
+          </div>
+        </div>
+        <div class="search-bar">
+          <input class="search-inp" id="searchPed" placeholder="Buscar por cliente o variedad..." oninput="filtrarPedidos(this.value)"/>
+        </div>
+        <div id="pedContainer"><div class="empty-state"><span class="big">📦</span><p>Sin pedidos anotados.</p></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-ov" id="modal">
+  <div class="modal">
+    <div class="mh"><h3 id="modalTitle">Informe</h3><button class="mc" onclick="closeModal()">✕</button></div>
+    <div class="mb"><pre id="modalContent">...</pre></div>
+    <div class="mf">
+      <button class="btn-pr" onclick="shareWhatsApp()" title="Enviar por WhatsApp">💬 WhatsApp</button>
+      <button class="btn-pr" onclick="shareEmail()" title="Enviar por email">📧 Email</button>
+      <button class="btn-pr" onclick="printModal()" title="Imprimir">🖨 Imprimir</button>
+      <button class="btn-cp" onclick="copyModal()">📋 Copiar</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="pdfFileInput" accept=".pdf,application/pdf" multiple style="display:none;" onchange="handlePdfSelect(event)">
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// STORES
+// ============================================================
+var K = { vuelos:'bf_vuelos_v1', pedidos:'bf_ped_v1', memory:'bf_mem_v2' };
+function loadStore(k){ try{ return JSON.parse(localStorage.getItem(K[k])||'[]'); }catch{ return []; } }
+function loadObj(k){ try{ return JSON.parse(localStorage.getItem(K[k])||'{}'); }catch{ return {}; } }
+function saveStore(k,v){ localStorage.setItem(K[k], JSON.stringify(v)); }
+
+// ---- VUELOS ----
+function loadVuelos(){ return loadStore('vuelos'); }
+function saveVuelos(v){ saveStore('vuelos',v); updateVuelosUI(); updateAlerts(); }
+function upsertVuelo(v){
+  var list = loadVuelos();
+  var idx = list.findIndex(function(x){ return x.awb && v.awb && x.awb === v.awb; });
+  if(idx >= 0) list[idx] = Object.assign({}, list[idx], v);
+  else list.unshift(v);
+  saveVuelos(list);
+  showToast('✈️ Vuelo ' + (v.awb||'') + ' actualizado');
+}
+function limpiarVuelos(){ if(confirm('¿Limpiar todos los vuelos?')){ saveVuelos([]); showToast('🗑 Vuelos limpiados'); } }
+
+function getVuelosPendientes(){
+  return loadVuelos().filter(function(v){ return !v.flete_calculado || (v.proveedores_pendientes && v.proveedores_pendientes.length > 0); });
+}
+
+function updateAlerts(){
+  var pendientes = getVuelosPendientes();
+  var badge = document.getElementById('hBadgeAlertas');
+  var btnSb = document.getElementById('btnCompletarSb');
+  if(pendientes.length > 0){
+    badge.style.display = 'flex';
+    badge.className = 'hbadge alert';
+    badge.innerHTML = '<div class="hdot red"></div><span>⚠ ' + pendientes.length + ' pendiente' + (pendientes.length>1?'s':'') + '</span>';
+    btnSb.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+    btnSb.style.display = 'none';
+  }
+}
+
+function mostrarVuelosPendientes(){
+  switchTab('vuelos');
+  showToast('Mostrando vuelos con pendientes');
+}
+
+function completarVuelo(awb){
+  startFlow('vuelo');
+  flowData.awbExistente = awb;
+  showToast('Sube los documentos que faltan para AWB ' + awb);
+}
+
+function updateVuelosUI(){
+  var list = loadVuelos(); var n = list.length;
+  document.getElementById('tbVuelos').textContent = n;
+  document.getElementById('hVuelos').textContent = n + ' vuelo' + (n!==1?'s':'');
+  var c = document.getElementById('vuelosContainer');
+  if(!n){ c.innerHTML = '<div class="empty-state"><span class="big">✈️</span><p>Sin vuelos registrados.<br>Usa <strong>Nuevo vuelo</strong> para empezar.</p></div>'; return; }
+  c.innerHTML = list.map(function(v){
+    var completo = v.flete_calculado && (!v.proveedores_pendientes || v.proveedores_pendientes.length === 0);
+    var statusClass = completo ? 'completo' : 'pendiente';
+    var statusText = completo ? '✓ Completo' : '⏳ Pendiente';
+    var fleteHtml = '';
+    if(v.flete_calculado){
+      fleteHtml = '<div class="vc-flete">' +
+        '<div class="vc-fi">Flete: <strong>' + (v.flete_usd||'?') + ' USD / ' + (v.flete_eur||'?') + ' €</strong></div>' +
+        '<div class="vc-fi">€/tallo: <strong>' + (v.flete_tallo||'?') + '</strong></div>' +
+        '<div class="vc-fi">Proveedores: <strong>' + (v.proveedores_ok||0) + '/' + (v.proveedores_total||0) + '</strong></div>' +
+      '</div>';
+    } else {
+      fleteHtml = '<div class="vc-pendiente-aviso">⚠ Flete no calculado — sube la guía aérea <button class="btn-completar" onclick="completarVuelo(\'' + (v.awb||'') + '\')">Completar</button></div>';
+    }
+    var provMissingHtml = '';
+    if(v.proveedores_pendientes && v.proveedores_pendientes.length > 0){
+      provMissingHtml = '<div class="vc-prov-missing">📋 Facturas pendientes: ' + v.proveedores_pendientes.join(', ') + ' <button class="btn-completar" onclick="completarVuelo(\'' + (v.awb||'') + '\')" style="margin-left:8px;">Añadir</button></div>';
+    }
+    var tableHtml = '';
+    if(v.inventario && v.inventario.length){
+      tableHtml = '<table class="inv-table"><thead><tr><th>Variedad</th><th>Paq</th><th>Tallos</th><th>FOB €/t</th><th>Flete €/t</th><th>Total €/t</th></tr></thead><tbody>' +
+        v.inventario.map(function(l){
+          var fob = parseFloat(l.fob_eur_tallo)||0;
+          var flete = parseFloat(l.flete_eur_tallo)||0;
+          var total = (fob && flete) ? (fob+flete).toFixed(4) : '';
+          return '<tr><td class="td-var">' + (l.variedad||'—') + '</td>' +
+            '<td class="td-cant">' + (l.paquetes||'—') + '</td>' +
+            '<td class="td-fob">' + (l.tallos||'—') + '</td>' +
+            '<td class="td-fob">' + (l.fob_eur_tallo ? l.fob_eur_tallo+'€' : '—') + '</td>' +
+            '<td class="td-flete">' + (l.flete_eur_tallo ? l.flete_eur_tallo+'€' : '<span class="td-pending">pendiente</span>') + '</td>' +
+            '<td class="td-total">' + (total ? total+'€' : '<span class="td-pending">pendiente</span>') + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    }
+    return '<div class="vuelo-card">' +
+      '<div class="vc-head">' +
+        '<div><div class="vc-awb">AWB ' + (v.awb||'?') + '</div><div class="vc-meta">' + [v.origen,v.fecha,v.aerolinea].filter(Boolean).join(' · ') + '</div></div>' +
+        '<span class="vc-status ' + statusClass + '">' + statusText + '</span>' +
+      '</div>' +
+      '<div class="vc-body">' + fleteHtml + provMissingHtml + tableHtml + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ---- PEDIDOS ----
+function loadPed(){ return loadStore('pedidos'); }
+function savePed(p){ saveStore('pedidos',p); updatePedUI(); }
+function addPed(rows){ savePed(loadPed().concat(rows)); showToast('✅ ' + rows.length + ' línea' + (rows.length>1?'s':'') + ' anotada' + (rows.length>1?'s':'')); }
+function delPed(i){ var p=loadPed(); p.splice(i,1); savePed(p); }
+function limpiarPed(){ if(confirm('¿Limpiar pedidos?')){ savePed([]); showToast('🗑 Pedidos limpiados'); } }
+
+function renderPedidos(pedidos){
+  var c = document.getElementById('pedContainer');
+  if(!pedidos.length){ c.innerHTML = '<div class="empty-state"><span class="big">📦</span><p>Sin pedidos anotados.</p></div>'; return; }
+  var byC = {};
+  pedidos.forEach(function(r,i){ var cl=r.cliente||'Sin cliente'; if(!byC[cl]) byC[cl]=[]; byC[cl].push(Object.assign({},r,{_i:i})); });
+  c.innerHTML = Object.keys(byC).map(function(cl){
+    var rows = byC[cl];
+    return '<div class="cg"><div class="cg-head"><div class="cg-nombre">🏪 ' + cl + '</div><div class="cg-total">' + rows.length + ' línea' + (rows.length!==1?'s':'') + '</div></div>' +
+      rows.map(function(r){ return '<div class="pr"><div class="pr-var">' + (r.variedad||'—') + '</div><div class="pr-cant">' + r.cantidad + '</div><div class="pr-uni">' + (r.unidad||'uds') + '</div><div style="display:flex;gap:4px;align-items:center"><div class="pr-hora">' + (r.hora||'') + '</div><button class="btn-del" onclick="delPed(' + r._i + ')">✕</button></div></div>'; }).join('') + '</div>';
+  }).join('');
+}
+
+function updatePedUI(){
+  var p = loadPed(); var n = p.length;
+  document.getElementById('tbPed').textContent = n;
+  document.getElementById('hPed').textContent = n + ' pedido' + (n!==1?'s':'');
+  var q = (document.getElementById('searchPed')||{}).value || '';
+  filtrarPedidos(q);
+}
+
+function filtrarPedidos(q){
+  var p = loadPed();
+  if(q && q.trim()){
+    var ql = q.toLowerCase();
+    p = p.filter(function(r){ return (r.cliente||'').toLowerCase().includes(ql) || (r.variedad||'').toLowerCase().includes(ql); });
+  }
+  renderPedidos(p);
+}
+
+// ---- MEMORIA ----
+function loadMem(){ return loadObj('memory'); }
+function saveMem(data){
+  var merged = mergeDeep(loadMem(), data);
+  localStorage.setItem(K.memory, JSON.stringify(merged));
+  updateMemUI();
+  showToast('🧠 Memoria actualizada');
+}
+function clearMemory(){ if(confirm('¿Borrar memoria?')){ localStorage.removeItem(K.memory); updateMemUI(); showToast('🗑 Memoria borrada'); } }
+function mergeDeep(t,s){
+  var r = Object.assign({},t);
+  Object.keys(s).forEach(function(k){
+    if(Array.isArray(s[k])&&Array.isArray(t[k])){ var ex=JSON.stringify(t[k]); r[k]=t[k].concat(s[k].filter(function(i){return !ex.includes(JSON.stringify(i));})); }
+    else if(typeof s[k]==='object'&&s[k]!==null&&typeof t[k]==='object'&&t[k]!==null){ r[k]=mergeDeep(t[k],s[k]); }
+    else{ r[k]=s[k]; }
+  });
+  return r;
+}
+var ML = { facturas_pendientes:'🧾 Facturas pend.', facturas_pagadas:'✅ Pagadas', stock_actual:'🌷 Stock', vuelos_recientes:'✈️ Vuelos', notas_proveedores:'📝 Proveedores', variedad_aliases:'🏷 Aliases', ultimo_cambio:'🕐 Último cambio' };
+function updateMemUI(){
+  var m=loadMem(), ks=Object.keys(m);
+  var c=document.getElementById('memCards');
+  if(!ks.length){ c.innerHTML='<div class="mem-empty">Sin datos aún</div>'; return; }
+  c.innerHTML=ks.map(function(k){ var v=typeof m[k]==='object'?JSON.stringify(m[k],null,1):String(m[k]); return '<div class="mem-card"><div class="mem-title">'+(ML[k]||k)+'</div><div class="mem-content">'+v+'</div></div>'; }).join('');
+}
+
+// ---- DAILY SUMMARY ----
+function renderDailySummary(){
+  var vuelos = loadVuelos();
+  var pedidos = loadPed();
+  var pendientes = getVuelosPendientes();
+  var mem = loadMem();
+  var factPend = mem.facturas_pendientes;
+  var nFactPend = Array.isArray(factPend) ? factPend.length : 0;
+  var ds = document.getElementById('dailySummary');
+  if(!vuelos.length && !pedidos.length && !nFactPend){ ds.style.display='none'; return; }
+  ds.style.display = 'block';
+  var html = '<div class="daily-summary"><div class="ds-title">Resumen de hoy</div><div class="ds-grid">';
+  if(vuelos.length) html += '<div class="ds-item"><span class="ds-icon">✈️</span><span class="ds-val">'+vuelos.length+'</span><span class="ds-label">vuelo'+( vuelos.length!==1?'s':'')+' registrado'+(vuelos.length!==1?'s':'')+'</span></div>';
+  if(pedidos.length) html += '<div class="ds-item"><span class="ds-icon">📋</span><span class="ds-val">'+pedidos.length+'</span><span class="ds-label">línea'+(pedidos.length!==1?'s':'')+' de pedido</span></div>';
+  if(nFactPend) html += '<div class="ds-item"><span class="ds-icon">🧾</span><span class="ds-val">'+nFactPend+'</span><span class="ds-label">factura'+(nFactPend!==1?'s':'')+' pendiente'+(nFactPend!==1?'s':'')+' de pago</span></div>';
+  html += '</div>';
+  if(pendientes.length){
+    html += '<div class="ds-alert" onclick="switchTab(\'vuelos\')">⚠️ ' + pendientes.length + ' vuelo' + (pendientes.length!==1?'s':'') + ' con documentos pendientes — pulsa para ver</div>';
+  }
+  html += '</div>';
+  ds.innerHTML = html;
+}
+
+// ============================================================
+// EXTRACT BLOCKS
+// ============================================================
+function extractBlock(text, tag){
+  if(!text) return null;
+  var re = new RegExp('<'+tag+'>[\\s\\S]*?</'+tag+'>');
+  var m = text.match(re);
+  if(!m) return null;
+  var inner = m[0].replace('<'+tag+'>','').replace('</'+tag+'>','').trim();
+  try{ return JSON.parse(inner); }catch(e){ return null; }
+}
+function cleanReply(text){
+  if(!text) return '';
+  return text.replace(/<MEMORY_UPDATE>[\s\S]*?<\/MEMORY_UPDATE>/g,'').replace(/<PEDIDOS>[\s\S]*?<\/PEDIDOS>/g,'').replace(/<VUELO_UPDATE>[\s\S]*?<\/VUELO_UPDATE>/g,'').trim();
+}
+function processBlocks(raw){
+  if(!raw) return;
+  var ped = extractBlock(raw,'PEDIDOS'); if(ped&&ped.length) addPed(ped);
+  var vu = extractBlock(raw,'VUELO_UPDATE'); if(vu) upsertVuelo(vu);
+  var mem = extractBlock(raw,'MEMORY_UPDATE'); if(mem) saveMem(mem);
+}
+
+// ============================================================
+// SYSTEM PROMPT
+// ============================================================
+function buildSysPrompt(){
+  var m = loadMem();
+  var aliases = m.variedad_aliases ? JSON.stringify(m.variedad_aliases) : '{}';
+  var vuelosActivos = loadVuelos().map(function(v){ return {awb:v.awb,flete_calculado:v.flete_calculado,proveedores_total:v.proveedores_total,proveedores_pendientes:v.proveedores_pendientes}; });
+  var hasMem = Object.keys(m).length > 0;
+
+  return 'Eres el asistente de gestión de Buscaflor (La Mejor S.L.), importadora de flores de corte en Sevilla. Usuario: Javier.\n\n'+
+
+'## REGLAS DE NEGOCIO\n'+
+'- Cambio fijo: 1 EUR = 1.1650 USD\n'+
+'- Unidades: Rosas/Gypsophila = paquetes 25 tallos · Alstroemeria = paquetes 10 tallos · Claveles/Hortensias = tallos individuales\n'+
+'- Proveedores: Floranrosa, Valleverde, Rosaprima, Calinama/Native/Exxide, Rosalinda, Much Flowers/Exportcalas, Agrinag, Solpacific, Benchmark Growers, El Milagro, Natuflor, Bondai Flowers, Plazoleta Bazzani, Singha, CI Surandina\n'+
+'- Facturas: sin duplicados. Recibos de pago NO son facturas\n\n'+
+
+'## FLETE AÉREO\n'+
+'De la guía: peso cobrable (CW), tarifa $/kg, cargos adicionales (CHC, MCC, MAA, FEC...)\n'+
+'Total flete USD = (CW × tarifa) + cargos · Total flete EUR = USD ÷ 1.1650\n'+
+'Flete EUR/tallo = Flete EUR ÷ total tallos · SIEMPRE mostrar USD y EUR. NO incluir aduanas ni MAD-SEV.\n\n'+
+
+'## INVENTARIO FOB\n'+
+'De facturas: variedad, tallos/paquetes, precio FOB USD/tallo\n'+
+'FOB EUR/tallo = FOB USD ÷ 1.1650\n'+
+'Si tienes flete: Total EUR/tallo = FOB EUR/tallo + Flete EUR/tallo\n'+
+'Si NO tienes flete: genera inventario solo FOB, marca flete como "pendiente"\n\n'+
+
+'## CONTROL DE PROVEEDORES\n'+
+'Cruza siempre la lista de proveedores de la guía/consolidation con las facturas recibidas.\n'+
+'Informa: qué facturas tienes ✓ y qué facturas faltan ✗\n'+
+'Si llegan más facturas para un AWB ya registrado: actualiza ese vuelo, no crees uno nuevo.\n\n'+
+
+'## IDENTIFICACIÓN DE VUELOS\n'+
+'Cada vuelo = un AWB único. NUNCA mezcles datos de AWBs distintos.\n'+
+'Vuelos activos en el sistema: '+JSON.stringify(vuelosActivos)+'\n\n'+
+
+'## APRENDIZAJE DE VARIEDADES\n'+
+'Aliases guardados: '+aliases+'\n'+
+'Si Javier usa nombre informal o abreviatura no reconocida:\n'+
+'1. Anota lo que entiendas\n'+
+'2. Al final pregunta: "¿Qué variedad es X?"\n'+
+'3. Cuando lo aclare, guarda: MEMORY_UPDATE {"variedad_aliases":{"x":"Variedad Completa"}}\n'+
+'4. Próximas veces usa el alias sin preguntar\n'+
+'Aliases típicos: rojas=Rosa roja, blancas=Rosa Mondial, gypso=Gypsophila, alstro=Alstroemeria\n\n'+
+
+'## PEDIDOS DESDE WHATSAPP\n'+
+'Reconoce cualquier formato: listas con guiones, texto seguido, números pegados a variedad, mayúsculas, errores tipográficos.\n'+
+'Interpreta con sentido común. Anota lo que puedas y pregunta solo lo imprescindible.\n\n'+
+
+'## BLOQUES DE SALIDA\n'+
+'Actualización de vuelo:\n'+
+'<VUELO_UPDATE>\n'+
+'{"awb":"","origen":"","fecha":"","aerolinea":"","flete_calculado":true,"flete_usd":"","flete_eur":"","flete_tallo":"","proveedores_total":0,"proveedores_ok":0,"proveedores_pendientes":[],"inventario":[{"variedad":"","paquetes":0,"tallos":0,"fob_eur_tallo":"","flete_eur_tallo":"","proveedor":""}]}\n'+
+'</VUELO_UPDATE>\n\n'+
+'Pedidos:\n'+
+'<PEDIDOS>\n'+
+'[{"cliente":"","variedad":"","cantidad":0,"unidad":"","hora":""}]\n'+
+'</PEDIDOS>\n\n'+
+'Memoria:\n'+
+'<MEMORY_UPDATE>\n'+
+'{"clave":"valor"}\n'+
+'</MEMORY_UPDATE>\n\n'+
+
+'## COMUNICACIÓN\n'+
+'Directo, conciso, solo soluciones. En español.\n'+
+'Sin flete: genera inventario FOB y di "cuando tengas la guía lo completo".\n'+
+'Sin facturas: lista exactamente qué proveedores faltan.\n\n'+
+
+(hasMem ? '## MEMORIA\n'+JSON.stringify(m,null,2) : '');
+}
+
+// ============================================================
+// PDF HANDLING
+// ============================================================
+var pendingPdfs = [];
+function handlePdfSelect(e){
+  var files = Array.from(e.target.files);
+  if(files.length) loadMultiplePdfs(files);
+  e.target.value='';
+}
+function loadMultiplePdfs(files){
+  var loaded = 0;
+  files.forEach(function(file){
+    var r = new FileReader();
+    r.onload = function(ev){
+      if(!pendingPdfs.find(function(p){return p.name===file.name;})){
+        pendingPdfs.push({name:file.name, base64:ev.target.result.split(',')[1]});
+      }
+      loaded++;
+      if(loaded===files.length) updatePdfList();
+    };
+    r.readAsDataURL(file);
+  });
+}
+function updatePdfList(){
+  var el = document.getElementById('pdfListZone');
+  if(!el) return;
+  el.innerHTML = pendingPdfs.map(function(p,i){
+    return '<div class="file-pill"><span class="fp-icon">📄</span><span class="fp-name">'+p.name+'</span><button class="fp-remove" onclick="removePdf('+i+')">✕</button></div>';
+  }).join('');
+  var btn = document.getElementById('btnEnviarVuelo');
+  if(btn) btn.disabled = pendingPdfs.length===0;
+}
+function removePdf(i){ pendingPdfs.splice(i,1); updatePdfList(); }
+
+// ============================================================
+// FLOWS
+// ============================================================
+var currentFlow = null, flowData = {};
+
+function startFlow(type){
+  switchTab('chat');
+  removeWelcome();
+  currentFlow = type;
+  flowData = {};
+  pendingPdfs = [];
+  if(type==='vuelo') flowVuelo_step1();
+  else if(type==='pedido') flowPedido_step1();
+}
+
+// ---- FLUJO VUELO ----
+function flowVuelo_step1(){
+  var awbHint = flowData.awbExistente ? ' (completando AWB '+flowData.awbExistente+')' : '';
+  var step = document.createElement('div');
+  step.className = 'flow-step';
+  step.innerHTML = [
+    '<div class="fs-label">Nuevo vuelo'+awbHint+'</div>',
+    '<div class="fs-q">Sube todos los documentos del vuelo</div>',
+    '<div class="fs-hint">Guía aérea + Recibo de bodega + Consolidation Report + Facturas de proveedores. Sube lo que tengas — si falta algo te lo digo.</div>',
+    '<div id="vueloDropArea" class="dz"><div class="dz-icon">📄</div><div class="dz-text">Haz clic o arrastra los PDFs aquí</div><div class="dz-hint">Ctrl+clic o Cmd+clic para seleccionar varios</div></div>',
+    '<div id="pdfListZone" class="file-list"></div>',
+    '<div class="flow-row">',
+      '<button class="flow-btn" id="btnEnviarVuelo" disabled onclick="flowVuelo_enviar()">✅ Analizar documentos</button>',
+      '<button class="flow-btn-sec" onclick="flowVuelo_soloFacturas()">Solo facturas (sin guía aérea)</button>',
+    '</div>'
+  ].join('');
+  document.getElementById('messages').appendChild(step);
+  document.getElementById('messages').scrollTop = 99999;
+  setTimeout(function(){
+    var area = document.getElementById('vueloDropArea');
+    if(!area) return;
+    area.addEventListener('click', function(){ document.getElementById('pdfFileInput').click(); });
+    area.addEventListener('dragover', function(e){ e.preventDefault(); area.classList.add('over'); });
+    area.addEventListener('dragleave', function(){ area.classList.remove('over'); });
+    area.addEventListener('drop', function(e){ e.preventDefault(); area.classList.remove('over'); loadMultiplePdfs(Array.from(e.dataTransfer.files).filter(function(f){return f.type==='application/pdf';})); });
+  }, 100);
+}
+
+function buildVueloPrompt(soloFacturas){
+  var awbCtx = flowData.awbExistente ? 'Este es un vuelo ya registrado con AWB '+flowData.awbExistente+'. Actualiza ese vuelo con los nuevos documentos.' : '';
+  if(soloFacturas){
+    return [awbCtx, 'Tengo '+pendingPdfs.length+' factura'+(pendingPdfs.length>1?'s':'')+' de proveedor sin guía aérea.',
+      '1. Lee cada factura: proveedor, variedad, tallos/paquetes, precio FOB USD/tallo',
+      '2. Calcula FOB EUR/tallo (dividido entre 1.1650)',
+      '3. Genera inventario con FOB. Marca flete como PENDIENTE',
+      '4. Indica qué AWB corresponde si aparece en algún documento',
+      'Cambio: 1 EUR = 1.1650 USD'].filter(Boolean).join('\n');
+  }
+  return [awbCtx,
+    'Tengo '+pendingPdfs.length+' documento'+(pendingPdfs.length>1?'s':'')+': '+pendingPdfs.map(function(p){return p.name;}).join(', '),
+    '',
+    '1. IDENTIFICA el vuelo: AWB, origen, fecha, aerolínea',
+    '2. SI HAY GUÍA AÉREA: calcula flete completo',
+    '   - Peso cobrable × tarifa $/kg + todos los cargos (CHC, MCC, MAA, FEC...)',
+    '   - Muestra SIEMPRE en dos columnas: USD y EUR (dividido entre 1.1650)',
+    '   - Flete EUR/tallo = flete EUR total ÷ total tallos. NO incluir aduanas ni MAD-SEV',
+    '3. CONTROL DE PROVEEDORES: lista quién aparece en guía/consolidation. Para cada factura, indica si está cubierta ✓ o falta ✗',
+    '4. PARA CADA FACTURA: variedad, tallos, paquetes, FOB USD/tallo, FOB EUR/tallo',
+    '   Si tienes flete: calcula Total EUR/tallo = FOB EUR + Flete EUR/tallo',
+    '5. Guarda con bloque VUELO_UPDATE',
+    'Cambio fijo: 1 EUR = 1.1650 USD'
+  ].filter(Boolean).join('\n');
+}
+
+function flowVuelo_soloFacturas(){
+  if(!pendingPdfs.length){ showToast('⚠ Sube al menos una factura'); return; }
+  sendMultiPdf(buildVueloPrompt(true));
+  currentFlow = null;
+}
+function flowVuelo_enviar(){
+  if(!pendingPdfs.length){ showToast('⚠ Sube los documentos primero'); return; }
+  sendMultiPdf(buildVueloPrompt(false));
+  currentFlow = null;
+}
+
+// ---- FLUJO PEDIDO ----
+function flowPedido_step1(){
+  var step = document.createElement('div');
+  step.className = 'flow-step';
+  step.id = 'stepPedido1';
+  step.innerHTML = [
+    '<div class="fs-label">Anotar pedido · Paso 1 de 2</div>',
+    '<div class="fs-q">¿De qué cliente es el pedido?</div>',
+    '<div class="fs-hint">Escribe el nombre o dicta con el micro.</div>',
+    '<div class="flow-row">',
+      '<input class="flow-inp" id="fp_cliente" placeholder="Nombre floristería..." style="flex:1;" onkeydown="if(event.key===\'Enter\')flowPedido_step2()"/>',
+      '<button class="icon-btn" onclick="startMicFor(\'fp_cliente\',flowPedido_step2)" title="Dictar">🎤</button>',
+      '<button class="flow-btn" onclick="flowPedido_step2()">Siguiente →</button>',
+    '</div>'
+  ].join('');
+  document.getElementById('messages').appendChild(step);
+  document.getElementById('messages').scrollTop = 99999;
+  setTimeout(function(){ var el=document.getElementById('fp_cliente'); if(el) el.focus(); },100);
+}
+
+function flowPedido_step2(){
+  var cliente = (document.getElementById('fp_cliente')||{}).value;
+  if(!cliente||!cliente.trim()){ showToast('⚠ Escribe el cliente'); return; }
+  flowData.cliente = cliente.trim();
+  var old = document.getElementById('stepPedido1'); if(old) old.remove();
+  var step = document.createElement('div');
+  step.className = 'flow-step';
+  step.innerHTML = [
+    '<div class="fs-label">Anotar pedido · Paso 2 de 2</div>',
+    '<div class="fs-q">¿Qué pide '+flowData.cliente+'?</div>',
+    '<div class="fs-hint">Escribe, dicta con el micro, o <strong>pega directamente el texto de WhatsApp</strong>. Interpreta abreviaturas y listas automáticamente.</div>',
+    '<textarea class="flow-inp" id="fp_items" rows="3" placeholder="Ej: 20 paquetes rojas, 5 hortensias, 10 gypso&#10;O pega el mensaje de WhatsApp directamente..." style="margin-bottom:8px;" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();flowPedido_enviar();}"></textarea>',
+    '<div class="flow-row">',
+      '<button class="icon-btn" onclick="startMicFor(\'fp_items\',flowPedido_enviar)" title="Dictar">🎤</button>',
+      '<button class="flow-btn" onclick="flowPedido_enviar()">✅ Anotar pedido</button>',
+      '<button class="flow-btn-sec" onclick="startFlow(\'pedido\')">← Cambiar cliente</button>',
+    '</div>'
+  ].join('');
+  document.getElementById('messages').appendChild(step);
+  document.getElementById('messages').scrollTop = 99999;
+  setTimeout(function(){ var el=document.getElementById('fp_items'); if(el) el.focus(); },100);
+}
+
+function flowPedido_enviar(){
+  var items = (document.getElementById('fp_items')||{}).value;
+  if(!items||!items.trim()){ showToast('⚠ Escribe el pedido'); return; }
+  var txt = [
+    'Anota el pedido del cliente "'+flowData.cliente+'".',
+    '',
+    'TEXTO (puede ser de WhatsApp, dictado o escrito):',
+    items.trim(),
+    '',
+    'Instrucciones:',
+    '- Extrae cada variedad como línea separada',
+    '- Usa los aliases que recuerdas de sesiones anteriores',
+    '- Unidades: rosas/gypso = paquetes 25 tallos, alstro = paquetes 10 tallos, claveles/hortensias = tallos',
+    '- Si hay variedad no reconocida: anótala tal cual y pregunta al final qué es',
+    '- Confirma brevemente el pedido anotado'
+  ].join('\n');
+  sendMessage(txt);
+  currentFlow = null;
+}
+
+// ============================================================
+// API KEY
+// ============================================================
+function saveApiKey(){ var k=document.getElementById('apiKey').value.trim(); if(k){localStorage.setItem('bf_apikey',k); var ok=k.startsWith('sk-ant-'); showApiSt(ok?'ok':'err',ok?'✓ Guardada':'⚠ Formato');} }
+function loadApiKey(){ var s=localStorage.getItem('bf_apikey'); if(s){document.getElementById('apiKey').value=s; showApiSt('ok','✓ Cargada');} }
+function showApiSt(t,m){ var el=document.getElementById('apiSt'); el.className='api-st '+t; el.textContent=m; }
+function getApiKey(){ return document.getElementById('apiKey').value.trim()||localStorage.getItem('bf_apikey')||''; }
+
+// ============================================================
+// VOICE
+// ============================================================
+var recognition=null, isRecording=false, micTarget=null, micCallback=null;
+function setupRec(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR) return null;
+  var r=new SR(); r.lang='es-ES'; r.continuous=false; r.interimResults=true;
+  r.onresult=function(e){ var f='',ii=''; for(var i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)f+=e.results[i][0].transcript;else ii+=e.results[i][0].transcript;} var el=document.getElementById(micTarget||'userInput'); if(el){el.value=f||ii;autoResize(el);} };
+  r.onend=function(){ stopMic(); var cb=micCallback; micCallback=null; if(cb){setTimeout(cb,300);}else{var t=(document.getElementById('userInput')||{}).value; if(t&&t.trim()){showToast('🎤 Enviando...');setTimeout(function(){sendMessage();},400);}} };
+  r.onerror=function(e){ stopMic(); if(e.error!=='no-speech') showToast('⚠ Error micro: '+e.error); };
+  return r;
+}
+function toggleMic(){ if(isRecording){stopMic();if(recognition)recognition.stop();}else{micTarget='userInput';micCallback=null;startMic();} }
+function startMicFor(id,cb){ micTarget=id; micCallback=cb; startMic(); }
+function startMic(){ if(!recognition)recognition=setupRec(); if(!recognition){showToast('⚠ Sin soporte de voz');return;} try{recognition.start();isRecording=true;document.getElementById('micBtn').classList.add('recording');document.getElementById('micSt').classList.add('active');}catch(e){showToast('⚠ Error al iniciar micro');} }
+function stopMic(){ isRecording=false;document.getElementById('micBtn').classList.remove('recording');document.getElementById('micSt').classList.remove('active');micTarget=null; }
+
+// ============================================================
+// TABS / TOAST / HOME / WELCOME
+// ============================================================
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active');});
+  document.querySelectorAll('.view').forEach(function(x){x.classList.remove('active');});
+  document.getElementById('tab-'+t).classList.add('active');
+  document.getElementById('view-'+t).classList.add('active');
+  if(t==='chat') renderDailySummary();
+}
+function showToast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(function(){t.classList.remove('show');},2800); }
+function removeWelcome(){ var w=document.getElementById('welcomeScreen'); if(w) w.remove(); }
+
+function buildWelcomeGrid(){
+  var pendientes = getVuelosPendientes();
+  var pedidos = loadPed();
+  var grid = document.getElementById('welcomeGrid');
+  if(!grid) return;
+  var cards = [
+    {icon:'✈️', title:'Nuevo vuelo', desc:'Guía + facturas → flete, inventario y control de proveedores', action:"startFlow('vuelo')", alert:false},
+    {icon:'📋', title:'Anotar pedido', desc:'Escribe, dicta o pega de WhatsApp', action:"startFlow('pedido')", alert:false},
+    {icon:'📦', title:'Ver inventario', desc: loadVuelos().length ? loadVuelos().length+' vuelo'+(loadVuelos().length!==1?'s':'')+' registrado'+(loadVuelos().length!==1?'s':'') : 'Sin vuelos aún', action:"switchTab('vuelos')", alert:false},
+    {icon:'📋', title:'Ver pedidos', desc: pedidos.length ? pedidos.length+' línea'+(pedidos.length!==1?'s':'')+' anotada'+(pedidos.length!==1?'s':'') : 'Sin pedidos hoy', action:"switchTab('pedidos')", alert:false}
+  ];
+  if(pendientes.length){
+    cards.unshift({icon:'⚠️', title:pendientes.length+' vuelo'+(pendientes.length!==1?'s':'')+' pendiente'+(pendientes.length!==1?'s':''), desc:'Faltan facturas o guía aérea — pulsa para completar', action:"switchTab('vuelos')", alert:true});
+    if(cards.length>4) cards.pop();
+  }
+  grid.innerHTML = cards.map(function(c){ return '<div class="fc'+(c.alert?' alert-card':'')+'" onclick="'+c.action+'"><span class="fi">'+c.icon+'</span><div class="ft">'+c.title+'</div><div class="fd">'+c.desc+'</div></div>'; }).join('');
+}
+
+function goHome(){
+  switchTab('chat');
+  var msgs = document.getElementById('messages');
+  msgs.innerHTML = '<div class="welcome" id="welcomeScreen"><span class="wf">🌸</span><h2>Hola, Javier</h2><p>Gestión de importación Buscaflor — vuelos, facturas, flete, pedidos.</p><div class="flow-grid" id="welcomeGrid"></div></div>';
+  buildWelcomeGrid();
+  renderDailySummary();
+  conversationHistory=[];
+  currentFlow=null;
+  pendingPdfs=[];
+}
+
+// ============================================================
+// CHAT ENGINE
+// ============================================================
+var conversationHistory=[], isLoading=false;
+function handleKey(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} }
+function autoResize(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,95)+'px'; }
+function sendQuick(t){ switchTab('chat'); sendMessage(t); }
+
+function appendBotMsg(text){
+  removeWelcome();
+  var c=document.getElementById('messages');
+  var d=document.createElement('div'); d.className='msg assistant';
+  var av=document.createElement('div'); av.className='av b'; av.textContent='🌸';
+  var bbl=document.createElement('div'); bbl.className='bbl'; bbl.innerHTML=formatText(text);
+  d.appendChild(av); d.appendChild(bbl);
+  c.appendChild(d); c.scrollTop=99999;
+}
+function appendUserMsg(html){
+  removeWelcome();
+  var c=document.getElementById('messages');
+  var d=document.createElement('div'); d.className='msg user';
+  var av=document.createElement('div'); av.className='av u'; av.textContent='JV';
+  var bbl=document.createElement('div'); bbl.className='bbl';
+  bbl.style.cssText='background:var(--verde);color:var(--crema);border-bottom-right-radius:3px;';
+  bbl.innerHTML=html;
+  d.appendChild(av); d.appendChild(bbl);
+  c.appendChild(d); c.scrollTop=99999;
+}
+function appendTyping(){
+  var c=document.getElementById('messages');
+  var d=document.createElement('div'); d.className='typing';
+  d.innerHTML='<div class="av b">🌸</div><div class="typing-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+  c.appendChild(d); c.scrollTop=99999; return d;
+}
+function formatText(t){
+  if(!t) return '';
+  return t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`(.+?)`/g,'<code>$1</code>')
+    .replace(/^### (.+)$/gm,'<strong style="font-size:13px;display:block;margin:7px 0 3px">$1</strong>')
+    .replace(/^## (.+)$/gm,'<strong style="font-size:14px;display:block;margin:8px 0 3px">$1</strong>')
+    .replace(/^- (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>)/g,'<ul style="margin:5px 0 5px 13px">$1</ul>')
+    .replace(/\n/g,'<br>');
+}
+
+async function callApi(messages){
+  var apiKey = getApiKey();
+  if(!apiKey){ alert('Introduce tu API Key en la barra lateral.'); throw new Error('Sin API Key'); }
+  var resp = await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,system:buildSysPrompt(),messages:messages})
+  });
+  if(!resp.ok){ var err=await resp.json().catch(function(){return {};}); throw new Error(err.error&&err.error.message?err.error.message:'Error HTTP '+resp.status); }
+  var data = await resp.json();
+  var block = data.content&&data.content.find(function(b){return b.type==='text';});
+  return block&&block.text ? block.text : '…';
+}
+
+async function sendMessage(overrideText){
+  if(isLoading) return;
+  var input = document.getElementById('userInput');
+  var text = overrideText||input.value.trim();
+  if(!text) return;
+  appendUserMsg(formatText(text));
+  conversationHistory.push({role:'user',content:text});
+  if(!overrideText){input.value='';input.style.height='auto';}
+  isLoading=true; document.getElementById('sendBtn').disabled=true;
+  var ty=appendTyping();
+  try{
+    var raw = await callApi(conversationHistory);
+    ty.remove();
+    processBlocks(raw);
+    appendBotMsg(cleanReply(raw));
+    conversationHistory.push({role:'assistant',content:raw});
+    renderDailySummary();
+  }catch(e){ ty.remove(); appendBotMsg('⚠️ Error: '+e.message); conversationHistory.pop(); }
+  isLoading=false; document.getElementById('sendBtn').disabled=false; input.focus();
+}
+
+async function sendMultiPdf(txt){
+  if(!pendingPdfs.length){ showToast('⚠ No hay PDFs'); return; }
+  var apiKey = getApiKey();
+  if(!apiKey){ alert('Introduce tu API Key.'); return; }
+  appendUserMsg(pendingPdfs.map(function(p){return '<div style="display:flex;align-items:center;gap:7px;background:rgba(255,255,255,0.1);border-radius:6px;padding:4px 9px;margin-bottom:4px;font-size:11.5px;">📄 '+p.name+'</div>';}).join('')+'<div style="font-size:12px;margin-top:3px;opacity:0.85;">'+txt.split('\n')[0]+'</div>');
+  var userContent = pendingPdfs.map(function(p){return {type:'document',source:{type:'base64',media_type:'application/pdf',data:p.base64}};});
+  userContent.push({type:'text',text:txt});
+  conversationHistory.push({role:'user',content:userContent});
+  pendingPdfs=[];
+  isLoading=true; document.getElementById('sendBtn').disabled=true;
+  var ty=appendTyping();
+  try{
+    var raw = await callApi(conversationHistory);
+    ty.remove();
+    processBlocks(raw);
+    appendBotMsg(cleanReply(raw));
+    conversationHistory.push({role:'assistant',content:raw});
+    renderDailySummary();
+    updateAlerts();
+  }catch(e){ ty.remove(); appendBotMsg('⚠️ Error: '+e.message); conversationHistory.pop(); }
+  isLoading=false; document.getElementById('sendBtn').disabled=false;
+}
+
+// ============================================================
+// INFORMES
+// ============================================================
+function generarInfPed(){
+  var p=loadPed();
+  document.getElementById('modalTitle').textContent='Informe de pedidos';
+  document.getElementById('modal').classList.add('open');
+  if(!p.length){document.getElementById('modalContent').textContent='No hay pedidos registrados.';return;}
+  var ahora=new Date();
+  var fecha=ahora.toLocaleDateString('es-ES',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  var hora=ahora.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+  var byC={}; p.forEach(function(r){var cl=r.cliente||'Sin cliente';if(!byC[cl])byC[cl]=[];byC[cl].push(r);});
+  var tot={}; p.forEach(function(r){var k=r.variedad+'||'+(r.unidad||'uds');tot[k]=(tot[k]||0)+(parseFloat(r.cantidad)||0);});
+  var lines=[];
+  lines.push('================================');
+  lines.push('  BUSCAFLOR - RESUMEN DE PEDIDOS');
+  lines.push('================================');
+  lines.push('  Fecha : '+fecha);
+  lines.push('  Hora  : '+hora);
+  lines.push('  Lineas: '+p.length);
+  lines.push('================================');
+  lines.push('');
+  lines.push('POR CLIENTE');
+  lines.push('--------------------------------');
+  Object.keys(byC).forEach(function(cl){
+    lines.push('');
+    lines.push('  '+cl);
+    byC[cl].forEach(function(r){lines.push('     - '+(r.variedad||'-')+': '+r.cantidad+' '+(r.unidad||'uds')+(r.hora?' ('+r.hora+')':''));});
+  });
+  lines.push('');
+  lines.push('');
+  lines.push('TOTALES POR VARIEDAD');
+  lines.push('--------------------------------');
+  lines.push('');
+  Object.keys(tot).forEach(function(k){var pt=k.split('||');lines.push('  '+pt[0]+': '+tot[k]+' '+pt[1]);});
+  lines.push('');
+  lines.push('================================');
+  lines.push('  '+fecha+' '+hora);
+  lines.push('  Buscaflor - La Mejor S.L. - Sevilla');
+  lines.push('================================');
+  document.getElementById('modalContent').textContent=lines.join('\n');
+}
+
+
+function generarInfVuelos(){
+  var list=loadVuelos();
+  document.getElementById('modalTitle').textContent='✈️ Informe de vuelos';
+  document.getElementById('modal').classList.add('open');
+  if(!list.length){document.getElementById('modalContent').textContent='No hay vuelos.';return;}
+  var fecha=new Date().toLocaleDateString('es-ES',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  var txt='BUSCAFLOR — INFORME DE VUELOS\n'+'─'.repeat(45)+'\nFecha: '+fecha+'\nVuelos: '+list.length+'\n';
+  list.forEach(function(v){
+    txt+='\n✈️ AWB '+(v.awb||'?')+' — '+(v.origen||'?')+' · '+(v.fecha||'')+' · '+(v.aerolinea||'')+'\n';
+    if(v.flete_calculado) txt+='   Flete: '+(v.flete_usd||'?')+' USD / '+(v.flete_eur||'?')+' EUR — '+(v.flete_tallo||'?')+' EUR/tallo\n';
+    else txt+='   ⚠ Flete pendiente\n';
+    txt+='   Proveedores: '+(v.proveedores_ok||0)+'/'+(v.proveedores_total||0);
+    if(v.proveedores_pendientes&&v.proveedores_pendientes.length) txt+=' — FALTAN: '+v.proveedores_pendientes.join(', ');
+    txt+='\n';
+    if(v.inventario&&v.inventario.length){
+      txt+='   '+'─'.repeat(40)+'\n';
+      txt+='   '+('Variedad').padEnd(25)+('Paq').padStart(5)+('Tallos').padStart(7)+('€/tallo').padStart(9)+'\n';
+      v.inventario.forEach(function(l){
+        var fob=parseFloat(l.fob_eur_tallo)||0; var fl=parseFloat(l.flete_eur_tallo)||0;
+        var total=(fob&&fl)?(fob+fl).toFixed(4):'pendiente';
+        txt+='   '+(l.variedad||'—').substring(0,24).padEnd(25)+String(l.paquetes||'-').padStart(5)+String(l.tallos||'-').padStart(7)+total.padStart(9)+'\n';
+      });
+    }
+  });
+  txt+='\n'+'─'.repeat(45)+'\nBuscaflor Agente IA';
+  document.getElementById('modalContent').textContent=txt;
+}
+
+function shareWhatsApp(){
+  var txt = document.getElementById('modalContent').textContent;
+  var encoded = encodeURIComponent(txt);
+  // On mobile opens WhatsApp app, on desktop opens WhatsApp Web
+  var url = 'https://wa.me/?text=' + encoded;
+  window.open(url, '_blank');
+}
+
+function shareEmail(){
+  var txt = document.getElementById('modalContent').textContent;
+  var title = document.getElementById('modalTitle').textContent;
+  var subject = encodeURIComponent('Buscaflor - ' + title + ' - ' + new Date().toLocaleDateString('es-ES'));
+  var body = encodeURIComponent(txt);
+  window.location.href = 'mailto:?subject=' + subject + '&body=' + body;
+}
+
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+function copyModal(){ navigator.clipboard.writeText(document.getElementById('modalContent').textContent).then(function(){showToast('📋 Copiado');}); }
+function printModal(){
+  var txt=document.getElementById('modalContent').textContent;
+  var title=document.getElementById('modalTitle').textContent;
+  var w=window.open('','_blank');
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+title+'</title>';
+  html+='<style>body{font-family:monospace;font-size:13px;padding:28px 36px;color:#1a1a1a;max-width:680px;margin:auto;}';
+  html+='pre{white-space:pre-wrap;line-height:1.8;}';
+  html+='@media print{body{padding:14px;}@page{margin:1.5cm;}}</style></head><body>';
+  html+='<pre>'+txt+'</pre>';
+  html+='<script>window.onload=function(){window.print();}<'+'/'+'script>';
+  html+='</body></html>';
+  w.document.write(html);
+  w.document.close();
+}
+document.getElementById('modal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+
+// ============================================================
+// INIT
+// ============================================================
+loadApiKey();
+updateMemUI();
+updatePedUI();
+updateVuelosUI();
+updateAlerts();
+buildWelcomeGrid();
+renderDailySummary();
+document.getElementById('userInput').focus();
+</script>
+</body>
+</html>
