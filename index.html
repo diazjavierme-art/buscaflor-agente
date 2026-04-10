@@ -406,7 +406,7 @@ header{background:var(--verde);padding:0 18px;height:54px;display:flex;align-ite
         <div class="sv-header">
           <div class="sv-title">📋 Pedidos del día</div>
           <div class="sv-actions">
-            <button class="btn-lmp" onclick="limpiarPed()">🗑 Limpiar</button>
+            <button class="btn-lmp" onclick="nuevoDia()" title="Resetea pedidos a cero, genera informe antes">🌅 Nuevo día</button>
             <button class="btn-inf" onclick="generarInfPed()">📊 Informe</button>
           </div>
         </div>
@@ -1213,6 +1213,20 @@ function shareEmail(){
   var subject = encodeURIComponent('Buscaflor - ' + title + ' - ' + new Date().toLocaleDateString('es-ES'));
   var body = encodeURIComponent(txt);
   window.location.href = 'mailto:?subject=' + subject + '&body=' + body;
+}
+
+function nuevoDia(){
+  var p=loadPed();
+  if(!p.length){ showToast('Ya está a cero — sin pedidos'); return; }
+  if(confirm('¿Generar informe e imprimir antes de resetear?')){
+    generarInfPed();
+    setTimeout(function(){ printModal(); }, 400);
+    setTimeout(function(){
+      if(confirm('¿Resetear pedidos a cero?')){ savePed([]); showToast('🌅 Nuevo día — pedidos a cero'); }
+    }, 900);
+  } else {
+    if(confirm('¿Resetear los pedidos sin imprimir?')){ savePed([]); showToast('🌅 Nuevo día — pedidos a cero'); }
+  }
 }
 
 function closeModal(){ document.getElementById('modal').classList.remove('open'); }
