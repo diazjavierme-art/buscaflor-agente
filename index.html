@@ -214,7 +214,9 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
   <!-- FILTER BAR -->
   <div class="filter-bar" id="filterBar">
     <button class="fb-btn active" id="fbTodos" onclick="setFilter('todos')">📋 Todos</button>
-    <button class="fb-btn week" id="fbSemanal" onclick="setFilter('semanal')">📅 Semanal</button>
+    <select id="fbSemana" style="border:1.5px solid var(--vc);border-radius:14px;padding:4px 10px;font-family:Sora,sans-serif;font-size:11.5px;font-weight:600;color:var(--vm);background:#edf7ef;outline:none;cursor:pointer;">
+      <option value="">📅 Semana...</option>
+    </select>
     <div id="fbCampaigns"></div>
     <button class="fb-add-camp" onclick="openCampModal()">＋ Campaña</button>
   </div>
@@ -223,10 +225,7 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
   <div class="view active" id="view-v" style="flex-direction:column;">
     <div class="la" id="lv"><div class="es"><span class="ei">🛒</span><div class="et">Sin pedidos de venta</div><div class="ed">Añade el pedido de un cliente con fecha de entrega.</div></div></div>
     <div class="ia">
-      <div class="camp-quick" id="campQuick">
-        <span style="font-size:9.5px;font-weight:600;color:var(--ts);text-transform:uppercase;letter-spacing:0.08em;align-self:center;">Campaña:</span>
-        <button class="cq-btn normal selected" data-camp="" onclick="selectCamp(this)">Normal</button>
-      </div>
+      
       <div class="fr">
         <div class="fg fd"><span class="fl">Fecha entrega</span><input type="date" class="di" id="vf"></div>
         <div class="fg"><span class="fl">Cliente</span>
@@ -238,6 +237,22 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
           <div class="sw"><input class="si" id="vpi" placeholder="Buscar o escribir producto..." autocomplete="off"><div class="sd" id="vpd"></div></div>
         </div>
         <div class="fg fc"><span class="fl">Cantidad</span><input type="number" class="ni" id="vq" placeholder="0" min="1"></div>
+      </div>
+      <!-- VENTA CONTEXT -->
+      <div class="pdf-context active" id="ventaContext" style="margin-bottom:8px;">
+        <div class="pdf-context-title">📋 ¿A qué corresponde este pedido?</div>
+        <div class="pdf-context-row">
+          <span class="pdf-context-label">Campaña</span>
+          <select id="campSelectV" style="flex:1;border:1.5px solid rgba(26,58,42,0.3);border-radius:8px;padding:6px 9px;font-family:'Sora',sans-serif;font-size:12px;background:var(--cr);outline:none;">
+            <option value="">Normal — sin campaña</option>
+          </select>
+        </div>
+        <div class="pdf-context-row">
+          <span class="pdf-context-label">Semana</span>
+          <select id="semanaSelectV" style="flex:1;border:1.5px solid rgba(26,58,42,0.3);border-radius:8px;padding:6px 9px;font-family:'Sora',sans-serif;font-size:12px;background:var(--cr);outline:none;">
+            <option value="">Según fecha entrega</option>
+          </select>
+        </div>
       </div>
       <button class="ba ve" onclick="addV()">＋ Añadir línea de venta</button>
     </div>
@@ -301,7 +316,7 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
           <button class="pra-cancel" onclick="cancelPacking()">✕ Cancelar</button>
         </div>
       </div>
-      <div id="campQuickC" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;"></div>
+      
       <button class="ba co" onclick="addC()">＋ Añadir línea de compra</button>
     </div>
     <div class="ab">
@@ -501,11 +516,12 @@ function addV(){
   var pr=document.getElementById('vpi').value.trim();
   var q=parseInt(document.getElementById('vq').value);
   var camp=document.getElementById('campSelectV')?document.getElementById('campSelectV').value:'';
+  var semanaV=document.getElementById('semanaSelectV')?document.getElementById('semanaSelectV').value:'';
   if(!f){toast('⚠ Selecciona fecha de entrega');return;}
   if(!cl){toast('⚠ Escribe o selecciona el cliente');return;}
   if(!pr){toast('⚠ Escribe o selecciona el producto');return;}
   if(!q||q<1){toast('⚠ Introduce la cantidad');return;}
-  addL('v',{id:nxtId(),f:f,cl:cl,pr:pr,q:q,camp:camp,t:Date.now()});
+  addL('v',{id:nxtId(),f:f,cl:cl,pr:pr,q:q,camp:camp,semana:semanaV||getWeekNum(f),t:Date.now()});
   document.getElementById('vpi').value='';
   document.getElementById('vq').value='';
   document.getElementById('vpi').focus();
@@ -564,27 +580,16 @@ function renderList(k){
 
   var html='';
 
-  if(isV && _currentFilter==='semanal'){
-    // Group by week
-    var byW={};var wOrd=[];
-    filtered.forEach(function(l){
-      var wk=getWeekLabel(l.f);
-      if(!byW[wk]){byW[wk]=[];wOrd.push(wk);}
-      byW[wk].push(l);
-    });
-    wOrd=wOrd.filter(function(v,i,a){return a.indexOf(v)===i;});
-    wOrd.forEach(function(wk){
-      var wlines=byW[wk];
-      html+='<div class="week-group"><div class="wgh"><span class="wgh-label">📅 '+wk+'</span><span class="wgh-count">'+wlines.length+' línea'+(wlines.length!==1?'s':'')+'</span></div>';
-      // Within week group by date
-      var byF2={};var fOrd2=[];
-      wlines.forEach(function(l){ if(!byF2[l.f]){byF2[l.f]=[];fOrd2.push(l.f);}byF2[l.f].push(l); });
-      fOrd2=fOrd2.filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
-      fOrd2.forEach(function(f){
-        html+=buildDateGroup(byF2[f],f,isV,k);
-      });
-      html+='</div>';
-    });
+  if(isV && _currentFilter==='semana' && _currentSemana){
+    // Filter by specific week number
+    filtered=filtered.filter(function(l){ return getWeekNum(l.f)===_currentSemana; });
+    if(!filtered.length){
+      area.innerHTML='<div class="es"><span class="ei">📅</span><div class="et">Sin pedidos en '+_currentSemana+'</div></div>';
+      return;
+    }
+  }
+
+  if(false){// placeholder
   } else {
     // Group by date (todos or camp filter)
     var byF={};var fOrd=[];
@@ -616,6 +621,7 @@ function renderList(k){
     });
   });
   area.scrollTop=area.scrollHeight;
+  if(k==='v') populateWeekSelect();
 }
 
 function buildDateGroup(lines,f,isV,k){
@@ -623,7 +629,8 @@ function buildDateGroup(lines,f,isV,k){
   if(isV && lines[0] && lines[0].camp){
     campBadge='<span style="font-size:9.5px;background:var(--do);color:var(--v);padding:1px 6px;border-radius:8px;font-weight:700;margin-left:5px;">🌸 '+lines[0].camp+'</span>';
   }
-  var h='<div class="dg"><div class="dgh"><span class="dgf">'+fmtF(f)+'</span>'+campBadge+'<span class="dgc">'+lines.length+' línea'+(lines.length!==1?'s':'')+'</span><div class="dgl"></div></div>';
+  var wkLabel=_currentFilter!=='semana'?'<span style="font-size:9.5px;font-family:DM Mono,monospace;color:var(--ts);background:var(--co);padding:1px 6px;border-radius:8px;">'+ getWeekNum(f)+'</span>':'';
+var h='<div class="dg"><div class="dgh"><span class="dgf">'+fmtF(f)+'</span>'+wkLabel+campBadge+'<span class="dgc">'+lines.length+' línea'+(lines.length!==1?'s':'')+'</span><div class="dgl"></div></div>';
   var byN={};var nOrd=[];
   lines.forEach(function(l){
     var n=isV?l.cl:l.pv;
@@ -944,43 +951,109 @@ function renderFilterBar(){
     });
   }
 }
-function renderCampQuick(){
-  var camps=loadCamps();var el=document.getElementById('campQuick');if(!el)return;
-  var cur=el.querySelector('.cq-btn.selected');var curVal=cur?cur.getAttribute('data-camp'):'';
-  el.innerHTML='<span style="font-size:9.5px;font-weight:600;color:var(--ts);text-transform:uppercase;letter-spacing:0.08em;align-self:center;">Campaña:</span>'+
-    '<button class="cq-btn normal'+(curVal===''?' selected':'')+'" data-camp="">Normal</button>'+
+function populateCampSelect(id, camps){
+  var sel=document.getElementById(id);
+  if(!sel) return;
+  var cur=sel.value;
+  sel.innerHTML='<option value="">Normal — sin campaña</option>'+
     camps.map(function(c){
-      var n=campName(c);
-      return '<button class="cq-btn'+(curVal===n?' selected':'')+'" data-camp="'+n+'">🌸 '+n+'</button>';
+      var n=campName(c); var f=campFecha(c);
+      var label=n+(f?' ('+fmtF(f).split(' ').slice(0,3).join(' ')+')':'');
+      return '<option value="'+n+'">🌸 '+label+'</option>';
     }).join('');
-  el.querySelectorAll('.cq-btn').forEach(function(b){b.addEventListener('click',function(){selectCamp(b);});});
+  if(cur) sel.value=cur;
 }
-// selectCamp removed — using selects now
 
-function renderCampQuickC(){
-  var camps=loadCamps();var el=document.getElementById('campQuickC');if(!el)return;
-  if(!camps.length){el.innerHTML='';return;}
-  el.innerHTML='<span style="font-size:9.5px;font-weight:600;color:var(--ts);text-transform:uppercase;letter-spacing:0.08em;align-self:center;">Campaña:</span>'+
-    '<button class="cq-btn normal selected" data-camp="">Normal</button>'+
-    camps.map(function(c){
-      var n=campName(c);
-      return '<button class="cq-btn" data-camp="'+n+'">🌸 '+n+'</button>';
-    }).join('');
-  el.querySelectorAll('.cq-btn').forEach(function(b){b.addEventListener('click',function(){selectCamp(b);});});
+function renderCampQuick(){
+  var camps=loadCamps();
+  populateCampSelect('campSelectV', camps);
+  populateCampSelect('campSelectC', camps);
+  populateCampSelect('pdfCampSelect', camps);
+  populateSemanaSelectV();
 }
-function setFilter(type,campEnc){
-  _currentFilter=type;_currentCamp=campEnc?decodeURIComponent(campEnc):null;
+
+function renderCampQuickC(){ renderCampQuick(); }
+function setFilter(type,val){
+  _currentFilter=type;
+  _currentCamp=null;
+  _currentSemana=null;
   document.querySelectorAll('.fb-btn').forEach(function(b){b.classList.remove('active');});
-  if(type==='todos')document.getElementById('fbTodos').classList.add('active');
-  else if(type==='semanal')document.getElementById('fbSemanal').classList.add('active');
-  else renderFilterBar();
+  if(type==='todos'){
+    document.getElementById('fbTodos').classList.add('active');
+    var fs=document.getElementById('fbSemana');if(fs)fs.value='';
+  } else if(type==='semana'){
+    _currentSemana=val||null;
+  } else if(type==='camp'){
+    _currentCamp=val?decodeURIComponent(val):null;
+  }
   renderList('v');
 }
+
+var _currentSemana=null;
 function getWeekLabel(s){
   var d=new Date(s+'T00:00:00'),m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));
   var su=new Date(m);su.setDate(m.getDate()+6);
   var M=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  return 'Semana '+m.getDate()+' '+M[m.getMonth()]+' — '+su.getDate()+' '+M[su.getMonth()];
+  return m.getDate()+' '+M[m.getMonth()]+' — '+su.getDate()+' '+M[su.getMonth()];
+}
+
+function getWeekNum(dateStr){
+  if(!dateStr) return '';
+  var d=new Date(dateStr+'T00:00:00');
+  var jan1=new Date(d.getFullYear(),0,1);
+  var weekNum=Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
+  return 'S'+String(weekNum).padStart(2,'0')+'/'+d.getFullYear();
+}
+
+function populateSemanaSelectV(){
+  var sel=document.getElementById('semanaSelectV');
+  if(!sel) return;
+  var today=new Date();
+  var options=['<option value="">Según fecha entrega</option>'];
+  for(var i=0;i<16;i++){
+    var d=new Date(today);d.setDate(today.getDate()+i*7);
+    var ds=d.toISOString().split('T')[0];
+    var wk=getWeekNum(ds);
+    var lbl=wk+' · '+getWeekLabel(ds);
+    options.push('<option value="'+wk+'">'+lbl+'</option>');
+  }
+  sel.innerHTML=options.join('');
+}
+
+function populateWeekSelect(){
+  var sel=document.getElementById('fbSemana');
+  if(!sel) return;
+  var data=ld('v');
+  if(!data.length){ sel.innerHTML='<option value="">📅 Semana...</option>'; return; }
+  // Get all unique weeks from ventas data
+  var weeks={};
+  data.forEach(function(l){
+    var wk=getWeekNum(l.f);
+    if(wk&&!weeks[wk]){
+      weeks[wk]={label:getWeekLabel(l.f),count:0};
+    }
+    if(wk) weeks[wk].count++;
+  });
+  // Also add next 8 weeks even if no data
+  var today=new Date();
+  for(var i=0;i<8;i++){
+    var d=new Date(today);d.setDate(today.getDate()+i*7);
+    var ds=d.toISOString().split('T')[0];
+    var wk=getWeekNum(ds);
+    if(!weeks[wk]) weeks[wk]={label:getWeekLabel(ds),count:0};
+  }
+  var sorted=Object.keys(weeks).sort();
+  var cur=_currentFilter==='semana'&&_currentSemana?_currentSemana:'';
+  sel.innerHTML='<option value="">📅 Semana...</option>'+
+    sorted.map(function(wk){
+      var w=weeks[wk];
+      var label=wk+' · '+w.label+(w.count?' ('+w.count+')':'');
+      return '<option value="'+wk+'"'+(cur===wk?' selected':'')+'>'+label+'</option>';
+    }).join('');
+  sel.onchange=function(){
+    if(sel.value) setFilter('semana',sel.value);
+    else setFilter('todos');
+  };
 }
 function openCampModal(){renderCampList();document.getElementById('campModal').classList.add('open');}
 function closeCampModal(){document.getElementById('campModal').classList.remove('open');}
