@@ -54,6 +54,8 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
 .prc.bl{color:var(--az);}
 .prd{background:none;border:none;color:rgba(212,132,122,0.35);cursor:pointer;font-size:15px;padding:2px 4px;flex-shrink:0;}
 .prd:active{color:var(--ro);}
+.pre{background:none;border:none;color:rgba(74,140,92,0.4);cursor:pointer;font-size:14px;padding:2px 4px;flex-shrink:0;}
+.pre:active{color:var(--vc);}
 .ia{background:var(--wh);border-top:1px solid var(--co);padding:10px 14px 14px;flex-shrink:0;}
 .fr{display:flex;gap:7px;margin-bottom:8px;}
 .fg{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;}
@@ -126,6 +128,15 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
 .akst{font-size:11px;text-align:center;margin-top:7px;min-height:15px;}
 .akst.ok{color:var(--vc);}
 .akst.er{color:var(--ro);}
+.pdf-context{background:rgba(58,106,154,0.06);border:1.5px solid rgba(58,106,154,0.2);border-radius:9px;padding:10px 12px;margin-bottom:8px;display:none;}
+.pdf-context.active{display:block;}
+.pdf-context-title{font-size:10px;font-weight:700;color:var(--az);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
+.pdf-context-row{display:flex;gap:6px;margin-bottom:7px;align-items:center;}
+.pdf-context-label{font-size:10px;color:var(--ts);white-space:nowrap;min-width:60px;}
+.pdf-camps{display:flex;gap:5px;flex-wrap:wrap;}
+.pdf-camp-btn{padding:4px 10px;border-radius:12px;border:1.5px solid var(--co);background:var(--wh);color:var(--ts);font-size:11px;font-family:'Sora',sans-serif;cursor:pointer;}
+.pdf-camp-btn.selected{background:var(--do);color:var(--v);border-color:var(--do);}
+.pdf-camp-btn.normal.selected{background:var(--az);color:white;border-color:var(--az);}
 .pdf-upload-btn{width:100%;padding:9px;border-radius:8px;border:1.5px dashed var(--azc);background:rgba(58,106,154,0.05);color:var(--az);font-family:'Sora',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;transition:all 0.2s;}
 .pdf-upload-btn:hover{background:rgba(58,106,154,0.1);}
 .pdf-upload-btn:active{background:rgba(58,106,154,0.15);}
@@ -139,6 +150,43 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
 .pdf-result-actions button{flex:1;padding:7px;border-radius:7px;border:none;font-family:'Sora',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer;}
 .pra-add{background:var(--az);color:white;}
 .pra-cancel{background:var(--co);color:var(--ts);}
+/* CAMPAIGN FILTER BAR */
+.filter-bar{background:var(--wh);border-bottom:1px solid var(--co);padding:8px 12px;display:flex;gap:6px;overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch;}
+.filter-bar::-webkit-scrollbar{display:none;}
+.fb-btn{flex-shrink:0;padding:5px 12px;border-radius:16px;border:1.5px solid var(--co);background:var(--wh);color:var(--ts);font-family:'Sora',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all 0.15s;}
+.fb-btn.active{background:var(--v);color:var(--cr);border-color:var(--v);}
+.fb-btn.campaign{border-color:var(--do);color:#6a4e10;}
+.fb-btn.campaign.active{background:var(--do);color:var(--v);border-color:var(--do);}
+.fb-btn.week{border-color:var(--vc);color:var(--vm);}
+.fb-btn.week.active{background:var(--vc);color:white;border-color:var(--vc);}
+.fb-add-camp{flex-shrink:0;padding:5px 10px;border-radius:16px;border:1.5px dashed var(--co);background:transparent;color:var(--ts);font-family:'Sora',sans-serif;font-size:11.5px;cursor:pointer;white-space:nowrap;}
+
+/* CAMPAIGN QUICK BUTTONS */
+.camp-quick{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+.cq-btn{padding:5px 11px;border-radius:14px;border:1.5px solid var(--co);background:var(--wh);color:var(--ts);font-family:'Sora',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s;}
+.cq-btn.selected{background:var(--do);color:var(--v);border-color:var(--do);}
+.cq-btn.normal.selected{background:var(--v);color:var(--cr);border-color:var(--v);}
+
+/* WEEK GROUP HEADER */
+.week-group{margin-bottom:16px;}
+.wgh{display:flex;align-items:center;gap:8px;margin-bottom:7px;padding:6px 10px;background:var(--vm);border-radius:8px;}
+.wgh-label{font-size:11px;font-weight:700;color:var(--cr);letter-spacing:0.06em;text-transform:uppercase;}
+.wgh-count{font-size:10px;color:rgba(245,240,232,0.7);background:rgba(255,255,255,0.15);padding:2px 7px;border-radius:8px;}
+
+/* CAMPAIGN MODAL */
+.camp-modal{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:400;display:none;align-items:flex-end;justify-content:center;}
+.camp-modal.open{display:flex;}
+.camp-sheet{background:var(--wh);border-radius:18px 18px 0 0;width:100%;max-width:520px;padding:18px 18px 28px;animation:su 0.25s ease;}
+.camp-sheet h3{font-family:'DM Serif Display',serif;font-size:17px;color:var(--v);margin-bottom:12px;}
+.camp-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;max-height:200px;overflow-y:auto;}
+.camp-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--cr);border-radius:8px;font-size:13px;font-weight:500;}
+.camp-del{background:none;border:none;color:rgba(212,132,122,0.5);cursor:pointer;font-size:14px;}
+.camp-del:active{color:var(--ro);}
+.camp-add-row{display:flex;gap:7px;}
+.camp-add-row input{flex:1;border:1.5px solid var(--co);border-radius:8px;padding:8px 11px;font-family:'Sora',sans-serif;font-size:13px;outline:none;background:var(--cr);}
+.camp-add-row input:focus{border-color:var(--vc);}
+.camp-add-row button{background:var(--v);color:var(--cr);border:none;border-radius:8px;padding:8px 14px;font-family:'Sora',sans-serif;font-size:12px;font-weight:700;cursor:pointer;}
+
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--v);color:var(--cr);padding:7px 16px;border-radius:18px;font-size:12px;white-space:nowrap;opacity:0;transition:all 0.25s;pointer-events:none;z-index:400;box-shadow:0 4px 14px rgba(0,0,0,0.15);}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 ::-webkit-scrollbar{width:3px;}
@@ -159,10 +207,22 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
     <div class="tab tc" id="tab-c" onclick="switchTab('c')">📦 Compras <span class="tb bl" id="bc">0</span></div>
   </div>
 
+  <!-- FILTER BAR -->
+  <div class="filter-bar" id="filterBar">
+    <button class="fb-btn active" id="fbTodos" onclick="setFilter('todos')">📋 Todos</button>
+    <button class="fb-btn week" id="fbSemanal" onclick="setFilter('semanal')">📅 Semanal</button>
+    <div id="fbCampaigns"></div>
+    <button class="fb-add-camp" onclick="openCampModal()">＋ Campaña</button>
+  </div>
+
   <!-- VENTAS -->
   <div class="view active" id="view-v" style="flex-direction:column;">
     <div class="la" id="lv"><div class="es"><span class="ei">🛒</span><div class="et">Sin pedidos de venta</div><div class="ed">Añade el pedido de un cliente con fecha de entrega.</div></div></div>
     <div class="ia">
+      <div class="camp-quick" id="campQuick">
+        <span style="font-size:9.5px;font-weight:600;color:var(--ts);text-transform:uppercase;letter-spacing:0.08em;align-self:center;">Campaña:</span>
+        <button class="cq-btn normal selected" data-camp="" onclick="selectCamp(this)">Normal</button>
+      </div>
       <div class="fr">
         <div class="fg fd"><span class="fl">Fecha entrega</span><input type="date" class="di" id="vf"></div>
         <div class="fg"><span class="fl">Cliente</span>
@@ -201,9 +261,26 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
         <div class="fg fc"><span class="fl">Cantidad</span><input type="number" class="ni bl" id="cq" placeholder="0" min="1"></div>
       </div>
       <input type="file" id="pdfPackingInput" accept=".pdf,application/pdf" style="display:none;" onchange="handlePackingPdf(event)">
-      <button class="pdf-upload-btn" onclick="document.getElementById('pdfPackingInput').click()">
-        📄 Subir packing list PDF — extraigo automáticamente
+      <button class="pdf-upload-btn" onclick="openPdfContext()">
+        📄 Subir packing list / factura PDF
       </button>
+      <!-- PDF CONTEXT SELECTOR -->
+      <div class="pdf-context" id="pdfContext">
+        <div class="pdf-context-title">📎 Antes de subir — ¿a qué corresponde?</div>
+        <div class="pdf-context-row">
+          <span class="pdf-context-label">Campaña</span>
+          <div class="pdf-camps" id="pdfCampBtns"></div>
+        </div>
+        <div class="pdf-context-row">
+          <span class="pdf-context-label">Semana</span>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="date" id="pdfSemanaFecha" class="di bl" style="font-size:11px;padding:5px 8px;" placeholder="Fecha de llegada">
+            <span style="font-size:10px;color:var(--ts);">llegada</span>
+          </div>
+        </div>
+        <button onclick="confirmarPdfContext()" style="width:100%;background:var(--az);color:white;border:none;border-radius:8px;padding:9px;font-family:'Sora',sans-serif;font-size:12.5px;font-weight:700;cursor:pointer;margin-top:4px;">📄 Seleccionar PDF →</button>
+        <button onclick="cancelPdfContext()" style="width:100%;background:transparent;color:var(--ts);border:none;padding:5px;font-family:'Sora',sans-serif;font-size:11px;cursor:pointer;margin-top:2px;">Cancelar</button>
+      </div>
       <div class="pdf-processing" id="pdfProcessing">
         <span style="display:inline-flex;gap:5px;">
           <span style="width:6px;height:6px;background:var(--az);border-radius:50%;animation:bounce 1.2s ease-in-out infinite;display:inline-block;"></span>
@@ -220,7 +297,8 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
           <button class="pra-cancel" onclick="cancelPacking()">✕ Cancelar</button>
         </div>
       </div>
-      <button class="ba co" onclick="addC()">＋ Añadir línea manual</button>
+      <div id="campQuickC" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;"></div>
+      <button class="ba co" onclick="addC()">＋ Añadir línea de compra</button>
     </div>
     <div class="ab">
       <button class="abinv" onclick="abrirInv()">📦 Inventario</button>
@@ -270,6 +348,58 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- EDIT MODAL -->
+<div class="mo" id="mEdit">
+  <div class="ms" style="max-height:70vh;">
+    <div class="msh"><h3>✏️ Editar línea</h3><button class="msc" onclick="closeM('mEdit')">✕</button></div>
+    <div class="msb" style="padding:14px 16px;">
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="fg">
+          <span class="fl">Fecha entrega</span>
+          <input type="date" class="di" id="editFecha">
+        </div>
+        <div class="fg" id="editClienteWrap">
+          <span class="fl">Cliente</span>
+          <div class="sw"><input class="si" id="editCliente" placeholder="Cliente..." autocomplete="off"><div class="sd" id="editClienteD"></div></div>
+        </div>
+        <div class="fg" id="editProvWrap">
+          <span class="fl">Proveedor</span>
+          <div class="sw"><input class="si bl" id="editProv" placeholder="Proveedor..." autocomplete="off"><div class="sd" id="editProvD"></div></div>
+        </div>
+        <div class="fg">
+          <span class="fl">Producto</span>
+          <div class="sw"><input class="si" id="editProducto" placeholder="Producto..." autocomplete="off"><div class="sd" id="editProductoD"></div></div>
+        </div>
+        <div class="fg">
+          <span class="fl">Cantidad</span>
+          <input type="number" class="ni" id="editCantidad" min="1">
+        </div>
+      </div>
+    </div>
+    <div class="msf">
+      <button class="mbo" onclick="closeM('mEdit')" style="border:1.5px solid var(--co)!important;">Cancelar</button>
+      <button class="mbg" onclick="saveEdit()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CAMPAIGN MODAL -->
+<div class="camp-modal" id="campModal">
+  <div class="camp-sheet">
+    <h3>🌸 Campañas</h3>
+    <div class="camp-list" id="campListEl"></div>
+    <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px;">
+      <input id="campNewInput" placeholder="Nombre campaña (ej: Día de la Madre)" style="border:1.5px solid var(--co);border-radius:8px;padding:8px 11px;font-family:'Sora',sans-serif;font-size:13px;outline:none;background:var(--cr);">
+      <div style="display:flex;gap:7px;align-items:center;">
+        <span style="font-size:10px;font-weight:600;color:var(--ts);text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;">Fecha evento</span>
+        <input type="date" id="campNewFecha" style="flex:1;border:1.5px solid var(--co);border-radius:8px;padding:7px 9px;font-family:'DM Mono',monospace;font-size:12px;outline:none;background:var(--cr);">
+      </div>
+      <button onclick="addCamp()" style="background:var(--v);color:var(--cr);border:none;border-radius:8px;padding:9px;font-family:'Sora',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">＋ Crear campaña</button>
+    </div>
+    <button onclick="closeCampModal()" style="width:100%;padding:9px;border-radius:8px;border:none;background:var(--co);color:var(--ts);font-family:'Sora',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">Cerrar</button>
+  </div>
+</div>
 
 <script>
 var CLIENTES=["ACTIVIDADES HOTELERAS STA. TERESA  S.L.", "AGROFOREX SERVICIOS URBANOS S.L. (CURSO NOVIAS)", "AGRUFLOR SL (AGRUFLOR)", "AHORAFLORES SL (DEACANTO)", "AIAD EL FARHANI MUSTAPHA", "AIDITA UÑA CORTINA (SFZ)", "ALEAL BUSINESS GROUP SL", "ALEJANDRO MARQUEZ ANTUNEZ (ALEJANDRO MARQUEZ ANTUNES (FLOR Y FLOR))", "AMANDA MARÍA GIRALDO SALAS (FLORÍSTERIA NIEBLA CONCHA)", "ANDALUPAQ EXPRESS (TIPSA)", "ANIA TRUBNIKOVA (REGALISIMO)", "ANTONELLA CATERING S.L", "ANTONIO JESUS QUIROS CALDERON", "ANTONIO JESÚS MELERO GARCÍA (ANTONIO MELERO)", "ARALIA Decoracion 2020 S.L.", "ARALIA EVENTOS S.L.", "ARFE TABERNAS S.L (LA ISLA)", "ARMANDO ULLATE (FLORISTERÍA SOFORA S.L)", "ARREGLOS FUNERARIOS S.L. (TANATORIO)", "ARTE DEL CAMPO Y PAISAJISMO S.L", "ASOC.CULT.COFRADE SANTA CRUZ (HERMANDAD LA RINCONADA)", "ASTROFLOR (DANIEL ASTROFLOR)", "AZUCENA GARCIA MARÍN", "Ana Maria Buzon Luzon (catering)", "Angeles Bautista Polo (Tello)", "Angeles Garcia Pimiento (JUAN CASTILLEJA)", "Antonio (cementerio) (Antonio (Cementerio))", "Antonio Jesús Cuéllar Segura (CUELLAR)", "Asoc. de Directores de Andalucia", "BACHICHA S.L.", "BLACK BACCARA S.L. (BLACK BACCARA)", "BLOM MARKET S.L.U. (BLOM MARKET)", "BLOOMING EXPERIENCE, S.L. (COLVIN)", "BODA ANA Y PEPE (28 de febrero/ 01 de marzo)", "BUCAROL S.L. (BUCARO)", "Bajoplato S.L. (Catering Campuzano)", "Baldomero Espinosa Roales (FLORES CAMELIA)", "Bondai Flowers SL (Bondai)", "CARMEN MARÍA BELLIDO PAN (NUBES DE AZAHAR \nPEÑAFLOR)", "CARMEN MARÍA GONZÁLEZ VIEJO (CARMEN DECOFLOR)", "CASFLOWER SL (Tomas-casflowers)", "CAYETANO", "CAYFE", "CC Lagoh Entidad de Gestion de Gastos (CC Lagoh Entidad de Gestion)", "CENTRO CERÁMICO AL ANDALUS S.L", "CIRIACO HERRERA MIRANDA", "CLUB NAÚTICO SEVILLA (CLUB NAÚTICO)", "COLEGIO SANTA MARÍA DE LOS REYES", "COMERCIAL REYFLOR SL (REYFLOR)", "COMERCIALIZADORA VIVEROS EL PINO S.L (VIVERO EL PINO)", "COMUNIDAD DE PROPIETARIOS EDIFICIO TORVISCO", "CONCEPCIÓN CANDELA LABRADOR (CONCHA CANDELA)", "COQUELICOT Passion S.L. (Cliente Burgos)", "CRISTALERIA Y ALUMINIOS LEIVA SL (CRISTALERIA Y ALUMINIOS LEIVA)", "CRISTINA AMODEO HELVANT (CRISTINA AMODEO)", "CRISTINA LIBRERO LEDESMA", "Carlos Garcia Fernández (Carlos García Fernández)", "Carmen Boza López (Flores Julio)", "Carmen Polo Beltran (TELLO SEVILLA)", "Carolina Martin Lopez (jose miguel justo fernandez)", "Catering y servicios Las Torres, SLU", "Cañamo Arte Floral S.L (Cañamo)", "Cerkiflor S.L.U. (CERKIFLOR)", "Cliente contado", "Cliente de contado", "Cristina", "DABEVICA S.L. (VITO - DANI)", "DAVID GIL DURÁN (NEYMAFLOR)", "DAVID SANCHEZ GONZALEZ (LOLAFLOR)", "DECOFLOR DE SEVILLA SL (CARMEN DECOFLOR)", "DELOCOLE SL (CRISTO DE LA SED)", "DISEÑO FLORISTICO LRO,S.L (MARTIN)", "De Acanto Premium Roses S.L. (De Acanto)", "EDIFICIOS Y LOCALES MISA, S.L.", "ELCREAL REVOLUTION S.L. (ELCREAL REVOLUTION SL)", "ELISABET CORTÉS PEDROSA (FLORISTERIA BOLLULLOS)", "ELVEA FLOR S.L.", "ENCAROMA FLORISTERIA (ENCARNA RODRIGUEZ MARTIN)", "ENRIQUE MONTALBAN S.L.", "EPYME", "ESCORIAL FINE ARTS. S.L.", "ESTEFANÍA VERA BONILLA (FANY ALXARAF)", "ESTER NARVÁEZ DOMÍNGUEZ (ESTER)", "EVENTOS EGO SL", "EZEQUIEL GARCÍA MUÑIZ (FLORISTERIA AÑIL)", "Eduardo Sanchez Sanchez (IBERFLOR)", "Eloy Murube Gonzalez", "Esperanza Iglesias Azcue", "Estefania Gahete Guerrero", "Estrella Fernández Carmona (La Casa de las Flores (Cazalla))", "Evenglobos", "FAMILIA MP SAN JULIAN SL", "FAMILIA MP TRIANA SL", "FATIMA AGENJO GARCIA (CHERRY LOVE)", "FCS SEVILLA SL (CRISTO DE LA SED)", "FERENT STEFAN (STEFAN PORTUGUES)", "FINCA HERMANOS VALDÉS S.L (HERMANOS VALDÉS)", "FLOR AL COSTO", "FLOR BAHIA S.L", "FLOR EN MAL ESTADO", "FLOR TIRADA", "FLORES CARMEN S.C.A. (CARMEN - ESTE)", "FLORES EL PORVENIR S.L. (EUSEBIO)", "FLORES LOMA FLOR S.L.U. (Juan Loma)", "FLORES Los Pacos S.L. (Flores Los Pacos S.L.)", "FLORES MEMORA SL (MEMORA)", "FLORES MOUGUET S.L. (MOUGUET)", "FLORES RUMEX SL (RUMEX)", "FLOREXIM S.L. (FLOREXIM)", "FLORHADA (Florhada)", "FLORISTERIA  ASIÁN", "FLORISTERIA MELINDA SL (TRONKO MADRID)", "FLORISTERIA PALOMA (Susana Solis)", "FLORISTERIA SOFORA S.L.", "FLORISTERÍA LA ROSA S.L. (LA ROSA DE RONDA)", "FLª SUROESTE S.L.", "FRANCISCO GONZALEZ FUENTES (PACO-CHIPIONA)", "FRANCISCO JAVIER DÍAZ CALVO (JAVIER DÍAZ)", "FRANCISCO JOSE CANTO GONZALEZ (MARIDO AZUCENA)", "FRANCISCO JOSÉ CORRERO CABELLO (FLORISTERÍA CENTRO FLOR)", "FRANCISCO MANUEL EGEA ROMERO (FRANCISCO EGEA)", "FRANCISCO REYERO GUTIERREZ (Velez Malaga)", "FRUTAS Y VERDURAS ANTUNEZ S.L. (ANTUNEZ)", "FUENTE CLARA", "FUNEFLOR SL", "FURNITURE LOGIS S.L.", "Fatima Mateo Santos (Floristeria Virgen de Araceli)", "Faustino Muñoz Rodriguez (FAUSTINO)", "Fco. Javier Gonzalez de la Rosa (Los pacos)", "Fepaflor SL (Jesus)", "Flores Caoba SL (Caoba)", "Flores Miranda S.L.L (FLORES MIRANDA)", "Flores Villodres Labella S.C. (FLORES VILLODRES LABELLA S.C.)", "Flores y Plantas Leon S.L. (Flores Sanchez Leon S.L.)", "Florimar del Maresme S.L. (BARCELONA)", "Floristeria Antonio Mendoza", "Floristeria Carelia", "Floristeria Plaza San Marcos", "Francisco Benitez Cardenas", "Francisco Carmona Amores (PULIDO)", "Francisco Javier Benitez Millan", "Francisco Jesús Domínguez Morales (Al-xaraf)", "Francisco Muñoz Diaz (PACO MUÑOZ)", "GARDEN EXPRESS SL", "GONZAFLOR S.L. (TURBO)", "GRUPO TINAKULA SL (TINAKULA)", "Grupo Enersol S.L", "Guillermo Lasso Garcia (Escuela Arte Floral)", "HERMANADAD SACRAMENTAL DE NTRO PADRE JESUS NAZARENO Y MARÍA SANTISIMA DE LA SALUD (CASA HERMANDAD)", "HERMANOS ESCALONA CB (SALVADOR ESCALONA)", "HERMANOS PALACIOS FLOR CORTADA SL (HERMANOS PALACIOS)", "HILLS ROSES S.L.U. (TOMAS GRANADA)", "HORDEBRIX S.L.", "HORDEBRIX S.L. (HORDEBRIX)", "HUMBERTO MARIOTTE CANO (HUMBERTO)", "Hermandad de Nuestra Señora del Rosario Patrona de Bornos (BORNOS)", "Hermanos Lopez Montalban S.L. (Hermanos Lopez Montaban)", "Hilario Monge Borrego (ANFORAS)", "IES JUAN CIUDAD DUARTE", "INVERSIONES Y PRODUCCIONES TIBER S.L. (Ludiflora)", "ISAAC MARINA RAMOS (FLORISTERIA VERDE OLIVA)", "ISAAC PEREZ NIETO (FLORISTERIA AZAHAR - SOBRINO CHARI CEMENTERIO)", "ISABEL CANDAU MICHEO (CARTAMO)", "ISABEL MARIA MUELAS MOLINA (LA BIEN PLANTÁ)", "ISMAEL MONTILLA GALLEGO (FLORISTERÍA COIMBRA)", "ITALICA DE FLORES SL (SEVILLA MI FLOR)", "Inmaculada Encarnación Garrido", "J.A. VEAS VILLALBA (VEAS , J.A.)", "JAVIER HERNANDEZ MORILLAS (Floristeria FLOWERING)", "JONATAN LAZARO RODRIGUEZ (YONI)", "JOSE AMIGO ALVAREZ (JOYMAFLOR)", "JOSE ANTONIO RUIZ MONCAYO (DEARTCON)", "JOSE CARLOS MORILLO PEREZ", "JOSE CARMONA AMORES (PULIDO)", "JOSE IGNACIO CASTRO MIÑO (Flores Miño)", "JOSE JAVIER GOMEZ CANO (JAVI LOS PALACIOS)", "JOSE MANUEL ASIAN LORA (FLORISTERIA ASIAN)", "JOSE MANUEL FERNÁNDEZ PINTO (FLORES MAY)", "JOSE RAMÓN SERNA (SERNA FLORISTAS)", "JOSE ROMERO BENITEZ (RIVERA)", "JUAN ALFONSO DÍAZ LÓPEZ (FLORES ALFONSO)", "JUAN ANTONIO RONDAN MOLINARES (BAMBU)", "JUAN JOSE FERNANDEZ RIVERO (JUAN JOSE)", "JUAN VALDERRAMA ÁNGULO (FLORISTERIA BAMBU\nMERCADO PUERTA LA CARNE)", "JUANA CALVO GARCIA", "Jemaflor Chipiona S.L. (JEMAFLOR)", "Jesus Fuertes de la Torre (Jesus La galeria)", "Jesus Merlo Garcia S.L. (Entregar en Avda. Estudiantes 39 ( Jardin -Flor ))", "Jose Francisco Herrera Sanchez (Jose Francisco ( personal))", "Jose Manuel Reyes Camacho (Jose Manuel)", "Jose Montero Antunez (Montero)", "Jose Santamaria Tirado (Santamaria)", "Juan Manuel Elias Moreno (Pino Montano)", "Juan Ramon Grondona Ceballos (Florabel)", "LA ROSA DE ORO", "LANLASH S.L", "LIDIA ALEJANDRA NOLASCO MONTOYA (TRONKO MADRID)", "LOLA FLORA", "Limolero S.L. - CIF: B-91225961 (Moises)", "Lola (Lola Bami)", "Los Molinos S.L", "Luxernature S.L. (Mayorista Tomelloso)", "MACARENA GARRIDO PARRADO (FLORISTERIA GARRIDO)", "MACARENA HERRERO CALVO (MIRKA EVENTOS)", "MAGNO RE CAPITAL SL", "MAMEN MELERO EVENTOS S.L.", "MANANT SC - LILAS FLORISTAS (LILAS FLORISTAS)", "MANUEL ANTUNEZ CARDOSO", "MANUEL CARMONA AMORES (QUIOSCO ALFALFA)", "MANUEL FERNÁNDEZ BALUFO (KIKO)", "MANUEL JESUS AZUAGA POLO", "MANUEL JESÚS ROLDÁN ALGABA", "MANUEL PORTELA MARTÍNEZ (FLORISTERÍA AGUILA)", "MANUEL VESPIA ROMÁN (SALTERAS)", "MARCELA GARCIA MARTINEZ (FLª PUERTA CARMONA)", "MARI ANGELES JIMENEZ GAMERO", "MARIA ARGUESO LIÑÁN (BRUNIA FLORAL)", "MARIA DEL CARMEN BENITEZ BERNAL (CRISTO DE LA SED)", "MARIA DEL CARMEN GONZALEZ JIMENEZ (MARY FLOWERS)", "MARIA ISABEL GORDILLO ALONSO (JACARANDA)", "MARIA JOSE REAL LARRINAGA (MARIA JOSE)", "MARILUZ LIMA VEGA (FLORISTERIA VIRGEN DE LA CARIDAD)", "MARÍA BLANCO DE CORDOVA MUÑOZ (CLIENTE CONTADO)", "MARÍA DEL AGUILA MARTINEZ TISCAR (FLORISTERIA TRIANA AGUILA)", "MARÍA FRANCO SAMADA", "MELERO FLORISTAS S.L. (MELERO)", "MERCADO RIVERA S.L. (MERCADO RIVERA SL)", "MIGUEL ANGEL FERNANDEZ MURILLO (MURILLO)", "MISS FLORES FLORISTERIA (Monica Jimenez Navarro)", "MONICA LAO LORENZO (VENECIA FLORIPONDIO)", "MREC Joaquin Costa SL", "Mamen Arte Floral SL", "Manuel Garcia Garfia", "Maria F. Perez Rodriguez (GALLEGA)", "Maria Luisa Galdeano García (Mª LUISA)", "Maria(Cementerio) (Maria)", "Marta Ferraro Manzano (catering gelves)", "Marta Quintana Strohecker (FLORISTERIA SAN MARCOS)", "Martha Isabel Urbano Mahecha (Preservadas)", "María Dolores Adame Mingorance (Lola Fedriani)", "María Vazquez García (Bellavista)", "Mercado de Flores y Plantas S.L.", "Mercedes Grado Ponce (JAVIER GRADO)", "Miguel Angel Rodriguez Query (Flores Query)", "Mirian Perez Sanchez (Floristeria Hada)", "Mª CARMEN RUIZ MORENO (FLORISTERIA LOS CLAVELES DE SEVILLA)", "Mª Carmen Rodríguez Soler (Cliente Ecija)", "Mª JOSEFA MORALES CARRASCO (FLORISTERIA VALME)", "Mª del Carmen Mejias Gonzalez (maria)", "Mª Ángeles Sánchez Sánchez (Floristeria Asunción)", "NATURA RECICLAJES SEVILLANOS S.L (VENTA PALETS)", "NAZA GARDEN SL (NAZA GARDEN VIVERO MONTEQUINTO)", "Noon Spain SL", "Ornamentales JURADO S.L. (Ornamentales Jurado S.L)", "PABLO FERNÁNDEZ TAUDIN (PABLO MONTERO)", "PACO VEAS", "PILAR SOSA MORIÑA (PILAR SOSA)", "PREBETONG HORMIGONES S.A.", "PROFLOR FLORES NATURALES S.L.", "PUERTA CARMONA (MARCELA GARCIA MARTINEZ)", "Paloma Barrio Cuenca-Romero (BLANCA PALOMA)", "Parroquia San Juan Pablo II (Iglesia Montequinto)", "Payme-Flor S.L. (Payme)", "Pedro Gonzalez de Luis (Pescaderia)", "Querry prueba", "RAFAEL FERNANDEZ CASAS", "RAFAEL SOSA MARTIN (SOSA)", "RB FLOWERS CHIPIONA SL", "REGLA VALDES GONZALEZ", "REMIGIO HERNANDEZ RODRIGUEZ (CARLOS REMIGIO)", "RENCAFLOR SL (Pekaflor)", "RI-GARDEN LORA SL (Ri-Garden Lora SL)", "ROCIO TORREÑO HERRERA (LUIS EUCALIPTO)", "ROSARIO CATALAN ANDRADE (JARDIN DE LA CARIDAD)", "ROSARIO PEREZ PINEDA (CHARI CEMENTERIO)", "ROSAS DE SEVILLA SL (ROSAS DE SEVILLA)", "ROSIFY SLL", "RUTH CRESPO PORTILLO (FLORES LA BOHEME)", "Rafael de Leon SL", "SALMEDINA, S.L.L., Comercializadora de Flores. (Salmedina)", "SALVADOR DAVID ÁLVAREZ FERREIRA", "SANTA MARIA TIRADO PRODUCTORES DE FLOR, S.L.U.", "SERGIO BARRIO SOTO (LAS FLORSTAS SANTANDER)", "SERINTRA de Cuenca S.L.U. (Aliaguilla)", "SERVILIFT , S.L.", "SEVILLA WAGEN S.A.", "SOLDEHOY DISTRIBUCIONES RENOVABLES SL", "SOLUTION GLOBAL PALET SL (PALETS RECOGIDAS)", "SONIA MORILLA JIMENEZ (JARDIN DEL CERRO)", "SURFLOR HISPALENSE SL (ANTONIO(TANATORIO))", "SYRSA AUTOMOCION,S.L.U", "Sanchiflor S.C.A.", "Sergio Daza Rodriguez (Jaraflor)", "Servicios Florales Palaflor (Pacon Chacón)", "Servicios Funerarios Zamoranos S.L.", "TELEROSA SPAIN SL (TELEROSA)", "TRADECOM S.A. (TRADECOMSA)", "TRIOFLOR S.L. (TRIOFLOR)", "VATEMA MANAGEMENT S.L. (HELLOO MONDAY)", "VENTA CONTADO (Venta Contado)", "VENTA CONTADO ANGELES (angeles)", "VENTA CONTADO CONCHI (CONCHI)", "VENTA CONTADO KIOSKO (Kiosko Magdalena)", "VENTA CONTADO MADRID CESAR", "VENTA CONTADO MIMI", "VENTA CONTADO ROMAN (ROMAN)", "VENTA CONTADO SAN JOSE (JOSE LUIS)", "VENTURA ENRIQUE ROMERO SUALIS (VENTURA ENRIQUE ROMERO SUALIES)", "VIA CALETA S.L (VIA CALETA/PUERTA CALETA)", "VICTORIANO MARQUEZ IGLESIAS (VICTOR MARQUEZ)", "VIRGINIA FLORISTA SL", "VISITACIÓN MORENO DÍAZ (VISITACION)", "VIVEROS AVAIM SL (JUAN MARÍA PINEDA)", "VIVEROS Beniflor S.L. (FRAN VIVERO)", "VIVEROS GIMENO SALAMANCA S.L.", "VIVEROS Hnos Belmonte S.L. (VIVEROS HERMANOS BELMONTE)", "VIVEROS MOLINA S.L. (VIVEROS MOLINA)", "VIVEROS RENESES, S.L.U.", "Victoria Santos", "WELCOMEFY S.L. (WELCOMEFY)", "XENIS EVENTOS S.L", "YOLANDA RAYA GONZALEZ (Yoli)", "de Gastos", "ÁNGEL JESUS DE BUSTOS FERNÁNDEZ (Ángel Móstoles)", "Ángela Bustamante Maestre"];
@@ -365,11 +495,12 @@ function addV(){
   var cl=document.getElementById('vci').value.trim();
   var pr=document.getElementById('vpi').value.trim();
   var q=parseInt(document.getElementById('vq').value);
+  var camp=document.querySelector('.cq-btn.selected')?document.querySelector('.cq-btn.selected').getAttribute('data-camp'):'';
   if(!f){toast('⚠ Selecciona fecha de entrega');return;}
   if(!cl){toast('⚠ Escribe o selecciona el cliente');return;}
   if(!pr){toast('⚠ Escribe o selecciona el producto');return;}
   if(!q||q<1){toast('⚠ Introduce la cantidad');return;}
-  addL('v',{id:nxtId(),f:f,cl:cl,pr:pr,q:q,t:Date.now()});
+  addL('v',{id:nxtId(),f:f,cl:cl,pr:pr,q:q,camp:camp,t:Date.now()});
   document.getElementById('vpi').value='';
   document.getElementById('vq').value='';
   document.getElementById('vpi').focus();
@@ -381,11 +512,13 @@ function addC(){
   var pv=document.getElementById('cpv').value.trim();
   var pr=document.getElementById('cpi').value.trim();
   var q=parseInt(document.getElementById('cq').value);
+  var campC=document.querySelector('#campQuickC .cq-btn.selected');
+  var camp=campC?campC.getAttribute('data-camp'):'';
   if(!f){toast('⚠ Selecciona fecha de llegada');return;}
   if(!pv){toast('⚠ Escribe el proveedor');return;}
   if(!pr){toast('⚠ Escribe o selecciona el producto');return;}
   if(!q||q<1){toast('⚠ Introduce la cantidad');return;}
-  addL('c',{id:nxtId(),f:f,pv:pv,pr:pr,q:q,t:Date.now()});
+  addL('c',{id:nxtId(),f:f,pv:pv,pr:pr,q:q,camp:camp,t:Date.now()});
   document.getElementById('cpi').value='';
   document.getElementById('cq').value='';
   document.getElementById('cpi').focus();
@@ -411,45 +544,91 @@ function renderList(k){
   var areaId=k==='v'?'lv':'lc';
   var area=document.getElementById(areaId);
   var isV=k==='v';
-  if(!data.length){
-    area.innerHTML=isV
-      ?'<div class="es"><span class="ei">🛒</span><div class="et">Sin pedidos de venta</div><div class="ed">Añade el pedido de un cliente con fecha de entrega.</div></div>'
-      :'<div class="es"><span class="ei">📦</span><div class="et">Sin pedidos de compra</div><div class="ed">Añade lo que pides a proveedores con fecha de llegada.</div></div>';
+
+  // Apply filter (only for ventas)
+  var filtered = data.map(function(l,i){ return Object.assign({},l,{_i:i}); });
+  if(isV && _currentFilter==='camp' && _currentCamp){
+    filtered = filtered.filter(function(l){ return (l.camp||'')=== _currentCamp; });
+  }
+
+  if(!filtered.length){
+    var msg = _currentFilter==='camp' ? 'Sin pedidos para esta campaña' : isV ? 'Sin pedidos de venta' : 'Sin pedidos de compra';
+    var icon = isV ? '🛒' : '📦';
+    area.innerHTML='<div class="es"><span class="ei">'+icon+'</span><div class="et">'+msg+'</div></div>';
     return;
   }
-  var byF={};var fOrd=[];
-  data.forEach(function(l,i){
-    if(!byF[l.f]){byF[l.f]=[];fOrd.push(l.f);}
-    byF[l.f].push(Object.assign({},l,{_i:i}));
-  });
-  fOrd=fOrd.filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
+
   var html='';
-  fOrd.forEach(function(f){
-    var lines=byF[f];
-    html+='<div class="dg"><div class="dgh"><span class="dgf">'+fmtF(f)+'</span><span class="dgc">'+lines.length+' línea'+(lines.length!==1?'s':'')+'</span><div class="dgl"></div></div>';
-    var byN={};var nOrd=[];
-    lines.forEach(function(l){
-      var n=isV?l.cl:l.pv;
-      if(!byN[n]){byN[n]=[];nOrd.push(n);}
-      byN[n].push(l);
+
+  if(isV && _currentFilter==='semanal'){
+    // Group by week
+    var byW={};var wOrd=[];
+    filtered.forEach(function(l){
+      var wk=getWeekLabel(l.f);
+      if(!byW[wk]){byW[wk]=[];wOrd.push(wk);}
+      byW[wk].push(l);
     });
-    nOrd=nOrd.filter(function(v,i,a){return a.indexOf(v)===i;});
-    nOrd.forEach(function(n){
-      var rows=byN[n];
-      html+='<div class="cg"><div class="cgh '+(isV?'ve':'co')+'"><span class="cgn">'+(isV?'🏪 ':'📦 ')+n+'</span><span class="cgl">'+rows.length+' línea'+(rows.length!==1?'s':'')+'</span></div>';
-      rows.forEach(function(l){
-        html+='<div class="pr"><span class="prv">'+l.pr+'</span><span class="prc'+(isV?'':' bl')+'">'+l.q+'</span>';
-        html+='<button class="prd" data-k="'+k+'" data-i="'+l._i+'">✕</button></div>';
+    wOrd=wOrd.filter(function(v,i,a){return a.indexOf(v)===i;});
+    wOrd.forEach(function(wk){
+      var wlines=byW[wk];
+      html+='<div class="week-group"><div class="wgh"><span class="wgh-label">📅 '+wk+'</span><span class="wgh-count">'+wlines.length+' línea'+(wlines.length!==1?'s':'')+'</span></div>';
+      // Within week group by date
+      var byF2={};var fOrd2=[];
+      wlines.forEach(function(l){ if(!byF2[l.f]){byF2[l.f]=[];fOrd2.push(l.f);}byF2[l.f].push(l); });
+      fOrd2=fOrd2.filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
+      fOrd2.forEach(function(f){
+        html+=buildDateGroup(byF2[f],f,isV,k);
       });
       html+='</div>';
     });
-    html+='</div>';
-  });
+  } else {
+    // Group by date (todos or camp filter)
+    var byF={};var fOrd=[];
+    filtered.forEach(function(l){
+      if(!byF[l.f]){byF[l.f]=[];fOrd.push(l.f);}
+      byF[l.f].push(l);
+    });
+    fOrd=fOrd.filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
+    fOrd.forEach(function(f){
+      html+=buildDateGroup(byF[f],f,isV,k);
+    });
+  }
+
   area.innerHTML=html;
   area.querySelectorAll('.prd').forEach(function(btn){
     btn.addEventListener('click',function(){delL(btn.getAttribute('data-k'),parseInt(btn.getAttribute('data-i')));});
   });
+  area.querySelectorAll('.pre').forEach(function(btn){
+    btn.addEventListener('click',function(){openEdit(btn.getAttribute('data-k'),parseInt(btn.getAttribute('data-i')));});
+  });
   area.scrollTop=area.scrollHeight;
+}
+
+function buildDateGroup(lines,f,isV,k){
+  var campBadge='';
+  if(isV && lines[0] && lines[0].camp){
+    campBadge='<span style="font-size:9.5px;background:var(--do);color:var(--v);padding:1px 6px;border-radius:8px;font-weight:700;margin-left:5px;">🌸 '+lines[0].camp+'</span>';
+  }
+  var h='<div class="dg"><div class="dgh"><span class="dgf">'+fmtF(f)+'</span>'+campBadge+'<span class="dgc">'+lines.length+' línea'+(lines.length!==1?'s':'')+'</span><div class="dgl"></div></div>';
+  var byN={};var nOrd=[];
+  lines.forEach(function(l){
+    var n=isV?l.cl:l.pv;
+    if(!byN[n]){byN[n]=[];nOrd.push(n);}
+    byN[n].push(l);
+  });
+  nOrd=nOrd.filter(function(v,i,a){return a.indexOf(v)===i;});
+  nOrd.forEach(function(n){
+    var rows=byN[n];
+    h+='<div class="cg"><div class="cgh '+(isV?'ve':'co')+'"><span class="cgn">'+(isV?'🏪 ':'📦 ')+n+'</span><span class="cgl">'+rows.length+' línea'+(rows.length!==1?'s':'')+'</span></div>';
+    rows.forEach(function(l){
+      var campTag=l.camp?'<span style="font-size:9px;background:rgba(201,168,76,0.2);color:#6a4e10;padding:1px 5px;border-radius:5px;margin-right:4px;">🌸 '+l.camp+'</span>':'';
+      h+='<div class="pr"><span class="prv">'+campTag+l.pr+'</span><span class="prc'+(isV?'':' bl')+'">'+l.q+'</span>';
+      h+='<button class="pre" data-k="'+k+'" data-i="'+l._i+'">✏️</button>';
+      h+='<button class="prd" data-k="'+k+'" data-i="'+l._i+'">✕</button></div>';
+    });
+    h+='</div>';
+  });
+  return h+'</div>';
 }
 
 function updBadges(){
@@ -474,7 +653,11 @@ function abrirInv(){
     vf.forEach(function(l){if(!prods[l.pr])prods[l.pr]={v:0,c:0};prods[l.pr].v+=l.q;});
     cf.forEach(function(l){if(!prods[l.pr])prods[l.pr]={v:0,c:0};prods[l.pr].c+=l.q;});
     var pk=Object.keys(prods).sort();if(!pk.length)return;
-    html+='<div class="ifg"><div class="ifh">'+fmtF(f)+'</div>';
+    var campasV=vf.map(function(l){return l.camp||'';}).filter(function(c){return c;});
+    var campasC=cf.map(function(l){return l.camp||'';}).filter(function(c){return c;});
+    var allCamps=[].concat(campasV,campasC).filter(function(v,i,a){return a.indexOf(v)===i;});
+    var campTag2=allCamps.length?(' <span style="font-size:10px;background:rgba(201,168,76,0.25);color:#6a4e10;padding:1px 7px;border-radius:8px;font-weight:600;">🌸 '+allCamps.join(', ')+'</span>'):'';
+    html+='<div class="ifg"><div class="ifh">'+fmtF(f)+campTag2+'</div>';
     html+='<div class="ifr" style="background:var(--cr);padding:5px 12px;"><span class="ifv1" style="font-size:10px;font-weight:700;color:var(--ts);text-transform:uppercase;">Producto</span><span class="ifv2" style="font-size:10px;font-weight:700;color:var(--vm);">Venta</span><span class="ifv3" style="font-size:10px;font-weight:700;color:var(--az);">Compra</span><span class="ifb" style="font-size:10px;font-weight:700;color:var(--ts);">Balance</span></div>';
     lines.push(fmtF(f).toUpperCase());lines.push('-'.repeat(36));
     pk.forEach(function(pr){
@@ -571,12 +754,309 @@ ddInputIds.forEach(function(id){
   el.addEventListener('keydown', function(e){ ddKey(e,id); });
 });
 
+
+// ── CAMPAIGNS ────────────────────────────────────────────────
+var _currentFilter='todos';
+var _currentCamp=null;
+function loadCamps(){
+  try{
+    var raw=JSON.parse(localStorage.getItem('bf_camps')||'[]');
+    // Normalize: support both string and object format
+    return raw.map(function(c){ return typeof c==='string'?{name:c,fecha:''}:c; });
+  }catch{return[];}
+}
+function campName(c){ return typeof c==='string'?c:c.name; }
+function campFecha(c){ return typeof c==='string'?'':c.fecha; }
+function saveCamps(c){localStorage.setItem('bf_camps',JSON.stringify(c));renderFilterBar();renderCampQuick();renderCampQuickC();}
+function renderFilterBar(){
+  var camps=loadCamps();var fb=document.getElementById('fbCampaigns');if(!fb)return;
+  fb.innerHTML=camps.map(function(c){
+    var n=campName(c);var f=campFecha(c);
+    var a=_currentFilter==='camp'&&_currentCamp===n;
+    var fTag=f?(' <span style="font-size:9px;opacity:0.7;">'+fmtF(f).split(' ').slice(0,2).join(' ')+'</span>'):'';
+    return '<button class="fb-btn campaign'+(a?' active':'')+'" data-camp="'+encodeURIComponent(n)+'">🌸 '+n+fTag+'</button>';
+  }).join('');
+  fb.querySelectorAll('.fb-btn').forEach(function(b){b.addEventListener('click',function(){setFilter('camp',b.getAttribute('data-camp'));});});
+}
+function renderCampQuick(){
+  var camps=loadCamps();var el=document.getElementById('campQuick');if(!el)return;
+  var cur=el.querySelector('.cq-btn.selected');var curVal=cur?cur.getAttribute('data-camp'):'';
+  el.innerHTML='<span style="font-size:9.5px;font-weight:600;color:var(--ts);text-transform:uppercase;letter-spacing:0.08em;align-self:center;">Campaña:</span>'+
+    '<button class="cq-btn normal'+(curVal===''?' selected':'')+'" data-camp="">Normal</button>'+
+    camps.map(function(c){
+      var n=campName(c);
+      return '<button class="cq-btn'+(curVal===n?' selected':'')+'" data-camp="'+n+'">🌸 '+n+'</button>';
+    }).join('');
+  el.querySelectorAll('.cq-btn').forEach(function(b){b.addEventListener('click',function(){selectCamp(b);});});
+}
+function selectCamp(btn){
+  // Only deselect siblings in same container
+  var parent=btn.parentElement;
+  parent.querySelectorAll('.cq-btn').forEach(function(b){b.classList.remove('selected');});
+  btn.classList.add('selected');
+}
+
+function renderCampQuickC(){
+  var camps=loadCamps();var el=document.getElementById('campQuickC');if(!el)return;
+  if(!camps.length){el.innerHTML='';return;}
+  el.innerHTML='<span style="font-size:9.5px;font-weight:600;color:var(--ts);text-transform:uppercase;letter-spacing:0.08em;align-self:center;">Campaña:</span>'+
+    '<button class="cq-btn normal selected" data-camp="">Normal</button>'+
+    camps.map(function(c){
+      var n=campName(c);
+      return '<button class="cq-btn" data-camp="'+n+'">🌸 '+n+'</button>';
+    }).join('');
+  el.querySelectorAll('.cq-btn').forEach(function(b){b.addEventListener('click',function(){selectCamp(b);});});
+}
+function setFilter(type,campEnc){
+  _currentFilter=type;_currentCamp=campEnc?decodeURIComponent(campEnc):null;
+  document.querySelectorAll('.fb-btn').forEach(function(b){b.classList.remove('active');});
+  if(type==='todos')document.getElementById('fbTodos').classList.add('active');
+  else if(type==='semanal')document.getElementById('fbSemanal').classList.add('active');
+  else renderFilterBar();
+  renderList('v');
+}
+function getWeekLabel(s){
+  var d=new Date(s+'T00:00:00'),m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));
+  var su=new Date(m);su.setDate(m.getDate()+6);
+  var M=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  return 'Semana '+m.getDate()+' '+M[m.getMonth()]+' — '+su.getDate()+' '+M[su.getMonth()];
+}
+function openCampModal(){renderCampList();document.getElementById('campModal').classList.add('open');}
+function closeCampModal(){document.getElementById('campModal').classList.remove('open');}
+function renderCampList(){
+  var camps=loadCamps();var el=document.getElementById('campListEl');if(!el)return;
+  if(!camps.length){el.innerHTML='<div style="color:var(--ts);font-size:12px;font-style:italic;padding:8px;">Sin campañas creadas.</div>';return;}
+  el.innerHTML=camps.map(function(c,i){
+    var f=campFecha(c);
+    var fStr=f?(' <span style="font-size:10px;font-family:DM Mono,monospace;color:var(--ts);background:var(--co);padding:1px 6px;border-radius:5px;">'+fmtF(f)+'</span>'):'';
+    return '<div class="camp-item"><span>🌸 '+campName(c)+fStr+'</span><button class="camp-del" data-i="'+i+'">✕</button></div>';
+  }).join('');
+  el.querySelectorAll('.camp-del').forEach(function(b){b.addEventListener('click',function(){delCamp(parseInt(b.getAttribute('data-i')));});});
+}
+function addCamp(){
+  var inp=document.getElementById('campNewInput');
+  var name=inp.value.trim();
+  var fecha=document.getElementById('campNewFecha').value;
+  if(!name){toast('⚠ Escribe el nombre de la campaña');return;}
+  var camps=loadCamps();
+  if(camps.find(function(c){return c.name===name;})){toast('Ya existe');return;}
+  camps.push({name:name,fecha:fecha});
+  saveCamps(camps);
+  inp.value='';
+  document.getElementById('campNewFecha').value='';
+  renderCampList();
+  toast('✅ Campaña "'+name+'" creada');
+}
+function delCamp(i){var camps=loadCamps();camps.splice(i,1);saveCamps(camps);if(_currentFilter==='camp')setFilter('todos');renderCampList();}
+
+
+// ── EDIT LINE ──────────────────────────────────────────────
+var _editK=null, _editI=null;
+
+function openEdit(k,i){
+  var data=ld(k);
+  var l=data[i];
+  if(!l)return;
+  _editK=k; _editI=i;
+  var isV=k==='v';
+  document.getElementById('editFecha').value=l.f||'';
+  document.getElementById('editProducto').value=l.pr||'';
+  document.getElementById('editCantidad').value=l.q||'';
+  // Show/hide cliente or proveedor
+  document.getElementById('editClienteWrap').style.display=isV?'flex':'none';
+  document.getElementById('editProvWrap').style.display=isV?'none':'flex';
+  if(isV) document.getElementById('editCliente').value=l.cl||'';
+  else document.getElementById('editProv').value=l.pv||'';
+  // Init dropdowns for edit modal
+  setupEditDropdown('editCliente','editClienteD',CLIENTES);
+  setupEditDropdown('editProducto','editProductoD',ARTICULOS.map(function(a){return a.d;}));
+  setupEditDropdown('editProv','editProvD',PROVEEDORES);
+  document.getElementById('mEdit').classList.add('open');
+  setTimeout(function(){document.getElementById('editProducto').focus();},200);
+}
+
+function setupEditDropdown(inputId,ddId,items){
+  var inp=document.getElementById(inputId);
+  var dd=document.getElementById(ddId);
+  if(!inp||!dd)return;
+  inp.oninput=function(){
+    var q=inp.value.toLowerCase();
+    var filtered=items.filter(function(x){return x.toLowerCase().includes(q);}).slice(0,60);
+    if(!filtered.length){
+      if(inp.value.trim()) dd.innerHTML='<div class="so" style="color:var(--vm);font-style:italic;" data-val="'+encodeURIComponent(inp.value.trim())+'">Usar "'+inp.value.trim()+'"</div>';
+      else dd.innerHTML='';
+      dd.classList.toggle('open',!!inp.value.trim());
+    } else {
+      dd.innerHTML=filtered.map(function(x){return '<div class="so" data-val="'+encodeURIComponent(x)+'">'+x+'</div>';}).join('');
+      dd.classList.add('open');
+    }
+    dd.querySelectorAll('.so').forEach(function(el){
+      el.addEventListener('mousedown',function(e){e.preventDefault();inp.value=decodeURIComponent(el.getAttribute('data-val'));dd.classList.remove('open');});
+    });
+  };
+  inp.onkeydown=function(e){if(e.key==='Escape')dd.classList.remove('open');};
+}
+
+function saveEdit(){
+  if(_editK===null||_editI===null)return;
+  var data=ld(_editK);
+  var l=data[_editI];
+  if(!l)return;
+  var f=document.getElementById('editFecha').value;
+  var pr=document.getElementById('editProducto').value.trim();
+  var q=parseInt(document.getElementById('editCantidad').value);
+  if(!f){toast('⚠ Selecciona la fecha');return;}
+  if(!pr){toast('⚠ Escribe el producto');return;}
+  if(!q||q<1){toast('⚠ Introduce la cantidad');return;}
+  l.f=f; l.pr=pr; l.q=q;
+  if(_editK==='v') l.cl=document.getElementById('editCliente').value.trim()||l.cl;
+  else l.pv=document.getElementById('editProv').value.trim()||l.pv;
+  data[_editI]=l;
+  sv(_editK,data);
+  closeM('mEdit');
+  toast('✅ Línea actualizada');
+}
+
+document.getElementById('mEdit').addEventListener('click',function(e){if(e.target===this)closeM('mEdit');});
+
+document.getElementById('campModal').addEventListener('click',function(e){if(e.target===this)closeCampModal();});
+
 var hoy=new Date().toISOString().split('T')[0];
 document.getElementById('vf').value=hoy;
 document.getElementById('cf').value=hoy;
-renderList('v');
-renderList('c');
-updBadges();
+// Run init after all functions defined
+setTimeout(function(){
+  renderFilterBar();
+  renderCampQuick();
+  renderList('v');
+  renderList('c');
+  updBadges();
+}, 0);
+// ── PACKING LIST PDF ────────────────────────────────────────
+var _packingLines = [];
+
+function openPdfContext(){
+  var camps = loadCamps();
+  var el = document.getElementById('pdfCampBtns');
+  if(el){
+    el.innerHTML = '<button class="pdf-camp-btn normal selected" data-camp="">Sin campaña</button>' +
+      camps.map(function(c){
+        var n = campName(c);
+        return '<button class="pdf-camp-btn" data-camp="'+n+'">🌸 '+n+'</button>';
+      }).join('');
+    el.querySelectorAll('.pdf-camp-btn').forEach(function(b){
+      b.addEventListener('click', function(){
+        el.querySelectorAll('.pdf-camp-btn').forEach(function(x){x.classList.remove('selected');});
+        b.classList.add('selected');
+      });
+    });
+  }
+  var cf = document.getElementById('cf');
+  var pf = document.getElementById('pdfSemanaFecha');
+  if(cf && pf && cf.value) pf.value = cf.value;
+  document.getElementById('pdfContext').classList.add('active');
+}
+
+function cancelPdfContext(){
+  document.getElementById('pdfContext').classList.remove('active');
+}
+
+function confirmarPdfContext(){
+  var campBtn = document.querySelector('#pdfCampBtns .pdf-camp-btn.selected');
+  window._pdfCamp = campBtn ? campBtn.getAttribute('data-camp') : '';
+  var fecha = document.getElementById('pdfSemanaFecha').value;
+  window._pdfFecha = fecha;
+  if(fecha && document.getElementById('cf')) document.getElementById('cf').value = fecha;
+  document.getElementById('pdfContext').classList.remove('active');
+  document.getElementById('pdfPackingInput').click();
+}
+
+async function handlePackingPdf(e){
+  var file = e.target.files[0];
+  if(!file){ return; }
+  e.target.value = '';
+  var apiKey = localStorage.getItem('bf_ak');
+  if(!apiKey){ toast('⚠ Configura tu API Key primero (botón 🔑)'); return; }
+  var reader = new FileReader();
+  reader.onload = async function(ev){
+    var base64 = ev.target.result.split(',')[1];
+    document.getElementById('pdfProcessing').classList.add('active');
+    document.getElementById('pdfResult').classList.remove('active');
+    var fecha = document.getElementById('cf').value;
+    var proveedor = document.getElementById('cpv').value.trim();
+    try {
+      var resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1500,
+          system: 'Eres el asistente de Buscaflor, empresa importadora de flores. Extraes datos de packing lists y facturas. Responde SOLO con JSON sin texto adicional.',
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+              { type: 'text', text: 'Lee este documento y extrae las lineas de producto. Responde SOLO con este JSON: {"proveedor":"nombre","fecha":"YYYY-MM-DD o vacia","lineas":[{"producto":"variedad con longitud","cantidad":0,"unidad":"paquetes o tallos"}]}' +
+                (proveedor ? ' Proveedor: '+proveedor+'.' : '') + (fecha ? ' Fecha referencia: '+fecha+'.' : '') }
+            ]
+          }]
+        })
+      });
+      document.getElementById('pdfProcessing').classList.remove('active');
+      if(!resp.ok){ var err=await resp.json().catch(function(){return{};}); throw new Error(err.error&&err.error.message?err.error.message:'Error '+resp.status); }
+      var data = await resp.json();
+      var txt = data.content && data.content.find(function(b){return b.type==='text';});
+      var raw = txt ? txt.text : '';
+      var parsed;
+      try { parsed = JSON.parse(raw.indexOf('{')>=0 ? raw.substring(raw.indexOf('{'), raw.lastIndexOf('}')+1) : raw.trim()); }
+      catch(e){ throw new Error('No pude interpretar la respuesta'); }
+      _packingLines = parsed.lineas || [];
+      var exProv = parsed.proveedor || proveedor || '';
+      var exFecha = parsed.fecha || fecha || '';
+      if(exProv && !proveedor) document.getElementById('cpv').value = exProv;
+      if(exFecha && exFecha.match(/\d{4}-\d{2}-\d{2}/)) document.getElementById('cf').value = exFecha;
+      if(!_packingLines.length){ toast('⚠ No encontré líneas de producto'); return; }
+      var camp = window._pdfCamp || '';
+      document.getElementById('pdfResultTitle').textContent = '📄 ' + _packingLines.length + ' línea' + (_packingLines.length!==1?'s':'') + ' extraída' + (_packingLines.length!==1?'s':'') + (exProv?' — '+exProv:'') + (camp?' 🌸 '+camp:'');
+      document.getElementById('pdfResultLines').innerHTML = _packingLines.map(function(l){
+        return '<div class="pdf-result-line">• <strong>'+l.cantidad+' '+(l.unidad||'uds')+'</strong> '+l.producto+'</div>';
+      }).join('');
+      document.getElementById('pdfResult').classList.add('active');
+    } catch(err) {
+      document.getElementById('pdfProcessing').classList.remove('active');
+      toast('⚠ Error: ' + err.message);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function addPackingLines(){
+  var fecha = document.getElementById('cf').value;
+  var proveedor = document.getElementById('cpv').value.trim();
+  var camp = window._pdfCamp || '';
+  if(!fecha){ toast('⚠ Selecciona la fecha de llegada'); return; }
+  if(!proveedor){ toast('⚠ Escribe el proveedor'); return; }
+  if(!_packingLines.length){ toast('⚠ Sin líneas para añadir'); return; }
+  _packingLines.forEach(function(l){
+    addL('c', { id: nxtId(), f: fecha, pv: proveedor, pr: l.producto, q: l.cantidad, camp: camp, t: Date.now() });
+  });
+  var campMsg = camp ? ' — 🌸 '+camp : '';
+  toast('✅ '+_packingLines.length+' línea'+(_packingLines.length!==1?'s':'')+' añadida'+(_packingLines.length!==1?'s':'')+campMsg);
+  cancelPacking();
+  window._pdfCamp = '';
+}
+
+function cancelPacking(){
+  _packingLines = [];
+  document.getElementById('pdfResult').classList.remove('active');
+  document.getElementById('pdfProcessing').classList.remove('active');
+}
+
 </script>
 </body>
 </html>
