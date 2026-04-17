@@ -169,9 +169,7 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
 
 /* CAMPAIGN QUICK BUTTONS */
 .camp-quick{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
-.cq-btn{padding:5px 11px;border-radius:14px;border:1.5px solid var(--co);background:var(--wh);color:var(--ts);font-family:'Sora',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s;}
-.cq-btn.selected{background:var(--do);color:var(--v);border-color:var(--do);}
-.cq-btn.normal.selected{background:var(--v);color:var(--cr);border-color:var(--v);}
+/* cq-btn removed */
 
 /* WEEK GROUP HEADER */
 .week-group{margin-bottom:16px;}
@@ -502,7 +500,7 @@ function addV(){
   var cl=document.getElementById('vci').value.trim();
   var pr=document.getElementById('vpi').value.trim();
   var q=parseInt(document.getElementById('vq').value);
-  var camp=document.querySelector('.cq-btn.selected')?document.querySelector('.cq-btn.selected').getAttribute('data-camp'):'';
+  var camp=document.getElementById('campSelectV')?document.getElementById('campSelectV').value:'';
   if(!f){toast('⚠ Selecciona fecha de entrega');return;}
   if(!cl){toast('⚠ Escribe o selecciona el cliente');return;}
   if(!pr){toast('⚠ Escribe o selecciona el producto');return;}
@@ -519,8 +517,7 @@ function addC(){
   var pv=document.getElementById('cpv').value.trim();
   var pr=document.getElementById('cpi').value.trim();
   var q=parseInt(document.getElementById('cq').value);
-  var campC=document.querySelector('#campQuickC .cq-btn.selected');
-  var camp=campC?campC.getAttribute('data-camp'):'';
+  var camp=document.getElementById('campSelectC')?document.getElementById('campSelectC').value:'';
   if(!f){toast('⚠ Selecciona fecha de llegada');return;}
   if(!pv){toast('⚠ Escribe el proveedor');return;}
   if(!pr){toast('⚠ Escribe o selecciona el producto');return;}
@@ -921,14 +918,31 @@ function campName(c){ return typeof c==='string'?c:c.name; }
 function campFecha(c){ return typeof c==='string'?'':c.fecha; }
 function saveCamps(c){localStorage.setItem('bf_camps',JSON.stringify(c));renderFilterBar();renderCampQuick();renderCampQuickC();}
 function renderFilterBar(){
-  var camps=loadCamps();var fb=document.getElementById('fbCampaigns');if(!fb)return;
-  fb.innerHTML=camps.map(function(c){
-    var n=campName(c);var f=campFecha(c);
-    var a=_currentFilter==='camp'&&_currentCamp===n;
-    var fTag=f?(' <span style="font-size:9px;opacity:0.7;">'+fmtF(f).split(' ').slice(0,2).join(' ')+'</span>'):'';
-    return '<button class="fb-btn campaign'+(a?' active':'')+'" data-camp="'+encodeURIComponent(n)+'">🌸 '+n+fTag+'</button>';
-  }).join('');
-  fb.querySelectorAll('.fb-btn').forEach(function(b){b.addEventListener('click',function(){setFilter('camp',b.getAttribute('data-camp'));});});
+  var camps=loadCamps();
+  var fb=document.getElementById('fbCampaigns');
+  if(!fb) return;
+  if(!camps.length){
+    fb.innerHTML='';
+    return;
+  }
+  // Use a select for campaigns in filter bar
+  var curVal=_currentFilter==='camp'&&_currentCamp?_currentCamp:'';
+  fb.innerHTML='<select id="campFilterSel" style="border:1.5px solid var(--do);border-radius:14px;padding:4px 10px;font-family:Sora,sans-serif;font-size:11.5px;font-weight:600;color:#6a4e10;background:#fdf8ee;outline:none;cursor:pointer;">'+
+    '<option value="">🌸 Campaña...</option>'+
+    camps.map(function(c){
+      var n=campName(c);var f=campFecha(c);
+      var label=n+(f?' ('+fmtF(f).split(' ').slice(0,2).join(' ')+')':'');
+      return '<option value="'+n+'"'+(curVal===n?' selected':'')+'>'+label+'</option>';
+    }).join('')+
+  '</select>';
+  var sel=document.getElementById('campFilterSel');
+  if(sel){
+    if(curVal) sel.classList.add('active');
+    sel.addEventListener('change',function(){
+      if(sel.value) setFilter('camp',encodeURIComponent(sel.value));
+      else setFilter('todos');
+    });
+  }
 }
 function renderCampQuick(){
   var camps=loadCamps();var el=document.getElementById('campQuick');if(!el)return;
@@ -941,12 +955,7 @@ function renderCampQuick(){
     }).join('');
   el.querySelectorAll('.cq-btn').forEach(function(b){b.addEventListener('click',function(){selectCamp(b);});});
 }
-function selectCamp(btn){
-  // Only deselect siblings in same container
-  var parent=btn.parentElement;
-  parent.querySelectorAll('.cq-btn').forEach(function(b){b.classList.remove('selected');});
-  btn.classList.add('selected');
-}
+// selectCamp removed — using selects now
 
 function renderCampQuickC(){
   var camps=loadCamps();var el=document.getElementById('campQuickC');if(!el)return;
@@ -1089,20 +1098,7 @@ var _packingLines = [];
 
 function openPdfContext(){
   var camps = loadCamps();
-  var el = document.getElementById('pdfCampBtns');
-  if(el){
-    el.innerHTML = '<button class="pdf-camp-btn normal selected" data-camp="">Sin campaña</button>' +
-      camps.map(function(c){
-        var n = campName(c);
-        return '<button class="pdf-camp-btn" data-camp="'+n+'">🌸 '+n+'</button>';
-      }).join('');
-    el.querySelectorAll('.pdf-camp-btn').forEach(function(b){
-      b.addEventListener('click', function(){
-        el.querySelectorAll('.pdf-camp-btn').forEach(function(x){x.classList.remove('selected');});
-        b.classList.add('selected');
-      });
-    });
-  }
+  populateCampSelect('pdfCampSelect', camps);
   var cf = document.getElementById('cf');
   var pf = document.getElementById('pdfSemanaFecha');
   if(cf && pf && cf.value) pf.value = cf.value;
@@ -1114,8 +1110,8 @@ function cancelPdfContext(){
 }
 
 function confirmarPdfContext(){
-  var campBtn = document.querySelector('#pdfCampBtns .pdf-camp-btn.selected');
-  window._pdfCamp = campBtn ? campBtn.getAttribute('data-camp') : '';
+  var sel = document.getElementById('pdfCampSelect');
+  window._pdfCamp = sel ? sel.value : '';
   var fecha = document.getElementById('pdfSemanaFecha').value;
   window._pdfFecha = fecha;
   if(fecha && document.getElementById('cf')) document.getElementById('cf').value = fecha;
