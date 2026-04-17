@@ -54,6 +54,12 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
 .prc.bl{color:var(--az);}
 .prd{background:none;border:none;color:rgba(212,132,122,0.35);cursor:pointer;font-size:15px;padding:2px 4px;flex-shrink:0;}
 .prd:active{color:var(--ro);}
+.pfin{background:none;border:1.5px solid rgba(74,140,92,0.3);color:var(--vc);cursor:pointer;font-size:10px;font-family:'Sora',sans-serif;font-weight:600;border-radius:12px;padding:3px 9px;white-space:nowrap;flex-shrink:0;}
+.pfin:active{background:rgba(74,140,92,0.1);}
+.pfin.done{background:rgba(74,140,92,0.12);border-color:var(--vc);color:var(--vc);}
+.preact{background:none;border:1.5px solid rgba(201,168,76,0.3);color:var(--do);cursor:pointer;font-size:10px;font-family:'Sora',sans-serif;font-weight:600;border-radius:12px;padding:3px 9px;white-space:nowrap;flex-shrink:0;}
+.cg.finalizado .cgh{opacity:0.7;}
+.cg.finalizado .pr{opacity:0.6;}
 .pre{background:none;border:none;color:rgba(74,140,92,0.4);cursor:pointer;font-size:14px;padding:2px 4px;flex-shrink:0;}
 .pre:active{color:var(--vc);}
 .ia{background:var(--wh);border-top:1px solid var(--co);padding:10px 14px 14px;flex-shrink:0;}
@@ -98,7 +104,7 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
 .msh{padding:15px 16px 11px;border-bottom:1px solid var(--co);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
 .msh h3{font-family:'DM Serif Display',serif;font-size:17px;color:var(--v);}
 .msc{background:none;border:none;font-size:19px;cursor:pointer;color:var(--ts);}
-.msb{padding:12px 16px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;}
+.msb{padding:8px 12px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;}
 .msb pre{font-family:'DM Mono',monospace;font-size:11.5px;line-height:1.8;white-space:pre-wrap;background:var(--cr);padding:11px;border-radius:8px;}
 .msf{padding:11px 16px 22px;border-top:1px solid var(--co);display:flex;gap:6px;flex-shrink:0;}
 .msf button{flex:1;padding:10px;border-radius:8px;font-family:'Sora',sans-serif;font-size:12px;font-weight:600;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:4px;}
@@ -316,6 +322,7 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
     <div class="msf">
       <button class="mbo" onclick="sWA()">💬 WhatsApp</button>
       <button class="mbo" onclick="sEM()">📧 Email</button>
+      <button class="mbo" onclick="sPrint()">🖨 Imprimir</button>
       <button class="mbg" onclick="sCopy()">📋 Copiar</button>
     </div>
   </div>
@@ -601,6 +608,16 @@ function renderList(k){
   area.querySelectorAll('.pre').forEach(function(btn){
     btn.addEventListener('click',function(){openEdit(btn.getAttribute('data-k'),parseInt(btn.getAttribute('data-i')));});
   });
+  area.querySelectorAll('.pfin').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      finalizarGrupo(btn.getAttribute('data-k'), decodeURIComponent(btn.getAttribute('data-name')), btn.getAttribute('data-fecha'), true);
+    });
+  });
+  area.querySelectorAll('.preact').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      finalizarGrupo(btn.getAttribute('data-k'), decodeURIComponent(btn.getAttribute('data-name')), btn.getAttribute('data-fecha'), false);
+    });
+  });
   area.scrollTop=area.scrollHeight;
 }
 
@@ -619,12 +636,25 @@ function buildDateGroup(lines,f,isV,k){
   nOrd=nOrd.filter(function(v,i,a){return a.indexOf(v)===i;});
   nOrd.forEach(function(n){
     var rows=byN[n];
-    h+='<div class="cg"><div class="cgh '+(isV?'ve':'co')+'"><span class="cgn">'+(isV?'🏪 ':'📦 ')+n+'</span><span class="cgl">'+rows.length+' línea'+(rows.length!==1?'s':'')+'</span></div>';
+    // Check if this client group is finalizado (all rows have finalizado flag)
+    var isFinalizado = rows.length > 0 && rows.every(function(l){ return l.finalizado; });
+    var finBtn = isV ?
+      (isFinalizado ?
+        '<button class="preact" data-k="'+k+'" data-name="'+encodeURIComponent(n)+'" data-fecha="'+f+'">↩ Reabrir</button>' :
+        '<button class="pfin" data-k="'+k+'" data-name="'+encodeURIComponent(n)+'" data-fecha="'+f+'">✅ Finalizar</button>'
+      ) : '';
+    h+='<div class="cg'+(isFinalizado?' finalizado':'')+'"><div class="cgh '+(isV?'ve':'co')+'" style="gap:6px;">';
+    h+='<span class="cgn">'+(isV?'🏪 ':'📦 ')+n+(isFinalizado?' <span style="font-size:10px;opacity:0.8;">✓ cerrado</span>':'')+'</span>';
+    h+='<div style="display:flex;align-items:center;gap:6px;"><span class="cgl">'+rows.length+' línea'+(rows.length!==1?'s':'')+'</span>'+finBtn+'</div>';
+    h+='</div>';
     rows.forEach(function(l){
       var campTag=l.camp?'<span style="font-size:9px;background:rgba(201,168,76,0.2);color:#6a4e10;padding:1px 5px;border-radius:5px;margin-right:4px;">🌸 '+l.camp+'</span>':'';
       h+='<div class="pr"><span class="prv">'+campTag+l.pr+'</span><span class="prc'+(isV?'':' bl')+'">'+l.q+'</span>';
-      h+='<button class="pre" data-k="'+k+'" data-i="'+l._i+'">✏️</button>';
-      h+='<button class="prd" data-k="'+k+'" data-i="'+l._i+'">✕</button></div>';
+      if(!isFinalizado){
+        h+='<button class="pre" data-k="'+k+'" data-i="'+l._i+'">✏️</button>';
+        h+='<button class="prd" data-k="'+k+'" data-i="'+l._i+'">✕</button>';
+      }
+      h+='</div>';
     });
     h+='</div>';
   });
@@ -680,38 +710,143 @@ function sCopyInv(){if(_invTxt)navigator.clipboard.writeText(_invTxt).then(funct
 // ── INFORME ────────────────────────────────────────────────
 var _infTxt='';
 function genInf(k){
+  window._lastInfK=k;
   var data=ld(k);
   if(!data.length){toast('Sin datos para el informe');return;}
   var isV=k==='v';
   var now=new Date();
   var fecha=now.toLocaleDateString('es-ES',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   var hora=now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+
+  // Group by fecha then by nombre
   var byF={};var fOrd=[];
   data.forEach(function(l){if(!byF[l.f]){byF[l.f]=[];fOrd.push(l.f);}byF[l.f].push(l);});
   fOrd=fOrd.filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
-  var lines=['================================',isV?'  BUSCAFLOR - PEDIDOS DE VENTA':'  BUSCAFLOR - PEDIDOS DE COMPRA','================================','  '+fecha,'  '+hora,'  '+data.length+' lineas · '+fOrd.length+' fecha'+(fOrd.length!==1?'s':''),'================================',''];
+
+  // Totales
+  var tots={};
+  data.forEach(function(l){tots[l.pr]=(tots[l.pr]||0)+l.q;});
+
+  // Build styled HTML
+  var rows='';
   fOrd.forEach(function(f){
-    lines.push(fmtF(f).toUpperCase());lines.push('-'.repeat(32));
-    var byN={};
-    byF[f].forEach(function(l){var n=isV?l.cl:l.pv;if(!byN[n])byN[n]=[];byN[n].push(l);});
-    Object.keys(byN).forEach(function(n){
-      lines.push('  '+n);
-      byN[n].forEach(function(l){lines.push('    '+String(l.q).padStart(4)+'  '+l.pr);});
+    var byN={};var nOrd=[];
+    byF[f].forEach(function(l){
+      var n=isV?l.cl:l.pv;
+      if(!byN[n])byN[n]=[];byN[n].push(l);
+      nOrd.push(n);
     });
-    lines.push('');
+    nOrd=nOrd.filter(function(v,i,a){return a.indexOf(v)===i;});
+    var campas=byF[f].map(function(l){return l.camp||'';}).filter(function(c,i,a){return c&&a.indexOf(c)===i;});
+    var campTag=campas.length?'<span class="rpt-camp">🌸 '+campas.join(', ')+'</span>':'';
+
+    rows+='<div class="rpt-fecha-head"><span>'+fmtF(f).toUpperCase()+'</span>'+campTag+'<span class="rpt-fecha-count">'+byF[f].length+' línea'+(byF[f].length!==1?'s':'')+'</span></div>';
+
+    nOrd.forEach(function(n){
+      var lineas=byN[n];
+      var finaliz=lineas.every(function(l){return l.finalizado;});
+      rows+='<div class="rpt-cliente'+(finaliz?' rpt-finalizado':'')+'">'+
+        '<div class="rpt-cli-head">'+
+          '<span class="rpt-cli-name">'+(isV?'🏪 ':'📦 ')+n+'</span>'+
+          (finaliz?'<span class="rpt-cli-done">✓ cerrado</span>':'')+
+          '<span class="rpt-cli-count">'+lineas.length+' línea'+(lineas.length!==1?'s':'')+'</span>'+
+        '</div>';
+      lineas.forEach(function(l){
+        var camp=l.camp?'<span class="rpt-camp-sm">'+l.camp+'</span>':'';
+        rows+='<div class="rpt-line">'+
+          '<span class="rpt-line-prod">'+camp+l.pr+'</span>'+
+          '<span class="rpt-line-qty">'+l.q+'</span>'+
+        '</div>';
+      });
+      rows+='</div>';
+    });
   });
-  var tots={};data.forEach(function(l){tots[l.pr]=(tots[l.pr]||0)+l.q;});
-  lines.push('================================');lines.push('TOTALES POR PRODUCTO');lines.push('-'.repeat(32));
-  Object.keys(tots).sort().forEach(function(p){lines.push('  '+String(tots[p]).padStart(4)+'  '+p);});
-  lines.push('================================');lines.push('  Buscaflor · La Mejor S.L.');lines.push('================================');
-  _infTxt=lines.join('\n');
-  document.getElementById('mInfT').textContent=isV?'🛒 Informe de ventas':'📦 Informe de compras';
-  document.getElementById('mInfC').textContent=_infTxt;
+
+  // Totales rows
+  var totRows=Object.keys(tots).sort().map(function(p){
+    return '<div class="rpt-tot-line"><span>'+p+'</span><span class="rpt-tot-qty">'+tots[p]+'</span></div>';
+  }).join('');
+
+  var html='<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'+
+    '<title>'+(isV?'Pedidos de Venta':'Pedidos de Compra')+' · Buscaflor · '+fecha+'</title>'+
+    '<style>'+
+    '*{box-sizing:border-box;margin:0;padding:0;}'+
+    'body{font-family:Arial,sans-serif;font-size:12px;color:#1a1a1a;background:white;padding:28px 32px;max-width:720px;margin:0 auto;}'+
+    'h1{font-size:16px;font-weight:700;color:#1a3a2a;margin-bottom:2px;}'+
+    '.meta{font-size:10px;color:#888;margin-bottom:18px;}'+
+    '.rpt-fecha-head{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:700;color:#1a3a2a;text-transform:uppercase;letter-spacing:0.08em;border-bottom:2px solid #1a3a2a;padding:5px 0 4px;margin:14px 0 6px;}'+
+    '.rpt-fecha-count{margin-left:auto;font-weight:400;color:#888;text-transform:none;letter-spacing:0;}'+
+    '.rpt-camp{font-size:9px;background:#f5f0e8;color:#6a4e10;padding:1px 7px;border-radius:8px;font-weight:600;border:1px solid #e8e0d0;}'+
+    '.rpt-cliente{border:1px solid #e8e0d0;border-radius:6px;margin-bottom:6px;overflow:hidden;}'+
+    '.rpt-finalizado{opacity:0.6;}'+
+    '.rpt-cli-head{display:flex;align-items:center;gap:8px;padding:5px 10px;background:#f9f7f3;border-bottom:1px solid #e8e0d0;}'+
+    '.rpt-cli-name{font-weight:700;font-size:11.5px;flex:1;}'+
+    '.rpt-cli-done{font-size:9px;color:#4a8c5c;background:#edf7ef;padding:1px 6px;border-radius:8px;border:1px solid #b8ddc0;}'+
+    '.rpt-cli-count{font-size:10px;color:#888;white-space:nowrap;}'+
+    '.rpt-line{display:flex;align-items:center;padding:4px 10px;border-bottom:1px solid #f0ede8;}'+
+    '.rpt-line:last-child{border-bottom:none;}'+
+    '.rpt-line-prod{flex:1;font-size:11.5px;}'+
+    '.rpt-line-qty{font-family:monospace;font-size:12px;font-weight:700;color:#2d5a3d;min-width:28px;text-align:right;}'+
+    '.rpt-camp-sm{font-size:9px;background:#f5f0e8;color:#6a4e10;padding:1px 5px;border-radius:5px;margin-right:5px;border:1px solid #e8e0d0;}'+
+    '.rpt-tots{margin-top:18px;border:1px solid #1a3a2a;border-radius:6px;overflow:hidden;}'+
+    '.rpt-tots-head{background:#1a3a2a;color:white;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;}'+
+    '.rpt-tot-line{display:flex;padding:4px 10px;border-bottom:1px solid #e8e0d0;font-size:11.5px;}'+
+    '.rpt-tot-line:last-child{border-bottom:none;}'+
+    '.rpt-tot-qty{font-family:monospace;font-weight:700;color:#2d5a3d;margin-left:auto;}'+
+    '.footer{margin-top:18px;font-size:9.5px;color:#aaa;text-align:center;border-top:1px solid #e8e0d0;padding-top:8px;}'+
+    '@media print{body{padding:14px;}@page{margin:1.2cm;size:A4;}}'+
+    '</style></head><body>'+
+    '<h1>'+(isV?'Pedidos de Venta':'Pedidos de Compra')+'</h1>'+
+    '<div class="meta">'+fecha+' · '+hora+' · '+data.length+' líneas · '+fOrd.length+' fecha'+(fOrd.length!==1?'s':'')+'</div>'+
+    rows+
+    '<div class="rpt-tots">'+
+      '<div class="rpt-tots-head">Totales por producto</div>'+
+      totRows+
+    '</div>'+
+    '<div class="footer">Buscaflor · La Mejor S.L. · Sevilla · Generado el '+fecha+' a las '+hora+'</div>'+
+    '</body></html>';
+
+  window._informeHtml = html;
+  window._informeText = (isV?'PEDIDOS DE VENTA':'PEDIDOS DE COMPRA') + ' · ' + fecha;
+
+  // Show modal with iframe preview
+  document.getElementById('mInfT').textContent = isV ? '🛒 Informe de ventas' : '📦 Informe de compras';
+  document.getElementById('mInfC').innerHTML = '';
+  var iframe = document.createElement('iframe');
+  iframe.style.cssText = 'width:100%;height:360px;border:none;border-radius:6px;background:white;';
+  iframe.srcdoc = html;
+  document.getElementById('mInfC').appendChild(iframe);
   document.getElementById('mInf').classList.add('open');
 }
-function sWA(){if(_infTxt)window.open('https://wa.me/?text='+encodeURIComponent(_infTxt),'_blank');}
-function sEM(){if(!_infTxt)return;var s=encodeURIComponent('Informe Buscaflor · '+new Date().toLocaleDateString('es-ES'));window.location.href='mailto:?subject='+s+'&body='+encodeURIComponent(_infTxt);}
-function sCopy(){if(_infTxt)navigator.clipboard.writeText(_infTxt).then(function(){toast('📋 Copiado');});}
+
+function sPrint(){
+  if(!window._informeHtml){toast('Genera el informe primero');return;}
+  var w=window.open('','_blank');
+  w.document.write(window._informeHtml);
+  w.document.close();
+  w.onload=function(){w.print();};
+}
+
+function sWA(){
+  // For WhatsApp share plain text version
+  var data = ld(_lastInfK||'v');
+  if(!data.length){toast('Sin datos');return;}
+  var lines=['BUSCAFLOR - PEDIDOS','Generado: '+new Date().toLocaleDateString('es-ES'),''];
+  var byF={};data.forEach(function(l){if(!byF[l.f])byF[l.f]=[];byF[l.f].push(l);});
+  Object.keys(byF).sort().forEach(function(f){
+    lines.push(fmtF(f).toUpperCase());
+    var byN={};byF[f].forEach(function(l){var n=(_lastInfK==='v'?l.cl:l.pv);if(!byN[n])byN[n]=[];byN[n].push(l);});
+    Object.keys(byN).forEach(function(n){lines.push('  '+n);byN[n].forEach(function(l){lines.push('    '+l.q+'  '+l.pr);});});
+    lines.push('');
+  });
+  window.open('https://wa.me/?text='+encodeURIComponent(lines.join('\n')),'_blank');
+}
+function sEM(){
+  if(!window._informeHtml){toast('Genera el informe primero');return;}
+  var s=encodeURIComponent('Informe Buscaflor · '+new Date().toLocaleDateString('es-ES'));
+  window.location.href='mailto:?subject='+s+'&body='+encodeURIComponent(window._informeText||'');
+}
+function sCopy(){var t=window._informeText||'';navigator.clipboard.writeText(t).then(function(){toast('📋 Copiado');});}
 
 // ── RESETEAR ───────────────────────────────────────────────
 function rst(k){
@@ -754,6 +889,23 @@ ddInputIds.forEach(function(id){
   el.addEventListener('keydown', function(e){ ddKey(e,id); });
 });
 
+
+// ── FINALIZAR GRUPO ────────────────────────────────────────────
+function finalizarGrupo(k, nombre, fecha, finalizar){
+  var data = ld(k);
+  var changed = 0;
+  data.forEach(function(l){
+    var lNombre = k==='v' ? l.cl : l.pv;
+    if(lNombre === nombre && l.f === fecha){
+      l.finalizado = finalizar;
+      changed++;
+    }
+  });
+  if(changed > 0){
+    sv(k, data);
+    toast(finalizar ? '✅ Pedido de '+nombre+' cerrado' : '↩ Pedido de '+nombre+' reabierto');
+  }
+}
 
 // ── CAMPAIGNS ────────────────────────────────────────────────
 var _currentFilter='todos';
