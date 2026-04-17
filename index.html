@@ -3,738 +3,580 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Buscaflor · Pedidos</title>
+<title>Buscaflor · Gestión</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --verde:#1a3a2a;--verde-medio:#2d5a3d;--verde-claro:#4a8c5c;
-  --verde-suave:#7ab88a;--crema:#f5f0e8;--crema-oscuro:#e8e0d0;
-  --rosa:#d4847a;--dorado:#c9a84c;--texto:#1a1a1a;
-  --texto-suave:#5a5a4a;--blanco:#ffffff;
-  --sombra:0 2px 12px rgba(26,58,42,0.10);
+  --v:#1a3a2a;--vm:#2d5a3d;--vc:#4a8c5c;--vs:#7ab88a;
+  --cr:#f5f0e8;--co:#e8e0d0;--ro:#d4847a;--do:#c9a84c;
+  --tx:#1a1a1a;--ts:#5a5a4a;--wh:#ffffff;
+  --az:#3a6a9a;--azc:#5a8abf;
+  --sh:0 2px 12px rgba(26,58,42,0.10);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{font-family:'Sora',sans-serif;background:var(--crema);color:var(--texto);min-height:100vh;display:flex;flex-direction:column;max-width:480px;margin:0 auto;}
-
-/* HEADER */
-header{background:var(--verde);padding:0 18px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.15);}
-.logo{display:flex;align-items:center;gap:9px;}
-.logo-icon{width:28px;height:28px;background:var(--dorado);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;}
-.logo-text{font-family:'DM Serif Display',serif;font-size:18px;color:var(--crema);}
-.logo-text span{color:var(--dorado);}
-.header-right{display:flex;align-items:center;gap:8px;}
-.hbtn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:var(--crema);border-radius:7px;padding:5px 10px;font-size:11px;font-family:'Sora',sans-serif;cursor:pointer;white-space:nowrap;}
-.hbtn:active{background:rgba(255,255,255,0.2);}
-.hbtn.gold{background:rgba(201,168,76,0.2);border-color:rgba(201,168,76,0.4);color:var(--dorado);}
-.ped-count{font-size:11px;color:var(--verde-suave);}
-
-/* MAIN */
-main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh - 54px);}
-
-/* PEDIDOS LIST */
-.pedidos-area{flex:1;overflow-y:auto;padding:14px 16px;-webkit-overflow-scrolling:touch;}
-
-.empty-state{text-align:center;padding:60px 20px;color:var(--texto-suave);}
-.empty-icon{font-size:52px;display:block;margin-bottom:12px;opacity:0.35;}
-.empty-title{font-family:'DM Serif Display',serif;font-size:20px;color:var(--verde);margin-bottom:6px;}
-.empty-desc{font-size:13px;line-height:1.6;}
-
-/* CLIENTE GROUP */
-.cliente-group{background:var(--blanco);border-radius:12px;margin-bottom:10px;overflow:hidden;box-shadow:var(--sombra);}
-.cg-head{background:var(--verde);padding:9px 14px;display:flex;justify-content:space-between;align-items:center;}
-.cg-nombre{font-size:13.5px;font-weight:600;color:var(--crema);}
-.cg-num{font-size:10px;font-family:'DM Mono',monospace;color:var(--dorado);background:rgba(201,168,76,0.2);padding:2px 7px;border-radius:8px;}
-.cg-total{font-size:10.5px;color:rgba(245,240,232,0.6);}
-.cg-estado{font-size:9.5px;color:var(--verde-suave);}
-
-.pedido-row{display:flex;align-items:center;padding:9px 14px;border-bottom:1px solid var(--crema-oscuro);gap:8px;}
-.pedido-row:last-child{border-bottom:none;}
-.pr-var{flex:1;font-size:13px;font-weight:500;color:var(--texto);}
-.pr-cant{font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--verde-medio);}
-.pr-uni{font-size:10.5px;color:var(--texto-suave);margin-left:2px;}
-.pr-del{background:none;border:none;color:rgba(212,132,122,0.4);cursor:pointer;font-size:16px;padding:2px 4px;flex-shrink:0;}
-.pr-del:active{color:var(--rosa);}
-
-/* FINALIZAR BADGE */
-.cg-finalizado .cg-head{background:var(--verde-medio);}
-.cg-finalizado .cg-estado{color:#a8e6b8;}
-
-/* INPUT AREA */
-.input-area{background:var(--blanco);border-top:1px solid var(--crema-oscuro);padding:12px 16px 20px;flex-shrink:0;}
-
-.cliente-selector{margin-bottom:10px;}
-.cs-label{font-size:10px;font-weight:600;color:var(--texto-suave);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:5px;display:block;}
-.cs-row{display:flex;gap:6px;}
-.cs-input{flex:1;border:1.5px solid var(--crema-oscuro);border-radius:8px;padding:8px 11px;font-family:'Sora',sans-serif;font-size:13px;background:var(--crema);outline:none;min-width:0;}
-.cs-input:focus{border-color:var(--verde-claro);}
-.cs-mic{width:36px;height:36px;background:transparent;border:1.5px solid var(--crema-oscuro);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:16px;}
-.cs-mic.recording{background:var(--rosa);border-color:var(--rosa);animation:recPulse 1s ease-in-out infinite;}
-@keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(212,132,122,0.4)}50%{box-shadow:0 0 0 6px rgba(212,132,122,0)}}
-
-.pedido-input-wrap{display:flex;gap:6px;align-items:flex-end;}
-.pedido-input{flex:1;border:1.5px solid var(--crema-oscuro);border-radius:10px;padding:10px 12px;font-family:'Sora',sans-serif;font-size:13px;resize:none;max-height:100px;outline:none;background:var(--crema);line-height:1.4;-webkit-overflow-scrolling:touch;}
-.pedido-input:focus{border-color:var(--verde-claro);box-shadow:0 0 0 3px rgba(74,140,92,0.08);}
-.pedido-input::placeholder{color:#bbb;}
-
-.send-btns{display:flex;flex-direction:column;gap:5px;flex-shrink:0;}
-.btn-mic-ped{width:36px;height:36px;background:transparent;border:1.5px solid var(--crema-oscuro);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;}
-.btn-mic-ped.recording{background:var(--rosa);border-color:var(--rosa);animation:recPulse 1s ease-in-out infinite;}
-.btn-send{width:36px;height:36px;background:var(--verde);border:none;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--crema);}
-.btn-send:active{background:var(--verde-claro);}
-
-.mic-hint{font-size:10px;color:var(--rosa);text-align:center;margin-top:5px;display:none;animation:blink 1s ease-in-out infinite;}
-.mic-hint.active{display:block;}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:0.4}}
-.input-hint{font-size:10px;color:#ccc;text-align:center;margin-top:6px;}
-
-/* BOTTOM ACTION BAR */
-.action-bar{background:var(--crema);border-top:1px solid var(--crema-oscuro);padding:10px 16px;display:flex;gap:8px;flex-shrink:0;}
-.ab-btn{flex:1;padding:10px 8px;border-radius:9px;border:none;font-family:'Sora',sans-serif;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:all 0.15s;}
-.ab-btn:active{transform:scale(0.97);}
-.ab-inf{background:var(--verde);color:var(--crema);}
-.ab-new{background:var(--crema-oscuro);color:var(--texto-suave);}
-.ab-fin{background:rgba(74,140,92,0.12);color:var(--verde-medio);border:1px solid rgba(74,140,92,0.25);}
-
-/* PROCESSING */
-.processing{text-align:center;padding:16px;display:none;}
-.processing.active{display:block;}
-.proc-dots{display:inline-flex;gap:5px;}
-.proc-dot{width:7px;height:7px;background:var(--verde-suave);border-radius:50%;animation:bounce 1.2s ease-in-out infinite;}
-.proc-dot:nth-child(2){animation-delay:0.2s;}
-.proc-dot:nth-child(3){animation-delay:0.4s;}
-
-/* TOAST */
-.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--verde);color:var(--crema);padding:8px 18px;border-radius:20px;font-size:12.5px;white-space:nowrap;opacity:0;transition:all 0.25s;pointer-events:none;z-index:400;box-shadow:0 4px 16px rgba(0,0,0,0.15);}
+body{font-family:'Sora',sans-serif;background:var(--cr);color:var(--tx);min-height:100vh;display:flex;flex-direction:column;max-width:520px;margin:0 auto;}
+header{background:var(--v);padding:0 16px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.15);}
+.logo{display:flex;align-items:center;gap:8px;}
+.li{width:26px;height:26px;background:var(--do);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;}
+.lt{font-family:'DM Serif Display',serif;font-size:17px;color:var(--cr);}
+.lt span{color:var(--do);}
+.hb{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:var(--cr);border-radius:6px;padding:4px 9px;font-size:10.5px;font-family:'Sora',sans-serif;cursor:pointer;}
+.tabs{display:flex;background:var(--wh);border-bottom:2px solid var(--co);flex-shrink:0;}
+.tab{flex:1;padding:11px 8px;font-size:12px;font-weight:600;color:var(--ts);cursor:pointer;border-bottom:3px solid transparent;text-align:center;transition:all 0.15s;margin-bottom:-2px;}
+.tab.active{color:var(--v);border-bottom-color:var(--v);background:var(--cr);}
+.tab.tc.active{color:var(--az);border-bottom-color:var(--az);}
+.tb{background:var(--do);color:var(--v);font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:3px;}
+.tb.bl{background:var(--az);color:white;}
+main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh - 52px);}
+.view{flex:1;display:none;flex-direction:column;overflow:hidden;min-height:0;}
+.view.active{display:flex;}
+.la{flex:1;overflow-y:auto;padding:12px 14px;-webkit-overflow-scrolling:touch;min-height:0;}
+.es{text-align:center;padding:50px 20px;color:var(--ts);}
+.ei{font-size:48px;display:block;margin-bottom:10px;opacity:0.3;}
+.et{font-family:'DM Serif Display',serif;font-size:19px;color:var(--v);margin-bottom:5px;}
+.ed{font-size:12.5px;line-height:1.6;}
+.dg{margin-bottom:14px;}
+.dgh{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.dgf{font-size:11px;font-weight:700;color:var(--v);letter-spacing:0.08em;text-transform:uppercase;font-family:'DM Mono',monospace;}
+.dgc{font-size:10px;color:var(--ts);background:var(--co);padding:2px 7px;border-radius:8px;}
+.dgl{flex:1;height:1px;background:var(--co);}
+.cg{background:var(--wh);border-radius:10px;margin-bottom:8px;overflow:hidden;box-shadow:var(--sh);}
+.cgh{padding:8px 12px;display:flex;justify-content:space-between;align-items:center;}
+.cgh.ve{background:var(--v);}
+.cgh.co{background:var(--az);}
+.cgn{font-size:12.5px;font-weight:600;color:var(--cr);}
+.cgi{display:flex;align-items:center;gap:7px;}
+.cgl{font-size:10.5px;color:rgba(245,240,232,0.6);}
+.pr{display:flex;align-items:center;padding:7px 12px;border-bottom:1px solid var(--co);gap:8px;}
+.pr:last-child{border-bottom:none;}
+.prv{flex:1;font-size:12.5px;font-weight:500;}
+.prc{font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:var(--vm);}
+.prc.bl{color:var(--az);}
+.prd{background:none;border:none;color:rgba(212,132,122,0.35);cursor:pointer;font-size:15px;padding:2px 4px;flex-shrink:0;}
+.prd:active{color:var(--ro);}
+.ia{background:var(--wh);border-top:1px solid var(--co);padding:10px 14px 14px;flex-shrink:0;}
+.fr{display:flex;gap:7px;margin-bottom:8px;}
+.fg{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;}
+.fg.fd{flex:0 0 130px;}
+.fg.fc{flex:0 0 80px;}
+.fl{font-size:9.5px;font-weight:600;color:var(--ts);letter-spacing:0.08em;text-transform:uppercase;}
+.sw{position:relative;}
+.si{width:100%;border:1.5px solid var(--co);border-radius:8px;padding:8px 10px;font-family:'Sora',sans-serif;font-size:12.5px;background:var(--cr);outline:none;}
+.si:focus{border-color:var(--vc);background:white;}
+.si.bl:focus{border-color:var(--azc);}
+.sd{position:absolute;top:calc(100% + 2px);left:0;right:0;background:white;border:1.5px solid var(--co);border-radius:8px;max-height:180px;overflow-y:auto;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.12);display:none;}
+.sd.open{display:block;}
+.so{padding:8px 11px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--co);}
+.so:last-child{border-bottom:none;}
+.so:hover,.so.hi{background:var(--cr);color:var(--v);}
+.se{padding:10px 11px;font-size:12px;color:var(--ts);font-style:italic;}
+.ni{width:100%;border:1.5px solid var(--co);border-radius:8px;padding:8px 10px;font-family:'DM Mono',monospace;font-size:14px;font-weight:600;background:var(--cr);outline:none;text-align:center;}
+.ni:focus{border-color:var(--vc);background:white;}
+.ni.bl:focus{border-color:var(--azc);}
+.di{width:100%;border:1.5px solid var(--co);border-radius:8px;padding:7px 9px;font-family:'DM Mono',monospace;font-size:12px;background:var(--cr);outline:none;}
+.di:focus{border-color:var(--vc);background:white;}
+.di.bl:focus{border-color:var(--azc);}
+.pi{width:100%;border:1.5px solid var(--co);border-radius:8px;padding:8px 10px;font-family:'Sora',sans-serif;font-size:12.5px;background:var(--cr);outline:none;}
+.pi:focus{border-color:var(--azc);background:white;}
+.ba{width:100%;padding:11px;border-radius:9px;border:none;font-family:'Sora',sans-serif;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;}
+.ba.ve{background:var(--v);color:var(--cr);}
+.ba.ve:active{background:var(--vc);}
+.ba.co{background:var(--az);color:white;}
+.ba.co:active{background:var(--azc);}
+.ab{background:var(--cr);border-top:1px solid var(--co);padding:9px 14px;display:flex;gap:7px;flex-shrink:0;}
+.ab button{flex:1;padding:9px 6px;border-radius:8px;border:none;font-family:'Sora',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;}
+.ab button:active{opacity:0.8;}
+.abinf{background:var(--v);color:var(--cr);}
+.abinv{background:rgba(201,168,76,0.15);color:#6a4e10;border:1px solid rgba(201,168,76,0.3)!important;}
+.abrst{background:var(--co);color:var(--ts);}
+.mo{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;display:none;align-items:flex-end;justify-content:center;}
+.mo.open{display:flex;}
+.ms{background:var(--wh);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;animation:su 0.25s ease;}
+@keyframes su{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.msh{padding:15px 16px 11px;border-bottom:1px solid var(--co);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.msh h3{font-family:'DM Serif Display',serif;font-size:17px;color:var(--v);}
+.msc{background:none;border:none;font-size:19px;cursor:pointer;color:var(--ts);}
+.msb{padding:12px 16px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;}
+.msb pre{font-family:'DM Mono',monospace;font-size:11.5px;line-height:1.8;white-space:pre-wrap;background:var(--cr);padding:11px;border-radius:8px;}
+.msf{padding:11px 16px 22px;border-top:1px solid var(--co);display:flex;gap:6px;flex-shrink:0;}
+.msf button{flex:1;padding:10px;border-radius:8px;font-family:'Sora',sans-serif;font-size:12px;font-weight:600;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:4px;}
+.msf button:active{opacity:0.8;}
+.mbg{background:var(--v);color:var(--cr);}
+.mbo{background:transparent;border:1.5px solid var(--co)!important;color:var(--ts);}
+.ifg{background:var(--wh);border-radius:10px;margin-bottom:10px;overflow:hidden;box-shadow:var(--sh);}
+.ifh{padding:9px 12px;background:linear-gradient(135deg,var(--v),var(--vm));color:var(--cr);font-size:12px;font-weight:700;font-family:'DM Mono',monospace;}
+.ifr{display:flex;align-items:center;padding:7px 12px;border-bottom:1px solid var(--co);gap:8px;}
+.ifr:last-child{border-bottom:none;}
+.ifv1{flex:1;font-size:12px;font-weight:500;}
+.ifv2{font-size:12px;font-family:'DM Mono',monospace;color:var(--vm);font-weight:600;min-width:38px;text-align:right;}
+.ifv3{font-size:12px;font-family:'DM Mono',monospace;color:var(--az);font-weight:600;min-width:38px;text-align:right;}
+.ifb{font-size:12px;font-family:'DM Mono',monospace;font-weight:700;min-width:44px;text-align:right;}
+.ifb.ok{color:var(--vc);}
+.ifb.ko{color:var(--ro);}
+.ifb.eq{color:var(--do);}
+.ifl{display:flex;gap:12px;padding:7px 14px;background:var(--cr);border-top:1px solid var(--co);font-size:10.5px;color:var(--ts);flex-shrink:0;}
+.akm{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;display:none;align-items:flex-end;justify-content:center;}
+.akm.open{display:flex;}
+.aks{background:var(--wh);border-radius:18px 18px 0 0;width:100%;max-width:520px;padding:20px 18px 30px;animation:su 0.25s ease;}
+.aks h3{font-family:'DM Serif Display',serif;font-size:17px;color:var(--v);margin-bottom:5px;}
+.aks p{font-size:12px;color:var(--ts);margin-bottom:12px;line-height:1.5;}
+.aks input{width:100%;border:1.5px solid var(--co);border-radius:8px;padding:9px 11px;font-family:'DM Mono',monospace;font-size:12px;outline:none;margin-bottom:9px;background:var(--cr);}
+.aks input:focus{border-color:var(--vc);}
+.aks button{width:100%;background:var(--v);color:var(--cr);border:none;padding:12px;border-radius:8px;font-size:13px;font-family:'Sora',sans-serif;font-weight:700;cursor:pointer;}
+.akst{font-size:11px;text-align:center;margin-top:7px;min-height:15px;}
+.akst.ok{color:var(--vc);}
+.akst.er{color:var(--ro);}
+.pdf-upload-btn{width:100%;padding:9px;border-radius:8px;border:1.5px dashed var(--azc);background:rgba(58,106,154,0.05);color:var(--az);font-family:'Sora',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;transition:all 0.2s;}
+.pdf-upload-btn:hover{background:rgba(58,106,154,0.1);}
+.pdf-upload-btn:active{background:rgba(58,106,154,0.15);}
+.pdf-processing{text-align:center;padding:10px;font-size:12px;color:var(--az);display:none;}
+.pdf-processing.active{display:block;}
+.pdf-result{background:rgba(58,106,154,0.06);border:1px solid rgba(58,106,154,0.2);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:12px;color:var(--vm);display:none;}
+.pdf-result.active{display:block;}
+.pdf-result-title{font-weight:700;color:var(--az);margin-bottom:5px;font-size:11.5px;}
+.pdf-result-line{padding:2px 0;color:var(--tx);}
+.pdf-result-actions{display:flex;gap:6px;margin-top:8px;}
+.pdf-result-actions button{flex:1;padding:7px;border-radius:7px;border:none;font-family:'Sora',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer;}
+.pra-add{background:var(--az);color:white;}
+.pra-cancel{background:var(--co);color:var(--ts);}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--v);color:var(--cr);padding:7px 16px;border-radius:18px;font-size:12px;white-space:nowrap;opacity:0;transition:all 0.25s;pointer-events:none;z-index:400;box-shadow:0 4px 14px rgba(0,0,0,0.15);}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-
-/* MODAL INFORME */
-.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;display:none;align-items:flex-end;justify-content:center;}
-.modal-ov.open{display:flex;}
-.modal-sheet{background:var(--blanco);border-radius:18px 18px 0 0;width:100%;max-width:480px;max-height:85vh;display:flex;flex-direction:column;animation:slideUp 0.25s ease;}
-@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-.ms-head{padding:16px 18px 12px;border-bottom:1px solid var(--crema-oscuro);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
-.ms-head h3{font-family:'DM Serif Display',serif;font-size:18px;color:var(--verde);}
-.ms-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--texto-suave);padding:2px 6px;}
-.ms-body{padding:14px 18px;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;}
-.ms-body pre{font-family:'DM Mono',monospace;font-size:12px;line-height:1.8;color:var(--texto);white-space:pre-wrap;background:var(--crema);padding:12px;border-radius:9px;}
-.ms-foot{padding:12px 18px 24px;border-top:1px solid var(--crema-oscuro);display:flex;gap:7px;flex-shrink:0;}
-.ms-btn{flex:1;padding:10px;border-radius:9px;font-family:'Sora',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:5px;}
-.ms-btn.green{background:var(--verde);color:var(--crema);}
-.ms-btn.outline{background:transparent;border:1.5px solid var(--crema-oscuro);color:var(--texto-suave);}
-.ms-btn:active{opacity:0.8;}
-
-/* API KEY MODAL */
-.apikey-modal{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;display:none;align-items:flex-end;justify-content:center;}
-.apikey-modal.open{display:flex;}
-.apikey-sheet{background:var(--blanco);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:20px 20px 32px;animation:slideUp 0.25s ease;}
-.apikey-sheet h3{font-family:'DM Serif Display',serif;font-size:18px;color:var(--verde);margin-bottom:6px;}
-.apikey-sheet p{font-size:12.5px;color:var(--texto-suave);margin-bottom:14px;line-height:1.5;}
-.apikey-sheet input{width:100%;border:1.5px solid var(--crema-oscuro);border-radius:9px;padding:10px 12px;font-family:'DM Mono',monospace;font-size:12px;outline:none;margin-bottom:10px;background:var(--crema);}
-.apikey-sheet input:focus{border-color:var(--verde-claro);}
-.apikey-save{width:100%;background:var(--verde);color:var(--crema);border:none;padding:13px;border-radius:9px;font-size:14px;font-family:'Sora',sans-serif;font-weight:600;cursor:pointer;}
-.apikey-st{font-size:11px;text-align:center;margin-top:8px;min-height:16px;}
-.apikey-st.ok{color:var(--verde-claro);}
-.apikey-st.err{color:var(--rosa);}
-
 ::-webkit-scrollbar{width:3px;}
-::-webkit-scrollbar-thumb{background:var(--crema-oscuro);border-radius:8px;}
+::-webkit-scrollbar-thumb{background:var(--co);border-radius:8px;}
 </style>
 </head>
 <body>
-
 <header>
-  <div class="logo">
-    <div class="logo-icon">🌸</div>
-    <div class="logo-text">Busca<span>flor</span></div>
-  </div>
-  <div class="header-right">
-    <span class="ped-count" id="pedCount">0 pedidos</span>
-    <button class="hbtn" onclick="openApikey()">🔑</button>
+  <div class="logo"><div class="li">🌸</div><div class="lt">Busca<span>flor</span></div></div>
+  <div style="display:flex;gap:6px;">
+    <button class="hb" onclick="abrirInv()">📦 Stock</button>
+    <button class="hb" onclick="openAK()">🔑</button>
   </div>
 </header>
-
 <main>
-  <div class="pedidos-area" id="pedidosArea">
-    <div class="empty-state" id="emptyState">
-      <span class="empty-icon">📋</span>
-      <div class="empty-title">Sin pedidos hoy</div>
-      <div class="empty-desc">Escribe o dicta el pedido de un cliente.<br>Lo archivo automáticamente.</div>
-    </div>
+  <div class="tabs">
+    <div class="tab active" id="tab-v" onclick="switchTab('v')">🛒 Ventas <span class="tb" id="bv">0</span></div>
+    <div class="tab tc" id="tab-c" onclick="switchTab('c')">📦 Compras <span class="tb bl" id="bc">0</span></div>
   </div>
 
-  <div class="processing" id="processing">
-    <div class="proc-dots">
-      <div class="proc-dot"></div>
-      <div class="proc-dot"></div>
-      <div class="proc-dot"></div>
-    </div>
-  </div>
-
-  <div class="input-area">
-    <div class="cliente-selector">
-      <span class="cs-label">Cliente</span>
-      <div class="cs-row">
-        <input class="cs-input" id="clienteInput" placeholder="Nombre floristería..." onkeydown="if(event.key==='Enter')document.getElementById('pedidoInput').focus()"/>
-        <button class="cs-mic" id="micCliente" onclick="toggleMic('cliente')" title="Dictar cliente">🎤</button>
+  <!-- VENTAS -->
+  <div class="view active" id="view-v" style="flex-direction:column;">
+    <div class="la" id="lv"><div class="es"><span class="ei">🛒</span><div class="et">Sin pedidos de venta</div><div class="ed">Añade el pedido de un cliente con fecha de entrega.</div></div></div>
+    <div class="ia">
+      <div class="fr">
+        <div class="fg fd"><span class="fl">Fecha entrega</span><input type="date" class="di" id="vf"></div>
+        <div class="fg"><span class="fl">Cliente</span>
+          <div class="sw"><input class="si" id="vci" placeholder="Buscar o escribir cliente..." autocomplete="off"><div class="sd" id="vcd"></div></div>
+        </div>
       </div>
-    </div>
-
-    <div class="pedido-input-wrap">
-      <textarea class="pedido-input" id="pedidoInput" rows="2"
-        placeholder="Escribe el pedido o pega de WhatsApp...&#10;Ej: 20 paq rosas rojas, 5 hortensias"
-        onkeydown="handleKey(event)"
-        oninput="autoResize(this)"></textarea>
-      <div class="send-btns">
-        <button class="btn-mic-ped" id="micPedido" onclick="toggleMic('pedido')" title="Dictar pedido">🎤</button>
-        <button class="btn-send" onclick="enviarPedido()" title="Enviar">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        </button>
+      <div class="fr">
+        <div class="fg"><span class="fl">Producto</span>
+          <div class="sw"><input class="si" id="vpi" placeholder="Buscar o escribir producto..." autocomplete="off"><div class="sd" id="vpd"></div></div>
+        </div>
+        <div class="fg fc"><span class="fl">Cantidad</span><input type="number" class="ni" id="vq" placeholder="0" min="1"></div>
       </div>
+      <button class="ba ve" onclick="addV()">＋ Añadir línea de venta</button>
     </div>
-    <div class="mic-hint" id="micHint">🔴 Escuchando...</div>
-    <div class="input-hint">Enter para enviar · Shift+Enter nueva línea · 🎤 para dictar</div>
+    <div class="ab">
+      <button class="abinv" onclick="abrirInv()">📦 Inventario</button>
+      <button class="abinf" onclick="genInf('v')">📊 Informe</button>
+      <button class="abrst" onclick="rst('v')">🗑 Resetear</button>
+    </div>
   </div>
 
-  <div class="action-bar">
-    <button class="ab-btn ab-fin" onclick="finalizarPedidoActual()">🔒 Finalizar</button>
-    <button class="ab-btn ab-inf" onclick="generarInforme()">📊 Informe</button>
-    <button class="ab-btn ab-new" onclick="nuevoDia()">🌅 Nuevo día</button>
+  <!-- COMPRAS -->
+  <div class="view" id="view-c" style="flex-direction:column;">
+    <div class="la" id="lc"><div class="es"><span class="ei">📦</span><div class="et">Sin pedidos de compra</div><div class="ed">Añade lo que pides a proveedores con fecha de llegada.</div></div></div>
+    <div class="ia">
+      <div class="fr">
+        <div class="fg fd"><span class="fl">Fecha llegada</span><input type="date" class="di bl" id="cf"></div>
+        <div class="fg"><span class="fl">Proveedor</span>
+          <div class="sw"><input class="si bl" id="cpv" placeholder="Buscar o escribir proveedor..." autocomplete="off"><div class="sd" id="cpvd"></div></div>
+        </div>
+      </div>
+      <div class="fr">
+        <div class="fg"><span class="fl">Producto</span>
+          <div class="sw"><input class="si bl" id="cpi" placeholder="Buscar o escribir producto..." autocomplete="off"><div class="sd" id="cpd"></div></div>
+        </div>
+        <div class="fg fc"><span class="fl">Cantidad</span><input type="number" class="ni bl" id="cq" placeholder="0" min="1"></div>
+      </div>
+      <input type="file" id="pdfPackingInput" accept=".pdf,application/pdf" style="display:none;" onchange="handlePackingPdf(event)">
+      <button class="pdf-upload-btn" onclick="document.getElementById('pdfPackingInput').click()">
+        📄 Subir packing list PDF — extraigo automáticamente
+      </button>
+      <div class="pdf-processing" id="pdfProcessing">
+        <span style="display:inline-flex;gap:5px;">
+          <span style="width:6px;height:6px;background:var(--az);border-radius:50%;animation:bounce 1.2s ease-in-out infinite;display:inline-block;"></span>
+          <span style="width:6px;height:6px;background:var(--az);border-radius:50%;animation:bounce 1.2s ease-in-out 0.2s infinite;display:inline-block;"></span>
+          <span style="width:6px;height:6px;background:var(--az);border-radius:50%;animation:bounce 1.2s ease-in-out 0.4s infinite;display:inline-block;"></span>
+        </span>
+        <span style="margin-left:8px;">Leyendo el packing list...</span>
+      </div>
+      <div class="pdf-result" id="pdfResult">
+        <div class="pdf-result-title" id="pdfResultTitle">Líneas extraídas</div>
+        <div id="pdfResultLines"></div>
+        <div class="pdf-result-actions">
+          <button class="pra-add" onclick="addPackingLines()">✅ Añadir todas</button>
+          <button class="pra-cancel" onclick="cancelPacking()">✕ Cancelar</button>
+        </div>
+      </div>
+      <button class="ba co" onclick="addC()">＋ Añadir línea manual</button>
+    </div>
+    <div class="ab">
+      <button class="abinv" onclick="abrirInv()">📦 Inventario</button>
+      <button class="abinf" onclick="genInf('c')">📊 Informe</button>
+      <button class="abrst" onclick="rst('c')">🗑 Resetear</button>
+    </div>
   </div>
 </main>
 
 <!-- INFORME MODAL -->
-<div class="modal-ov" id="informeModal">
-  <div class="modal-sheet">
-    <div class="ms-head">
-      <h3>📊 Informe del día</h3>
-      <button class="ms-close" onclick="closeModal()">✕</button>
-    </div>
-    <div class="ms-body"><pre id="informeContent">...</pre></div>
-    <div class="ms-foot">
-      <button class="ms-btn outline" onclick="shareWhatsApp()">💬 WhatsApp</button>
-      <button class="ms-btn outline" onclick="shareEmail()">📧 Email</button>
-      <button class="ms-btn green" onclick="copyInforme()">📋 Copiar</button>
+<div class="mo" id="mInf">
+  <div class="ms">
+    <div class="msh"><h3 id="mInfT">Informe</h3><button class="msc" onclick="closeM('mInf')">✕</button></div>
+    <div class="msb"><pre id="mInfC">...</pre></div>
+    <div class="msf">
+      <button class="mbo" onclick="sWA()">💬 WhatsApp</button>
+      <button class="mbo" onclick="sEM()">📧 Email</button>
+      <button class="mbg" onclick="sCopy()">📋 Copiar</button>
     </div>
   </div>
 </div>
 
-<!-- API KEY MODAL -->
-<div class="apikey-modal" id="apikeyModal">
-  <div class="apikey-sheet">
-    <h3>🔑 API Key de Claude</h3>
-    <p>Necesaria para que el agente interprete los pedidos automáticamente. Se guarda en este navegador.</p>
-    <input type="password" id="apikeyInput" placeholder="sk-ant-api03-..." oninput="checkApikey()"/>
-    <button class="apikey-save" onclick="saveApikey()">💾 Guardar</button>
-    <div class="apikey-st" id="apikeySt"></div>
+<!-- INVENTARIO MODAL -->
+<div class="mo" id="mInv">
+  <div class="ms">
+    <div class="msh"><h3>📦 Inventario por fecha</h3><button class="msc" onclick="closeM('mInv')">✕</button></div>
+    <div class="ifl">
+      <span>🟢 Suficiente</span><span>🔴 Falta</span><span>🟡 Exacto</span>
+    </div>
+    <div class="msb" id="mInvC" style="padding:10px 14px;"></div>
+    <div class="msf">
+      <button class="mbo" onclick="sWAInv()">💬 WhatsApp</button>
+      <button class="mbg" onclick="sCopyInv()">📋 Copiar</button>
+    </div>
+  </div>
+</div>
+
+<!-- API KEY -->
+<div class="akm" id="mAK">
+  <div class="aks">
+    <h3>🔑 API Key</h3>
+    <p>Se guarda en este navegador.</p>
+    <input type="password" id="aki" placeholder="sk-ant-api03-..." oninput="chkAK()">
+    <button onclick="saveAK()">💾 Guardar</button>
+    <div class="akst" id="akst"></div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-// ============================================================
-// STORE
-// ============================================================
-var STORE_KEY = 'bf_pedidos_v2';
-var CTR_KEY   = 'bf_ped_ctr';
-var API_KEY   = 'bf_apikey';
+var CLIENTES=["ACTIVIDADES HOTELERAS STA. TERESA  S.L.", "AGROFOREX SERVICIOS URBANOS S.L. (CURSO NOVIAS)", "AGRUFLOR SL (AGRUFLOR)", "AHORAFLORES SL (DEACANTO)", "AIAD EL FARHANI MUSTAPHA", "AIDITA UÑA CORTINA (SFZ)", "ALEAL BUSINESS GROUP SL", "ALEJANDRO MARQUEZ ANTUNEZ (ALEJANDRO MARQUEZ ANTUNES (FLOR Y FLOR))", "AMANDA MARÍA GIRALDO SALAS (FLORÍSTERIA NIEBLA CONCHA)", "ANDALUPAQ EXPRESS (TIPSA)", "ANIA TRUBNIKOVA (REGALISIMO)", "ANTONELLA CATERING S.L", "ANTONIO JESUS QUIROS CALDERON", "ANTONIO JESÚS MELERO GARCÍA (ANTONIO MELERO)", "ARALIA Decoracion 2020 S.L.", "ARALIA EVENTOS S.L.", "ARFE TABERNAS S.L (LA ISLA)", "ARMANDO ULLATE (FLORISTERÍA SOFORA S.L)", "ARREGLOS FUNERARIOS S.L. (TANATORIO)", "ARTE DEL CAMPO Y PAISAJISMO S.L", "ASOC.CULT.COFRADE SANTA CRUZ (HERMANDAD LA RINCONADA)", "ASTROFLOR (DANIEL ASTROFLOR)", "AZUCENA GARCIA MARÍN", "Ana Maria Buzon Luzon (catering)", "Angeles Bautista Polo (Tello)", "Angeles Garcia Pimiento (JUAN CASTILLEJA)", "Antonio (cementerio) (Antonio (Cementerio))", "Antonio Jesús Cuéllar Segura (CUELLAR)", "Asoc. de Directores de Andalucia", "BACHICHA S.L.", "BLACK BACCARA S.L. (BLACK BACCARA)", "BLOM MARKET S.L.U. (BLOM MARKET)", "BLOOMING EXPERIENCE, S.L. (COLVIN)", "BODA ANA Y PEPE (28 de febrero/ 01 de marzo)", "BUCAROL S.L. (BUCARO)", "Bajoplato S.L. (Catering Campuzano)", "Baldomero Espinosa Roales (FLORES CAMELIA)", "Bondai Flowers SL (Bondai)", "CARMEN MARÍA BELLIDO PAN (NUBES DE AZAHAR \nPEÑAFLOR)", "CARMEN MARÍA GONZÁLEZ VIEJO (CARMEN DECOFLOR)", "CASFLOWER SL (Tomas-casflowers)", "CAYETANO", "CAYFE", "CC Lagoh Entidad de Gestion de Gastos (CC Lagoh Entidad de Gestion)", "CENTRO CERÁMICO AL ANDALUS S.L", "CIRIACO HERRERA MIRANDA", "CLUB NAÚTICO SEVILLA (CLUB NAÚTICO)", "COLEGIO SANTA MARÍA DE LOS REYES", "COMERCIAL REYFLOR SL (REYFLOR)", "COMERCIALIZADORA VIVEROS EL PINO S.L (VIVERO EL PINO)", "COMUNIDAD DE PROPIETARIOS EDIFICIO TORVISCO", "CONCEPCIÓN CANDELA LABRADOR (CONCHA CANDELA)", "COQUELICOT Passion S.L. (Cliente Burgos)", "CRISTALERIA Y ALUMINIOS LEIVA SL (CRISTALERIA Y ALUMINIOS LEIVA)", "CRISTINA AMODEO HELVANT (CRISTINA AMODEO)", "CRISTINA LIBRERO LEDESMA", "Carlos Garcia Fernández (Carlos García Fernández)", "Carmen Boza López (Flores Julio)", "Carmen Polo Beltran (TELLO SEVILLA)", "Carolina Martin Lopez (jose miguel justo fernandez)", "Catering y servicios Las Torres, SLU", "Cañamo Arte Floral S.L (Cañamo)", "Cerkiflor S.L.U. (CERKIFLOR)", "Cliente contado", "Cliente de contado", "Cristina", "DABEVICA S.L. (VITO - DANI)", "DAVID GIL DURÁN (NEYMAFLOR)", "DAVID SANCHEZ GONZALEZ (LOLAFLOR)", "DECOFLOR DE SEVILLA SL (CARMEN DECOFLOR)", "DELOCOLE SL (CRISTO DE LA SED)", "DISEÑO FLORISTICO LRO,S.L (MARTIN)", "De Acanto Premium Roses S.L. (De Acanto)", "EDIFICIOS Y LOCALES MISA, S.L.", "ELCREAL REVOLUTION S.L. (ELCREAL REVOLUTION SL)", "ELISABET CORTÉS PEDROSA (FLORISTERIA BOLLULLOS)", "ELVEA FLOR S.L.", "ENCAROMA FLORISTERIA (ENCARNA RODRIGUEZ MARTIN)", "ENRIQUE MONTALBAN S.L.", "EPYME", "ESCORIAL FINE ARTS. S.L.", "ESTEFANÍA VERA BONILLA (FANY ALXARAF)", "ESTER NARVÁEZ DOMÍNGUEZ (ESTER)", "EVENTOS EGO SL", "EZEQUIEL GARCÍA MUÑIZ (FLORISTERIA AÑIL)", "Eduardo Sanchez Sanchez (IBERFLOR)", "Eloy Murube Gonzalez", "Esperanza Iglesias Azcue", "Estefania Gahete Guerrero", "Estrella Fernández Carmona (La Casa de las Flores (Cazalla))", "Evenglobos", "FAMILIA MP SAN JULIAN SL", "FAMILIA MP TRIANA SL", "FATIMA AGENJO GARCIA (CHERRY LOVE)", "FCS SEVILLA SL (CRISTO DE LA SED)", "FERENT STEFAN (STEFAN PORTUGUES)", "FINCA HERMANOS VALDÉS S.L (HERMANOS VALDÉS)", "FLOR AL COSTO", "FLOR BAHIA S.L", "FLOR EN MAL ESTADO", "FLOR TIRADA", "FLORES CARMEN S.C.A. (CARMEN - ESTE)", "FLORES EL PORVENIR S.L. (EUSEBIO)", "FLORES LOMA FLOR S.L.U. (Juan Loma)", "FLORES Los Pacos S.L. (Flores Los Pacos S.L.)", "FLORES MEMORA SL (MEMORA)", "FLORES MOUGUET S.L. (MOUGUET)", "FLORES RUMEX SL (RUMEX)", "FLOREXIM S.L. (FLOREXIM)", "FLORHADA (Florhada)", "FLORISTERIA  ASIÁN", "FLORISTERIA MELINDA SL (TRONKO MADRID)", "FLORISTERIA PALOMA (Susana Solis)", "FLORISTERIA SOFORA S.L.", "FLORISTERÍA LA ROSA S.L. (LA ROSA DE RONDA)", "FLª SUROESTE S.L.", "FRANCISCO GONZALEZ FUENTES (PACO-CHIPIONA)", "FRANCISCO JAVIER DÍAZ CALVO (JAVIER DÍAZ)", "FRANCISCO JOSE CANTO GONZALEZ (MARIDO AZUCENA)", "FRANCISCO JOSÉ CORRERO CABELLO (FLORISTERÍA CENTRO FLOR)", "FRANCISCO MANUEL EGEA ROMERO (FRANCISCO EGEA)", "FRANCISCO REYERO GUTIERREZ (Velez Malaga)", "FRUTAS Y VERDURAS ANTUNEZ S.L. (ANTUNEZ)", "FUENTE CLARA", "FUNEFLOR SL", "FURNITURE LOGIS S.L.", "Fatima Mateo Santos (Floristeria Virgen de Araceli)", "Faustino Muñoz Rodriguez (FAUSTINO)", "Fco. Javier Gonzalez de la Rosa (Los pacos)", "Fepaflor SL (Jesus)", "Flores Caoba SL (Caoba)", "Flores Miranda S.L.L (FLORES MIRANDA)", "Flores Villodres Labella S.C. (FLORES VILLODRES LABELLA S.C.)", "Flores y Plantas Leon S.L. (Flores Sanchez Leon S.L.)", "Florimar del Maresme S.L. (BARCELONA)", "Floristeria Antonio Mendoza", "Floristeria Carelia", "Floristeria Plaza San Marcos", "Francisco Benitez Cardenas", "Francisco Carmona Amores (PULIDO)", "Francisco Javier Benitez Millan", "Francisco Jesús Domínguez Morales (Al-xaraf)", "Francisco Muñoz Diaz (PACO MUÑOZ)", "GARDEN EXPRESS SL", "GONZAFLOR S.L. (TURBO)", "GRUPO TINAKULA SL (TINAKULA)", "Grupo Enersol S.L", "Guillermo Lasso Garcia (Escuela Arte Floral)", "HERMANADAD SACRAMENTAL DE NTRO PADRE JESUS NAZARENO Y MARÍA SANTISIMA DE LA SALUD (CASA HERMANDAD)", "HERMANOS ESCALONA CB (SALVADOR ESCALONA)", "HERMANOS PALACIOS FLOR CORTADA SL (HERMANOS PALACIOS)", "HILLS ROSES S.L.U. (TOMAS GRANADA)", "HORDEBRIX S.L.", "HORDEBRIX S.L. (HORDEBRIX)", "HUMBERTO MARIOTTE CANO (HUMBERTO)", "Hermandad de Nuestra Señora del Rosario Patrona de Bornos (BORNOS)", "Hermanos Lopez Montalban S.L. (Hermanos Lopez Montaban)", "Hilario Monge Borrego (ANFORAS)", "IES JUAN CIUDAD DUARTE", "INVERSIONES Y PRODUCCIONES TIBER S.L. (Ludiflora)", "ISAAC MARINA RAMOS (FLORISTERIA VERDE OLIVA)", "ISAAC PEREZ NIETO (FLORISTERIA AZAHAR - SOBRINO CHARI CEMENTERIO)", "ISABEL CANDAU MICHEO (CARTAMO)", "ISABEL MARIA MUELAS MOLINA (LA BIEN PLANTÁ)", "ISMAEL MONTILLA GALLEGO (FLORISTERÍA COIMBRA)", "ITALICA DE FLORES SL (SEVILLA MI FLOR)", "Inmaculada Encarnación Garrido", "J.A. VEAS VILLALBA (VEAS , J.A.)", "JAVIER HERNANDEZ MORILLAS (Floristeria FLOWERING)", "JONATAN LAZARO RODRIGUEZ (YONI)", "JOSE AMIGO ALVAREZ (JOYMAFLOR)", "JOSE ANTONIO RUIZ MONCAYO (DEARTCON)", "JOSE CARLOS MORILLO PEREZ", "JOSE CARMONA AMORES (PULIDO)", "JOSE IGNACIO CASTRO MIÑO (Flores Miño)", "JOSE JAVIER GOMEZ CANO (JAVI LOS PALACIOS)", "JOSE MANUEL ASIAN LORA (FLORISTERIA ASIAN)", "JOSE MANUEL FERNÁNDEZ PINTO (FLORES MAY)", "JOSE RAMÓN SERNA (SERNA FLORISTAS)", "JOSE ROMERO BENITEZ (RIVERA)", "JUAN ALFONSO DÍAZ LÓPEZ (FLORES ALFONSO)", "JUAN ANTONIO RONDAN MOLINARES (BAMBU)", "JUAN JOSE FERNANDEZ RIVERO (JUAN JOSE)", "JUAN VALDERRAMA ÁNGULO (FLORISTERIA BAMBU\nMERCADO PUERTA LA CARNE)", "JUANA CALVO GARCIA", "Jemaflor Chipiona S.L. (JEMAFLOR)", "Jesus Fuertes de la Torre (Jesus La galeria)", "Jesus Merlo Garcia S.L. (Entregar en Avda. Estudiantes 39 ( Jardin -Flor ))", "Jose Francisco Herrera Sanchez (Jose Francisco ( personal))", "Jose Manuel Reyes Camacho (Jose Manuel)", "Jose Montero Antunez (Montero)", "Jose Santamaria Tirado (Santamaria)", "Juan Manuel Elias Moreno (Pino Montano)", "Juan Ramon Grondona Ceballos (Florabel)", "LA ROSA DE ORO", "LANLASH S.L", "LIDIA ALEJANDRA NOLASCO MONTOYA (TRONKO MADRID)", "LOLA FLORA", "Limolero S.L. - CIF: B-91225961 (Moises)", "Lola (Lola Bami)", "Los Molinos S.L", "Luxernature S.L. (Mayorista Tomelloso)", "MACARENA GARRIDO PARRADO (FLORISTERIA GARRIDO)", "MACARENA HERRERO CALVO (MIRKA EVENTOS)", "MAGNO RE CAPITAL SL", "MAMEN MELERO EVENTOS S.L.", "MANANT SC - LILAS FLORISTAS (LILAS FLORISTAS)", "MANUEL ANTUNEZ CARDOSO", "MANUEL CARMONA AMORES (QUIOSCO ALFALFA)", "MANUEL FERNÁNDEZ BALUFO (KIKO)", "MANUEL JESUS AZUAGA POLO", "MANUEL JESÚS ROLDÁN ALGABA", "MANUEL PORTELA MARTÍNEZ (FLORISTERÍA AGUILA)", "MANUEL VESPIA ROMÁN (SALTERAS)", "MARCELA GARCIA MARTINEZ (FLª PUERTA CARMONA)", "MARI ANGELES JIMENEZ GAMERO", "MARIA ARGUESO LIÑÁN (BRUNIA FLORAL)", "MARIA DEL CARMEN BENITEZ BERNAL (CRISTO DE LA SED)", "MARIA DEL CARMEN GONZALEZ JIMENEZ (MARY FLOWERS)", "MARIA ISABEL GORDILLO ALONSO (JACARANDA)", "MARIA JOSE REAL LARRINAGA (MARIA JOSE)", "MARILUZ LIMA VEGA (FLORISTERIA VIRGEN DE LA CARIDAD)", "MARÍA BLANCO DE CORDOVA MUÑOZ (CLIENTE CONTADO)", "MARÍA DEL AGUILA MARTINEZ TISCAR (FLORISTERIA TRIANA AGUILA)", "MARÍA FRANCO SAMADA", "MELERO FLORISTAS S.L. (MELERO)", "MERCADO RIVERA S.L. (MERCADO RIVERA SL)", "MIGUEL ANGEL FERNANDEZ MURILLO (MURILLO)", "MISS FLORES FLORISTERIA (Monica Jimenez Navarro)", "MONICA LAO LORENZO (VENECIA FLORIPONDIO)", "MREC Joaquin Costa SL", "Mamen Arte Floral SL", "Manuel Garcia Garfia", "Maria F. Perez Rodriguez (GALLEGA)", "Maria Luisa Galdeano García (Mª LUISA)", "Maria(Cementerio) (Maria)", "Marta Ferraro Manzano (catering gelves)", "Marta Quintana Strohecker (FLORISTERIA SAN MARCOS)", "Martha Isabel Urbano Mahecha (Preservadas)", "María Dolores Adame Mingorance (Lola Fedriani)", "María Vazquez García (Bellavista)", "Mercado de Flores y Plantas S.L.", "Mercedes Grado Ponce (JAVIER GRADO)", "Miguel Angel Rodriguez Query (Flores Query)", "Mirian Perez Sanchez (Floristeria Hada)", "Mª CARMEN RUIZ MORENO (FLORISTERIA LOS CLAVELES DE SEVILLA)", "Mª Carmen Rodríguez Soler (Cliente Ecija)", "Mª JOSEFA MORALES CARRASCO (FLORISTERIA VALME)", "Mª del Carmen Mejias Gonzalez (maria)", "Mª Ángeles Sánchez Sánchez (Floristeria Asunción)", "NATURA RECICLAJES SEVILLANOS S.L (VENTA PALETS)", "NAZA GARDEN SL (NAZA GARDEN VIVERO MONTEQUINTO)", "Noon Spain SL", "Ornamentales JURADO S.L. (Ornamentales Jurado S.L)", "PABLO FERNÁNDEZ TAUDIN (PABLO MONTERO)", "PACO VEAS", "PILAR SOSA MORIÑA (PILAR SOSA)", "PREBETONG HORMIGONES S.A.", "PROFLOR FLORES NATURALES S.L.", "PUERTA CARMONA (MARCELA GARCIA MARTINEZ)", "Paloma Barrio Cuenca-Romero (BLANCA PALOMA)", "Parroquia San Juan Pablo II (Iglesia Montequinto)", "Payme-Flor S.L. (Payme)", "Pedro Gonzalez de Luis (Pescaderia)", "Querry prueba", "RAFAEL FERNANDEZ CASAS", "RAFAEL SOSA MARTIN (SOSA)", "RB FLOWERS CHIPIONA SL", "REGLA VALDES GONZALEZ", "REMIGIO HERNANDEZ RODRIGUEZ (CARLOS REMIGIO)", "RENCAFLOR SL (Pekaflor)", "RI-GARDEN LORA SL (Ri-Garden Lora SL)", "ROCIO TORREÑO HERRERA (LUIS EUCALIPTO)", "ROSARIO CATALAN ANDRADE (JARDIN DE LA CARIDAD)", "ROSARIO PEREZ PINEDA (CHARI CEMENTERIO)", "ROSAS DE SEVILLA SL (ROSAS DE SEVILLA)", "ROSIFY SLL", "RUTH CRESPO PORTILLO (FLORES LA BOHEME)", "Rafael de Leon SL", "SALMEDINA, S.L.L., Comercializadora de Flores. (Salmedina)", "SALVADOR DAVID ÁLVAREZ FERREIRA", "SANTA MARIA TIRADO PRODUCTORES DE FLOR, S.L.U.", "SERGIO BARRIO SOTO (LAS FLORSTAS SANTANDER)", "SERINTRA de Cuenca S.L.U. (Aliaguilla)", "SERVILIFT , S.L.", "SEVILLA WAGEN S.A.", "SOLDEHOY DISTRIBUCIONES RENOVABLES SL", "SOLUTION GLOBAL PALET SL (PALETS RECOGIDAS)", "SONIA MORILLA JIMENEZ (JARDIN DEL CERRO)", "SURFLOR HISPALENSE SL (ANTONIO(TANATORIO))", "SYRSA AUTOMOCION,S.L.U", "Sanchiflor S.C.A.", "Sergio Daza Rodriguez (Jaraflor)", "Servicios Florales Palaflor (Pacon Chacón)", "Servicios Funerarios Zamoranos S.L.", "TELEROSA SPAIN SL (TELEROSA)", "TRADECOM S.A. (TRADECOMSA)", "TRIOFLOR S.L. (TRIOFLOR)", "VATEMA MANAGEMENT S.L. (HELLOO MONDAY)", "VENTA CONTADO (Venta Contado)", "VENTA CONTADO ANGELES (angeles)", "VENTA CONTADO CONCHI (CONCHI)", "VENTA CONTADO KIOSKO (Kiosko Magdalena)", "VENTA CONTADO MADRID CESAR", "VENTA CONTADO MIMI", "VENTA CONTADO ROMAN (ROMAN)", "VENTA CONTADO SAN JOSE (JOSE LUIS)", "VENTURA ENRIQUE ROMERO SUALIS (VENTURA ENRIQUE ROMERO SUALIES)", "VIA CALETA S.L (VIA CALETA/PUERTA CALETA)", "VICTORIANO MARQUEZ IGLESIAS (VICTOR MARQUEZ)", "VIRGINIA FLORISTA SL", "VISITACIÓN MORENO DÍAZ (VISITACION)", "VIVEROS AVAIM SL (JUAN MARÍA PINEDA)", "VIVEROS Beniflor S.L. (FRAN VIVERO)", "VIVEROS GIMENO SALAMANCA S.L.", "VIVEROS Hnos Belmonte S.L. (VIVEROS HERMANOS BELMONTE)", "VIVEROS MOLINA S.L. (VIVEROS MOLINA)", "VIVEROS RENESES, S.L.U.", "Victoria Santos", "WELCOMEFY S.L. (WELCOMEFY)", "XENIS EVENTOS S.L", "YOLANDA RAYA GONZALEZ (Yoli)", "de Gastos", "ÁNGEL JESUS DE BUSTOS FERNÁNDEZ (Ángel Móstoles)", "Ángela Bustamante Maestre"];
+var ARTICULOS=[{"c": "407", "d": "3D 60CM/25T"}, {"c": "890", "d": "ABONOS"}, {"c": "330", "d": "ABSOLUT IN PINK  60CM/25T"}, {"c": "363", "d": "ACEBO"}, {"c": "296", "d": "ACHILEA"}, {"c": "34", "d": "AKITO 40CM/25T"}, {"c": "33", "d": "AKITO 50CM/25T"}, {"c": "32", "d": "AKITO 60CM/25T"}, {"c": "31", "d": "AKITO 70CM/25T"}, {"c": "30", "d": "AKITO 80CM/25T"}, {"c": "44", "d": "ALBA 40CM/25T"}, {"c": "43", "d": "ALBA 50CM/25T"}, {"c": "42", "d": "ALBA 60CM/25T"}, {"c": "41", "d": "ALBA 70CM/25T"}, {"c": "40", "d": "ALBA 80CM/25T"}, {"c": "325", "d": "ALEIA 50CM/10T"}, {"c": "324", "d": "ALEIA 60CM/10T"}, {"c": "323", "d": "ALEIA 70/10T"}, {"c": "349", "d": "ALGODÓN 11 BOLAS"}, {"c": "348", "d": "ALGODÓN 9 BOLAS"}, {"c": "366", "d": "ALQUILER NAVE MENSUAL"}, {"c": "938", "d": "ALSTRO PERFECTION"}, {"c": "956", "d": "ALSTRO SUPER SELECT"}, {"c": "367", "d": "ALSTROEMERIAS 60CM FANCY"}, {"c": "245", "d": "ALSTROEMERIAS SELECT"}, {"c": "373", "d": "AMNESIA 40CM/25T"}, {"c": "440", "d": "ANDREA 50CM/25T"}, {"c": "441", "d": "ANDREA 60CM/25T"}, {"c": "1016", "d": "ARBOL DE EUCALIPTO"}, {"c": "382", "d": "ARO CORONA 60CM"}, {"c": "381", "d": "ARO CORONA 80CM"}, {"c": "706", "d": "ARTICA 40CM/25T"}, {"c": "678", "d": "ARTICA 50CM/25T"}, {"c": "679", "d": "ARTICA 60CM/25T"}, {"c": "1032", "d": "ASCOT 60CM/25T"}, {"c": "283", "d": "ASSORTED 40 CM/25T"}, {"c": "281", "d": "ASSORTED 40 CM/25T 12 PAQUETES"}, {"c": "282", "d": "ASSORTED 40 CM/25T 14 PAQUETES"}, {"c": "280", "d": "ASSORTED 40 CM/25T 1O PAQUETES"}, {"c": "433", "d": "ASSORTED 50CM/25T"}, {"c": "284", "d": "ASSORTED 60 CM/25T"}, {"c": "489", "d": "ASSORTED 70CM/25T"}, {"c": "435", "d": "ASSORTED 70CM/25T"}, {"c": "334", "d": "ASSORTED CAJA CESAR"}, {"c": "809", "d": "ASSORTED GARDEN 60 CM/25TALLOS"}, {"c": "487", "d": "ATOMIC 50CM/25T"}, {"c": "486", "d": "ATOMIC 60CM/25T"}, {"c": "817", "d": "AUBADE 60 CM/25TALLOS"}, {"c": "247", "d": "AUSTIN GARDEN ROSES"}, {"c": "939", "d": "BARISTA 60CM/25T"}, {"c": "889", "d": "BASE CON IVA"}, {"c": "380", "d": "BASE NO SUJETA"}, {"c": "888", "d": "BASE SIN IVA"}, {"c": "747", "d": "BE SWEET 60CM/25T"}, {"c": "936", "d": "BIKINI 50CM/25T"}, {"c": "830", "d": "BIKINI 60CM/25T"}, {"c": "394", "d": "BIKINI 70CM/25T"}, {"c": "310", "d": "BLACK MAGIC 60CM/25T"}, {"c": "315", "d": "BLACK MAGIC 70CM/25T"}, {"c": "899", "d": "BLESSING 50CM/25T"}, {"c": "746", "d": "BLESSING 60CM/25T"}, {"c": "39", "d": "BLIZZARD 40CM/25T"}, {"c": "38", "d": "BLIZZARD 50CM/25T"}, {"c": "37", "d": "BLIZZARD 60CM/25T"}, {"c": "36", "d": "BLIZZARD 70CM/25T"}, {"c": "35", "d": "BLIZZARD 80CM/25T"}, {"c": "170", "d": "BLUEBERRY 80CM/25T"}, {"c": "172", "d": "BLUEBERRY 80CM/25T"}, {"c": "171", "d": "BLUEBERRY 80CM/25T"}, {"c": "173", "d": "BLUEBERRY 80CM/25T"}, {"c": "174", "d": "BLUEBERRY 80CM/25T"}, {"c": "479", "d": "BLUSH 50CM/25T"}, {"c": "404", "d": "BLUSH 60CM/25T"}, {"c": "499", "d": "BLUSH 70CM/25T"}, {"c": "745", "d": "BOULEVARD"}, {"c": "666", "d": "BOUQUETS"}, {"c": "667", "d": "BOUQUETS XL"}, {"c": "119", "d": "BRIGHTON 40CM/25T"}, {"c": "118", "d": "BRIGHTON 50CM/25T"}, {"c": "117", "d": "BRIGHTON 60CM/25T"}, {"c": "116", "d": "BRIGHTON 70CM/25T"}, {"c": "115", "d": "BRIGHTON 80CM/25T"}, {"c": "289", "d": "CABARET 40CM/25T"}, {"c": "288", "d": "CABARET 50CM/25T"}, {"c": "287", "d": "CABARET 60CM/25T"}, {"c": "286", "d": "CABARET 70CM/25T"}, {"c": "285", "d": "CABARET 80CM/25T"}, {"c": "868", "d": "CALAS"}, {"c": "780", "d": "CANDLE LIGHT 40CM/25T"}, {"c": "781", "d": "CANDLE LIGHT 50CM/25T"}, {"c": "816", "d": "CANDLE LIGHT 60 CM/25TALLOS"}, {"c": "317", "d": "CANDY EXPRESION"}, {"c": "990", "d": "CANDY EXPRESSION 60CM/25T"}, {"c": "933", "d": "CAPUCCINO 40CM/10T"}, {"c": "276", "d": "CARPE DIEM 40CM/25T"}, {"c": "275", "d": "CARPE DIEM 50CM/25T"}, {"c": "274", "d": "CARPE DIEM 60CM/25T"}, {"c": "273", "d": "CARPE DIEM 70CM/25T"}, {"c": "272", "d": "CARPE DIEM 80CM/25T"}, {"c": "467", "d": "CARROUSEL 50CM/25T"}, {"c": "189", "d": "CHERRY BRANDY 40CM/25T"}, {"c": "188", "d": "CHERRY BRANDY 50CM/25T"}, {"c": "187", "d": "CHERRY BRANDY 60CM/25T"}, {"c": "186", "d": "CHERRY BRANDY 70CM/25T"}, {"c": "185", "d": "CHERRY BRANDY 80CM/25T"}, {"c": "455", "d": "CHERRY LOVE 70CM/25T"}, {"c": "164", "d": "CHERRY OH 40CM/25T"}, {"c": "163", "d": "CHERRY OH 50CM/25T"}, {"c": "162", "d": "CHERRY OH 60CM/25T"}, {"c": "161", "d": "CHERRY OH 70CM/25T"}, {"c": "160", "d": "CHERRY OH 80CM/25T"}, {"c": "1033", "d": "CLAVEL CARAMELO SELECT"}, {"c": "346", "d": "CLAVEL FANCY MIXTO (POR TALLOS)"}, {"c": "618", "d": "CLAVEL FCY AMARILLO"}, {"c": "625", "d": "CLAVEL FCY ANTIGUA"}, {"c": "615", "d": "CLAVEL FCY BICOLOR"}, {"c": "584", "d": "CLAVEL FCY BLANCO"}, {"c": "582", "d": "CLAVEL FCY BURGUNDY"}, {"c": "612", "d": "CLAVEL FCY CARAMELO"}, {"c": "599", "d": "CLAVEL FCY FUCSIA"}, {"c": "610", "d": "CLAVEL FCY GOLEM"}, {"c": "580", "d": "CLAVEL FCY MORADO"}, {"c": "598", "d": "CLAVEL FCY NARANJA"}, {"c": "583", "d": "CLAVEL FCY NAZARENO"}, {"c": "588", "d": "CLAVEL FCY NOBBIO"}, {"c": "581", "d": "CLAVEL FCY ROJO"}, {"c": "594", "d": "CLAVEL FCY ROSA"}, {"c": "867", "d": "CLAVEL FCY SEÑORITO"}, {"c": "624", "d": "CLAVEL FCY VERDE"}, {"c": "611", "d": "CLAVEL FCY ZAFIRO"}, {"c": "613", "d": "CLAVEL NOVEDADES"}, {"c": "616", "d": "CLAVEL PEPPERMINT"}, {"c": "1034", "d": "CLAVEL SELECT AMARILLO"}, {"c": "343", "d": "CLAVEL SELECT ANTIGUA"}, {"c": "246", "d": "CLAVEL SELECT BLANCO"}, {"c": "1031", "d": "CLAVEL SELECT FUCSIA"}, {"c": "795", "d": "CLAVEL SELECT GOLEM"}, {"c": "1020", "d": "CLAVEL SELECT MIXTO"}, {"c": "1030", "d": "CLAVEL SELECT MORADO"}, {"c": "1021", "d": "CLAVEL SELECT NARANJA"}, {"c": "621", "d": "CLAVEL SELECT ROJO"}, {"c": "623", "d": "CLAVEL SELECT ROSA"}, {"c": "546", "d": "CLAVEL SHORT"}, {"c": "451", "d": "CLAVEL STANDARD"}, {"c": "450", "d": "CLAVEL STANDARD (POR TALLOS)"}, {"c": "368", "d": "COMUNIDAD"}, {"c": "807", "d": "CONFINDENTIAL 60 CM/25TALLOS"}, {"c": "149", "d": "COOL WATER 40CM/25T"}, {"c": "148", "d": "COOL WATER 50CM/25T"}, {"c": "147", "d": "COOL WATER 60CM/25T"}, {"c": "146", "d": "COOL WATER 70CM/25T"}, {"c": "145", "d": "COOL WATER 80CM/25T"}, {"c": "391", "d": "COOLDOWN 60CM/25T"}, {"c": "813", "d": "CORAL EXPRESSION 60 CM/25TALLOS"}, {"c": "365", "d": "CORAL REEF 50CM/25T"}, {"c": "491", "d": "CORAL REEF 60CM/25T"}, {"c": "386", "d": "COTTON EXPRESSION 60CM"}, {"c": "387", "d": "COTTON EXPRESSION 70CM"}, {"c": "620", "d": "COUNTRY BLUES 40CM/25T"}, {"c": "1029", "d": "COUNTRY BLUES 50CM/25T"}, {"c": "1035", "d": "COUNTRY BLUES 60CM/25T"}, {"c": "1038", "d": "COUNTRY HOME 50CM/25T"}, {"c": "810", "d": "COUNTRY HOME 60 CM/25TALLOS"}, {"c": "49", "d": "CREAM DE LA CREAM 40CM/25T"}, {"c": "48", "d": "CREAM DE LA CREAM 50CM/25T"}, {"c": "47", "d": "CREAM DE LA CREAM 60CM/25T"}, {"c": "46", "d": "CREAM DE LA CREAM 70CM/25T"}, {"c": "45", "d": "CREAM DE LA CREAM 80CM/25T"}, {"c": "948", "d": "CRISANTEMO"}, {"c": "555", "d": "CUBOS"}, {"c": "234", "d": "CUMBIA 40CM/25T"}, {"c": "233", "d": "CUMBIA 50CM/25T"}, {"c": "232", "d": "CUMBIA 60CM/25T"}, {"c": "231", "d": "CUMBIA 70CM/25T"}, {"c": "230", "d": "CUMBIA 80CM/25T"}, {"c": "449", "d": "DEEP PURPLE 40CM/25T"}, {"c": "400", "d": "DEEP PURPLE 50CM/25T"}, {"c": "305", "d": "DEEP PURPLE 60CM/25T"}, {"c": "376", "d": "DEEP SILVER 60CM/25T"}, {"c": "688", "d": "DEJAVU 50CM/25T"}, {"c": "347", "d": "DEJAVU 60CM/25T"}, {"c": "59", "d": "ENGAGEMENT 40CM/25T"}, {"c": "58", "d": "ENGAGEMENT 50CM/25T"}, {"c": "57", "d": "ENGAGEMENT 60CM/25T"}, {"c": "56", "d": "ENGAGEMENT 70CM/25T"}, {"c": "55", "d": "ENGAGEMENT 80CM/25T"}, {"c": "266", "d": "ESCIMO 40CM/25T"}, {"c": "265", "d": "ESCIMO 50CM/25T"}, {"c": "264", "d": "ESCIMO 60CM/25T"}, {"c": "263", "d": "ESCIMO 70CM/25T"}, {"c": "262", "d": "ESCIMO 80CM/25T"}, {"c": "350", "d": "ESPARRAGUERA"}, {"c": "261", "d": "ESPAÑA 40CM/25T"}, {"c": "260", "d": "ESPAÑA 50CM/25T"}, {"c": "259", "d": "ESPAÑA 60CM/25T"}, {"c": "308", "d": "ESPAÑA 60CM/25T"}, {"c": "258", "d": "ESPAÑA 70CM/25T"}, {"c": "257", "d": "ESPAÑA 80CM/25T"}, {"c": "239", "d": "ESPERANCE 40CM/25T"}, {"c": "238", "d": "ESPERANCE 50CM/25T"}, {"c": "237", "d": "ESPERANCE 60CM/25T"}, {"c": "236", "d": "ESPERANCE 70CM/25T"}, {"c": "235", "d": "ESPERANCE 80CM/25T"}, {"c": "920", "d": "ESPONJAS"}, {"c": "903", "d": "EUCALIPTO"}, {"c": "947", "d": "EUCALIPTO BABY"}, {"c": "1017", "d": "EUCALIPTO TINTURADO"}, {"c": "306", "d": "EXPLORER 40CM/25T"}, {"c": "408", "d": "EXPLORER 50CM/25T"}, {"c": "9", "d": "EXPLORER 60CM/25T"}, {"c": "8", "d": "EXPLORER 70CM/25T"}, {"c": "7", "d": "EXPLORER 80CM/25T"}, {"c": "94", "d": "FAITH 40CM/25T"}, {"c": "93", "d": "FAITH 50CM/25T"}, {"c": "92", "d": "FAITH 60CM/25T"}, {"c": "91", "d": "FAITH 70CM/25T"}, {"c": "90", "d": "FAITH 80CM/25T"}, {"c": "876", "d": "FELICITY 60CM/25T"}, {"c": "314", "d": "FIESTA 60CM/25T"}, {"c": "336", "d": "FINALLY 50CM/25T"}, {"c": "414", "d": "FREE SPIRIT"}, {"c": "901", "d": "FREEDOM 30CM/25T"}, {"c": "6", "d": "FREEDOM 40CM/25T"}, {"c": "5", "d": "FREEDOM 50CM/25T"}, {"c": "4", "d": "FREEDOM 60CM/25T"}, {"c": "3", "d": "FREEDOM 70CM/25T"}, {"c": "2", "d": "FREEDOM 80CM/25T"}, {"c": "1", "d": "FREEDOM 90CM/25T"}, {"c": "922", "d": "FRESSIAS"}, {"c": "446", "d": "FRIENDLY 50CM/25T"}, {"c": "447", "d": "FRIENDLY 60CM/25T"}, {"c": "311", "d": "FRUTETO 60CM/25T"}, {"c": "705", "d": "FRUTETTO 40CM/25T"}, {"c": "799", "d": "FRUTETTO 50CM/25T"}, {"c": "698", "d": "FRUTETTO 70CM/25T"}, {"c": "831", "d": "FRUTTETO 50CM/25T"}, {"c": "388", "d": "FUSION 50CM/25T"}, {"c": "339", "d": "FUSION 60CM/25T"}, {"c": "466", "d": "FUSION 70CM/25T"}, {"c": "811", "d": "GAME ON 60 CM/25TALLOS"}, {"c": "340", "d": "GARDEN 50CM"}, {"c": "344", "d": "GARDEN ROSES"}, {"c": "371", "d": "GASOLINA"}, {"c": "84", "d": "GERALDINE 40CM/25T"}, {"c": "83", "d": "GERALDINE 50CM/25T"}, {"c": "82", "d": "GERALDINE 60CM/25T"}, {"c": "81", "d": "GERALDINE 70CM/25T"}, {"c": "80", "d": "GERALDINE 80CM/25T"}, {"c": "318", "d": "GERBERA"}, {"c": "477", "d": "GIGI 60CM/25T"}, {"c": "1002", "d": "GIRASOLES"}, {"c": "758", "d": "GISELE 40CM/25T"}, {"c": "756", "d": "GISELE 50CM/25T"}, {"c": "937", "d": "GISELLE 60CM/25T"}, {"c": "586", "d": "GLACIER"}, {"c": "438", "d": "GOTCHA 50CM/25T"}, {"c": "785", "d": "GOTCHA 60CM/25T"}, {"c": "439", "d": "GOTCHA 70CM/25T"}, {"c": "808", "d": "GREEN TEA 60 CM/25TALLOS"}, {"c": "405", "d": "GREEN TEA 60CM/25T"}, {"c": "332", "d": "HAPPY BRIBE 50CM/25T"}, {"c": "1101", "d": "HAPPY BRIBE 60CM/25T"}, {"c": "656", "d": "HEARTS 40"}, {"c": "657", "d": "HEARTS 50CM"}, {"c": "251", "d": "HELECHO EXTRA"}, {"c": "250", "d": "HELECHO GOLDEN"}, {"c": "249", "d": "HELECHO PRIMERA"}, {"c": "64", "d": "HERMOSA 40CM/25T"}, {"c": "63", "d": "HERMOSA 50CM/25T"}, {"c": "62", "d": "HERMOSA 60CM/25T"}, {"c": "61", "d": "HERMOSA 70CM/25T"}, {"c": "60", "d": "HERMOSA 80CM/25T"}, {"c": "139", "d": "HIGH & EXOTIC 40CM/25T"}, {"c": "138", "d": "HIGH & EXOTIC 50CM/25T"}, {"c": "137", "d": "HIGH & EXOTIC 60CM/25T"}, {"c": "136", "d": "HIGH & EXOTIC 70CM/25T"}, {"c": "135", "d": "HIGH & EXOTIC 80CM/25T"}, {"c": "804", "d": "HIGH & MAGIG 50CM/25T"}, {"c": "199", "d": "HIGH & ORANGE 40CM/25T"}, {"c": "198", "d": "HIGH & ORANGE 50CM/25T"}, {"c": "197", "d": "HIGH & ORANGE 60CM/25T"}, {"c": "196", "d": "HIGH & ORANGE 70CM/25T"}, {"c": "195", "d": "HIGH & ORANGE 80CM/25T"}, {"c": "812", "d": "HIGH AND FLAME 60 CM/25TALLOS"}, {"c": "820", "d": "HIGH AND FLAME 60 CM/25TALLOS"}, {"c": "819", "d": "HIGH AND INTENZ"}, {"c": "805", "d": "HIGH AND PURE 60 CM/25TALLOS"}, {"c": "803", "d": "HIGH MAGIC 60 CM/25TALLOS"}, {"c": "935", "d": "HIGHLIGHT 50CM/25T"}, {"c": "934", "d": "HIGHLIGHT 60CM/25T"}, {"c": "806", "d": "HILUX 60 CM/25TALLOS"}, {"c": "587", "d": "HIPERICUM"}, {"c": "338", "d": "HONEY DROP 50CM/25T"}, {"c": "337", "d": "HONEY DROP 60CM/25T"}, {"c": "902", "d": "HORTENSIAS"}, {"c": "965", "d": "HORTENSIAS ANTIQUE"}, {"c": "482", "d": "HOT EXPLORER 50CM/25T"}, {"c": "480", "d": "HOT EXPLORER 60CM/25T"}, {"c": "481", "d": "HOT EXPLORER 70CM/25T"}, {"c": "821", "d": "HOT LADY 60 CM/25TALLOS"}, {"c": "204", "d": "HOT MERENGUE 40CM/25T"}, {"c": "203", "d": "HOT MERENGUE 50CM/25T"}, {"c": "202", "d": "HOT MERENGUE 60CM/25T"}, {"c": "201", "d": "HOT MERENGUE 70CM/25T"}, {"c": "200", "d": "HOT MERENGUE 80CM/25T"}, {"c": "333", "d": "HOT PARIS 60CM/25T"}, {"c": "114", "d": "HUMMER 40CM/25T"}, {"c": "113", "d": "HUMMER 50CM/25T"}, {"c": "112", "d": "HUMMER 60CM/25T"}, {"c": "111", "d": "HUMMER 70CM/25T"}, {"c": "110", "d": "HUMMER 80CM/25T"}, {"c": "992", "d": "IDOLE 60CM/25T"}, {"c": "399", "d": "IGLOO 60CM/25T"}, {"c": "417", "d": "IGUANA 60CM/25T"}, {"c": "822", "d": "IGUAZU 60 CM/25TALLOS"}, {"c": "943", "d": "ILEX"}, {"c": "354", "d": "ILEX 50CM"}, {"c": "358", "d": "ILEX 60CM"}, {"c": "359", "d": "ILEX 70CM"}, {"c": "303", "d": "INTENSE 50CM/25T"}, {"c": "302", "d": "INTENSE 60CM/25T"}, {"c": "1037", "d": "IRIS"}, {"c": "89", "d": "JESSIKA 40CM/25T"}, {"c": "88", "d": "JESSIKA 50CM/25T"}, {"c": "87", "d": "JESSIKA 60CM/25T"}, {"c": "86", "d": "JESSIKA 70CM/25T"}, {"c": "85", "d": "JESSIKA 80CM/25T"}, {"c": "898", "d": "KAHALA 50CM/25T"}, {"c": "788", "d": "KAHALA 60CM/25T"}, {"c": "375", "d": "KENDALL 60CM/25T"}, {"c": "593", "d": "LADY EVA 60CM/25T"}, {"c": "134", "d": "LATINA 40CM/25T"}, {"c": "133", "d": "LATINA 50CM/25T"}, {"c": "132", "d": "LATINA 60CM/25T"}, {"c": "131", "d": "LATINA 70CM/25T"}, {"c": "130", "d": "LATINA 80CM/25T"}, {"c": "364", "d": "LEMONADE 50CM/25T"}, {"c": "329", "d": "LEMONADE 60CM/25T"}, {"c": "699", "d": "LEONIDAS 60CM 25T"}, {"c": "993", "d": "LIGHTHOUSE 50CM/25T"}, {"c": "352", "d": "LILIUM ORIENTAL"}, {"c": "1001", "d": "LISIANTHUS"}, {"c": "946", "d": "LO SEVERN 2"}, {"c": "635", "d": "LOLA 50CM/25T"}, {"c": "636", "d": "LOLA 60CM/25T"}, {"c": "814", "d": "LONDON EYE 60 CM/25TALLOS"}, {"c": "415", "d": "LORRAINE 60CM/25T"}, {"c": "879", "d": "LUCIANO 50CM/25T"}, {"c": "312", "d": "LUCIANO 60CM/25T"}, {"c": "341", "d": "LUMIA 60CM/25T"}, {"c": "369", "d": "LUZ"}, {"c": "786", "d": "MAGIC TIMES 60CM/25T"}, {"c": "944", "d": "MAGNOLIO"}, {"c": "209", "d": "MALIBU 40CM/25T"}, {"c": "208", "d": "MALIBU 50CM/25T"}, {"c": "207", "d": "MALIBU 60CM/25T"}, {"c": "206", "d": "MALIBU 70CM/25T"}, {"c": "205", "d": "MALIBU 80CM/25T"}, {"c": "327", "d": "MAMMA MIA  60CM/25T"}, {"c": "331", "d": "MANDALA 60CM/25T"}, {"c": "377", "d": "MANTENIMIENTO COCHES"}, {"c": "298", "d": "MANZANILLA"}, {"c": "921", "d": "MARGARITAS"}, {"c": "908", "d": "MATCHA 40CM/25T"}, {"c": "907", "d": "MATCHA 50CM/25T"}, {"c": "789", "d": "MATCHA 60CM/25T"}, {"c": "906", "d": "MATCHA 60CM/25T"}, {"c": "790", "d": "MATCHA 70CM/25T"}, {"c": "924", "d": "MATHIOLAS"}, {"c": "915", "d": "MAZO DE LENTISCO/ARAYÁN/FINITO"}, {"c": "372", "d": "MIA 60CM/25T"}, {"c": "668", "d": "MINI CLAVEL (POR TALLOS)"}, {"c": "940", "d": "MOAB 60CM/25T"}, {"c": "653", "d": "MOAB 70CM/25T"}, {"c": "335", "d": "MOMENTUM 40CM/25T"}, {"c": "436", "d": "MOMENTUM 50CM/25T"}, {"c": "434", "d": "MOMENTUM 60CM/25T"}, {"c": "24", "d": "MONDIAL 40CM/25T"}, {"c": "23", "d": "MONDIAL 50CM/25T"}, {"c": "22", "d": "MONDIAL 60CM/25T"}, {"c": "21", "d": "MONDIAL 70CM/25T"}, {"c": "20", "d": "MONDIAL 80CM/25T"}, {"c": "154", "d": "MOODY BLUES 40CM/25T"}, {"c": "153", "d": "MOODY BLUES 50CM/25T"}, {"c": "152", "d": "MOODY BLUES 60CM/25T"}, {"c": "151", "d": "MOODY BLUES 70CM/25T"}, {"c": "150", "d": "MOODY BLUES 80CM/25T"}, {"c": "406", "d": "MOTHER OF PEARL 50CM/25T"}, {"c": "403", "d": "MOTHER OF PEARL 60 CM/25T"}, {"c": "301", "d": "MOVISTAR 50CM/25T"}, {"c": "300", "d": "MOVISTAR 60CM/25T"}, {"c": "353", "d": "MUERDAGO"}, {"c": "277", "d": "NARDOS GRANDES"}, {"c": "278", "d": "NARDOS MEDIANOS"}, {"c": "279", "d": "NARDOS PEQUEÑOS"}, {"c": "299", "d": "NARDOS SUPER"}, {"c": "99", "d": "NAUTICA 40CM/25T"}, {"c": "98", "d": "NAUTICA 50CM/25T"}, {"c": "97", "d": "NAUTICA 60CM/25T"}, {"c": "96", "d": "NAUTICA 70CM/25T"}, {"c": "95", "d": "NAUTICA 80CM/25T"}, {"c": "313", "d": "NENA 40CM/25T"}, {"c": "402", "d": "NENA 50CM/25T"}, {"c": "309", "d": "NENA 60CM/25T"}, {"c": "444", "d": "NEW YELLOW 50CM/25T"}, {"c": "445", "d": "NEW YELLOW 60CM/25T"}, {"c": "801", "d": "NEWSFLASH 60 CM/25TALLOS"}, {"c": "194", "d": "NINA 40CM/25T"}, {"c": "193", "d": "NINA 50CM/25T"}, {"c": "192", "d": "NINA 60CM/25T"}, {"c": "191", "d": "NINA 70CM/25T"}, {"c": "190", "d": "NINA 80CM/25T"}, {"c": "941", "d": "NOVELIS"}, {"c": "351", "d": "NOVELIS NORMANDIA"}, {"c": "401", "d": "NOVIA 60CM/25T"}, {"c": "144", "d": "OCEAN SONG 40CM/25T"}, {"c": "143", "d": "OCEAN SONG 50CM/25T"}, {"c": "142", "d": "OCEAN SONG 60CM/25T"}, {"c": "141", "d": "OCEAN SONG 70CM/25T"}, {"c": "140", "d": "OCEAN SONG 80CM/25T"}, {"c": "602", "d": "OPALA 50CM/25T"}, {"c": "601", "d": "OPALA 60CM/25T"}, {"c": "184", "d": "ORANGE CRUSH 40CM/25T"}, {"c": "183", "d": "ORANGE CRUSH 50CM/25T"}, {"c": "182", "d": "ORANGE CRUSH 60CM/25T"}, {"c": "181", "d": "ORANGE CRUSH 70CM/25T"}, {"c": "180", "d": "ORANGE CRUSH 80CM/25T"}, {"c": "925", "d": "ORQUIDEAS"}, {"c": "361", "d": "PALETS"}, {"c": "385", "d": "PALETS"}, {"c": "689", "d": "PALOMA 60CM/25T"}, {"c": "342", "d": "PANAMERA 60CM/25T"}, {"c": "904", "d": "PANICULATA"}, {"c": "360", "d": "PASCUELOS"}, {"c": "396", "d": "PASTELA 60CM/25T"}, {"c": "757", "d": "PEONIAS"}, {"c": "1003", "d": "PEONIAS"}, {"c": "109", "d": "PERLA 40CM/25T"}, {"c": "108", "d": "PERLA 50CM/25T"}, {"c": "107", "d": "PERLA 60CM/25T"}, {"c": "106", "d": "PERLA 70CM/25T"}, {"c": "105", "d": "PERLA 80CM/25T"}, {"c": "290", "d": "PETALOS"}, {"c": "910", "d": "PHOENIX 60CM/25T"}, {"c": "326", "d": "PINK EXPRESSION 60CM/25T"}, {"c": "169", "d": "PINK FLOYD 40CM/25T"}, {"c": "168", "d": "PINK FLOYD 50CM/25T"}, {"c": "167", "d": "PINK FLOYD 60CM/25T"}, {"c": "166", "d": "PINK FLOYD 70CM/25T"}, {"c": "165", "d": "PINK FLOYD 80CM/25T"}, {"c": "104", "d": "PINK MONDIAL 40CM/25T"}, {"c": "103", "d": "PINK MONDIAL 50CM/25T"}, {"c": "102", "d": "PINK MONDIAL 60CM/25T"}, {"c": "101", "d": "PINK MONDIAL 70CM/25T"}, {"c": "100", "d": "PINK MONDIAL 80CM/25T"}, {"c": "442", "d": "PINK OHARA 25T/50CM"}, {"c": "392", "d": "PLAYA BLANCA 40CM/25T"}, {"c": "877", "d": "PLAYA BLANCA 50CM/25T"}, {"c": "818", "d": "PLAYA BLANCA 60 CM/25TALLOS"}, {"c": "991", "d": "PLAYA BLANCA 70CM/25T"}, {"c": "362", "d": "POINSETIAS"}, {"c": "54", "d": "POLAR STAR 40CM/25T"}, {"c": "53", "d": "POLAR STAR 50CM/25T"}, {"c": "52", "d": "POLAR STAR 60CM/25T"}, {"c": "51", "d": "POLAR STAR 70CM/25T"}, {"c": "50", "d": "POLAR STAR 80CM/25T"}, {"c": "676", "d": "POLO 50CM/25T"}, {"c": "675", "d": "POLO 60CM/25T"}, {"c": "854", "d": "POMAROSA 60CM/25T"}, {"c": "1036", "d": "POMAROSA 60CM/25T"}, {"c": "547", "d": "POMPEI 50CM/25T"}, {"c": "548", "d": "POMPEI 60CM/25T"}, {"c": "320", "d": "PRIMAVERA 40CM/25T"}, {"c": "321", "d": "PRIMAVERA 50CM/25T"}, {"c": "322", "d": "PRIMAVERA 60CM/25T"}, {"c": "29", "d": "PROUD 40CM/25T"}, {"c": "28", "d": "PROUD 50CM/25T"}, {"c": "27", "d": "PROUD 60CM/25T"}, {"c": "26", "d": "PROUD 70CM/25T"}, {"c": "25", "d": "PROUD 80CM/25T"}, {"c": "319", "d": "QUEENS CROWN 60CM/25T"}, {"c": "219", "d": "QUICKSAND 40CM/25T"}, {"c": "218", "d": "QUICKSAND 50CM/25T"}, {"c": "217", "d": "QUICKSAND 60CM/25T"}, {"c": "216", "d": "QUICKSAND 70CM/25T"}, {"c": "215", "d": "QUICKSAND 80CM/25T"}, {"c": "214", "d": "RAINBOW 40CM/25T"}, {"c": "213", "d": "RAINBOW 50CM/25T"}, {"c": "212", "d": "RAINBOW 60CM/25T"}, {"c": "211", "d": "RAINBOW 70CM/25T"}, {"c": "210", "d": "RAINBOW 80CM/25T"}, {"c": "316", "d": "RED PANTHER 70CM/25T"}, {"c": "345", "d": "RED PARIS 60CM/25T"}, {"c": "378", "d": "REPARTO SEVILLA"}, {"c": "942", "d": "ROBLE ROJO"}, {"c": "416", "d": "ROSEBERRY 60CM/25T"}, {"c": "79", "d": "ROSITA VENDELA 40CM/25T"}, {"c": "78", "d": "ROSITA VENDELA 50CM/25T"}, {"c": "77", "d": "ROSITA VENDELA 60CM/25T"}, {"c": "76", "d": "ROSITA VENDELA 70CM/25T"}, {"c": "75", "d": "ROSITA VENDELA 80CM/25T"}, {"c": "778", "d": "SAGA 40CM/25T"}, {"c": "687", "d": "SAGA 50CM/25T"}, {"c": "569", "d": "SAGA 60CM/25T"}, {"c": "779", "d": "SAGA 60CM/25T"}, {"c": "224", "d": "SAHARA 40CM/25T"}, {"c": "223", "d": "SAHARA 50CM/25T"}, {"c": "222", "d": "SAHARA 60CM/25T"}, {"c": "221", "d": "SAHARA 70CM/25T"}, {"c": "220", "d": "SAHARA 80CM/25T"}, {"c": "295", "d": "SALMA 40CM/25T"}, {"c": "294", "d": "SALMA 50CM/25T"}, {"c": "293", "d": "SALMA 60CM/25T"}, {"c": "292", "d": "SALMA 70CM/25T"}, {"c": "291", "d": "SALMA 80CM/25T"}, {"c": "379", "d": "SERVICIOS"}, {"c": "74", "d": "SEÑORITA 40CM/25T"}, {"c": "73", "d": "SEÑORITA 50CM/25T"}, {"c": "72", "d": "SEÑORITA 60CM/25T"}, {"c": "71", "d": "SEÑORITA 70CM/25T"}, {"c": "70", "d": "SEÑORITA 80CM/25T"}, {"c": "702", "d": "SHIMMER 50CM/25T"}, {"c": "703", "d": "SHIMMER 60CM/25T"}, {"c": "374", "d": "SHIMMER 70CM/25T"}, {"c": "771", "d": "SHY 50CM/25T"}, {"c": "772", "d": "SHY 60CM/25T"}, {"c": "568", "d": "SILANTON 25T/60CM"}, {"c": "1004", "d": "SOLIDAGO"}, {"c": "766", "d": "SPARK 40CM/25T"}, {"c": "767", "d": "SPARK 50CM/25T"}, {"c": "768", "d": "SPARK 60CM/25T"}, {"c": "769", "d": "SPARK 70CM/25T"}, {"c": "770", "d": "SPARK 80CM/25T"}, {"c": "589", "d": "SPIDER ANASTASIA"}, {"c": "248", "d": "SPRAY ROSES"}, {"c": "129", "d": "STARDUST 40CM/25T"}, {"c": "128", "d": "STARDUST 50CM/25T"}, {"c": "127", "d": "STARDUST 60CM/25T"}, {"c": "126", "d": "STARDUST 70CM/25T"}, {"c": "125", "d": "STARDUST 80CM/25T"}, {"c": "923", "d": "STATICE"}, {"c": "370", "d": "SUBIDA IPC"}, {"c": "995", "d": "SUPER SUN 60CM/25T"}, {"c": "69", "d": "SWEET AKITO 40CM/25T"}, {"c": "68", "d": "SWEET AKITO 50CM/25T"}, {"c": "67", "d": "SWEET AKITO 60CM/25T"}, {"c": "66", "d": "SWEET AKITO 70CM/25T"}, {"c": "65", "d": "SWEET AKITO 80CM/25T"}, {"c": "585", "d": "SWEET AVALANCHE"}, {"c": "592", "d": "SWEET GRAPE 50CM/25T"}, {"c": "591", "d": "SWEET GRAPE 60CM/25T"}, {"c": "389", "d": "SWEET UNIQUE 50CM/25T"}, {"c": "490", "d": "SWEET UNIQUE 50CM/25T"}, {"c": "411", "d": "SWEET UNIQUE 60CM/25T"}, {"c": "390", "d": "SWEET UNIQUE 60CM/25T"}, {"c": "229", "d": "SWEETNESS 40CM/25T"}, {"c": "228", "d": "SWEETNESS 50CM/25T"}, {"c": "227", "d": "SWEETNESS 60CM/25T"}, {"c": "226", "d": "SWEETNESS 70CM/25T"}, {"c": "225", "d": "SWEETNESS 80CM/25T"}, {"c": "393", "d": "SYMBOL 40CM/25T"}, {"c": "887", "d": "TABATHA 60CM/25T"}, {"c": "124", "d": "TARA 40CM/25T"}, {"c": "123", "d": "TARA 50CM/25T"}, {"c": "122", "d": "TARA 60CM/25T"}, {"c": "121", "d": "TARA 70CM/25T"}, {"c": "120", "d": "TARA 80CM/25T"}, {"c": "988", "d": "TIBET 40CM/25T"}, {"c": "578", "d": "TIBET 50CM/25T"}, {"c": "579", "d": "TIBET 60CM/25T"}, {"c": "989", "d": "TIBET 70CM/25T"}, {"c": "502", "d": "TIFFANY 40CM/25T"}, {"c": "681", "d": "TIFFANY 50CM/25T"}, {"c": "307", "d": "TIFFANY 60CM/25T"}, {"c": "14", "d": "TINTO 40CM/25T"}, {"c": "13", "d": "TINTO 50CM/25T"}, {"c": "12", "d": "TINTO 60CM/25T"}, {"c": "11", "d": "TINTO 70CM/25T"}, {"c": "10", "d": "TINTO 80CM/25T"}, {"c": "470", "d": "TINTURADA 25T/60CM"}, {"c": "328", "d": "TINTURADA ARCOIRIS"}, {"c": "256", "d": "TITANIC 40CM/25T"}, {"c": "255", "d": "TITANIC 50CM/25T"}, {"c": "254", "d": "TITANIC 60CM/25T"}, {"c": "253", "d": "TITANIC 70CM/25T"}, {"c": "252", "d": "TITANIC 80CM/25T"}, {"c": "159", "d": "TOPAZ 40CM/25T"}, {"c": "158", "d": "TOPAZ 50CM/25T"}, {"c": "157", "d": "TOPAZ 60CM/25T"}, {"c": "156", "d": "TOPAZ 70CM/25T"}, {"c": "155", "d": "TOPAZ 80CM/25T"}, {"c": "802", "d": "TOUCH OF CLASS 60 CM/25TALLOS"}, {"c": "384", "d": "TRANSPORTE AUTOBUS"}, {"c": "777", "d": "TRANSPORTE-TIPSA"}, {"c": "383", "d": "TULIPANES"}, {"c": "271", "d": "TURTLE 40CM/25T"}, {"c": "270", "d": "TURTLE 50CM/25T"}, {"c": "269", "d": "TURTLE 60CM/25T"}, {"c": "268", "d": "TURTLE 70CM/25T"}, {"c": "267", "d": "TURTLE 80CM/25T"}, {"c": "1012", "d": "TUYA"}, {"c": "19", "d": "VENDELA 40CM/25T"}, {"c": "18", "d": "VENDELA 50CM/25T"}, {"c": "17", "d": "VENDELA 60CM/25T"}, {"c": "16", "d": "VENDELA 70CM/25T"}, {"c": "15", "d": "VENDELA 80CM/25T"}, {"c": "905", "d": "VERDES"}, {"c": "244", "d": "VERSILIA 40CM/25T"}, {"c": "243", "d": "VERSILIA 50CM/25T"}, {"c": "242", "d": "VERSILIA 60CM/25T"}, {"c": "241", "d": "VERSILIA 70CM/25T"}, {"c": "240", "d": "VERSILIA 80CM/25T"}, {"c": "297", "d": "VISNAGA"}, {"c": "179", "d": "VOODOO 40CM/25T"}, {"c": "178", "d": "VOODOO 50CM/25T"}, {"c": "177", "d": "VOODOO 60CM/25T"}, {"c": "176", "d": "VOODOO 70CM/25T"}, {"c": "175", "d": "VOODOO 80CM/25T"}, {"c": "355", "d": "WASABI 40CM/25T"}, {"c": "356", "d": "WASABI 50CM/25T"}, {"c": "357", "d": "WASABI 60CM/25T"}, {"c": "395", "d": "WESTMINSTER 40CM/10T"}, {"c": "825", "d": "WHITE CHOCOLATE 25T/60CM"}, {"c": "826", "d": "WHITE CHOCOLATE 70CM/25T"}, {"c": "696", "d": "WHITE OHARA 60CM"}, {"c": "999", "d": "WHITE SHIMMER 60CM/25T"}, {"c": "945", "d": "YELLOW KING 60CM/25T"}, {"c": "304", "d": "YELLOW MONDIAL 60CM/25T"}];
+var PROVEEDORES=["Agrinag (Ecuador)", "Cantiza Flores (Ecuador)", "El Milagro (Ecuador)", "Exportcalas / Much Flowers (Ecuador)", "Floranrosa (Ecuador)", "Flores de Napoles (Ecuador)", "Ilusiones Garden (Ecuador)", "Natuflor (Ecuador)", "Quimbiamba (Ecuador)", "Quito Inorflowers (Ecuador)", "Rocopax CIA Ltda (Ecuador)", "Rosalinda (Ecuador)", "Rosaprima (Ecuador)", "Saftec (Ecuador)", "Solpacific (Ecuador)", "Valleverde Farms (Ecuador)", "Valthomig (Ecuador)", "Yanez Chancusig (Ecuador)", "Benchmark Growers (Colombia)", "CI Surandina (Colombia)", "El Milagro (Colombia)", "Kuehne+Nagel (Colombia)", "Plazoleta Bazzani (Colombia)", "Singha SAS (Colombia)"];
 
-function loadPedidos(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY)||'[]'); }catch{ return []; } }
-function savePedidos(p){ localStorage.setItem(STORE_KEY, JSON.stringify(p)); renderPedidos(); updateCount(); }
-function getNextNum(){ var n=(parseInt(localStorage.getItem(CTR_KEY)||'0')+1); localStorage.setItem(CTR_KEY,n); return 'P-'+String(n).padStart(3,'0'); }
+// ── STORE ──────────────────────────────────────────────────
+var SK={v:'bf_v1',c:'bf_c1'};
+function ld(k){try{return JSON.parse(localStorage.getItem(SK[k])||'[]');}catch{return [];}}
+function sv(k,d){localStorage.setItem(SK[k],JSON.stringify(d));renderList(k);updBadges();}
+function addL(k,l){var d=ld(k);d.push(l);sv(k,d);}
+function delL(k,i){var d=ld(k);d.splice(i,1);sv(k,d);}
+var _id=parseInt(localStorage.getItem('bf_id')||'0');
+function nxtId(){_id++;localStorage.setItem('bf_id',_id);return 'P-'+String(_id).padStart(3,'0');}
 
-// Active pedido
-var activePedido = null;
-function loadActive(){ try{ return JSON.parse(localStorage.getItem('bf_active')||'null'); }catch{ return null; } }
-function saveActive(){ localStorage.setItem('bf_active', JSON.stringify(activePedido)); }
+// ── DROPDOWN ───────────────────────────────────────────────
+var _ddItems={
+  vci:CLIENTES,
+  vpi:ARTICULOS.map(function(a){return a.d;}),
+  cpi:ARTICULOS.map(function(a){return a.d;}),
+  cpv:PROVEEDORES
+};
+var _ddMap={vci:'vcd',vpi:'vpd',cpi:'cpd',cpv:'cpvd'};
+var _ddNext={vci:'vpi',vpi:'vq',cpi:'cq',cpv:'cpi'};
 
-// ============================================================
-// RENDER
-// ============================================================
-function renderPedidos(){
-  var area = document.getElementById('pedidosArea');
-  var empty = document.getElementById('emptyState');
-  var active = loadActive();
-  var pedidos = loadPedidos();
+function ddInput(inputId){
+  var q=document.getElementById(inputId).value;
+  showDD(inputId,q);
+}
+function ddFocus(inputId){showDD(inputId,document.getElementById(inputId).value||'');}
 
-  // Clear existing groups
-  area.querySelectorAll('.cliente-group').forEach(function(el){ el.remove(); });
+function showDD(inputId,q){
+  var ddId=_ddMap[inputId];
+  var items=_ddItems[inputId]||[];
+  var ql=q.toLowerCase().trim();
+  var filtered=ql?items.filter(function(x){return x.toLowerCase().includes(ql);}):items;
+  filtered=filtered.slice(0,80);
+  var dd=document.getElementById(ddId);
+  if(!dd)return;
+  // Close others
+  Object.values(_ddMap).forEach(function(id){if(id!==ddId){var el=document.getElementById(id);if(el)el.classList.remove('open');}});
+  if(!filtered.length){
+    if(q.trim()){
+      dd.innerHTML='<div class="so" style="color:var(--vm);font-style:italic;" data-iid="'+inputId+'" data-val="'+encodeURIComponent(q.trim())+'">Usar &quot;'+q.trim()+'&quot;</div>';
+    }else{
+      dd.innerHTML='<div class="se">Empieza a escribir...</div>';
+    }
+  }else{
+    var esc=ql.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    dd.innerHTML=filtered.map(function(item){
+      var hl=ql?item.replace(new RegExp('('+esc+')','gi'),'<strong>$1</strong>'):item;
+      return '<div class="so" data-iid="'+inputId+'" data-val="'+encodeURIComponent(item)+'">'+hl+'</div>';
+    }).join('');
+  }
+  dd.classList.add('open');
+  // Attach click
+  dd.querySelectorAll('.so').forEach(function(el){
+    el.addEventListener('mousedown',function(e){
+      e.preventDefault();
+      var iid=el.getAttribute('data-iid');
+      var val=decodeURIComponent(el.getAttribute('data-val'));
+      document.getElementById(iid).value=val;
+      dd.classList.remove('open');
+      var nxt=_ddNext[iid];
+      if(nxt)setTimeout(function(){document.getElementById(nxt).focus();},50);
+    });
+  });
+  dd.classList.add('open');
+}
 
-  var hasContent = (active && active.lineas && active.lineas.length > 0) || pedidos.length > 0;
+function ddKey(e,inputId){
+  var ddId=_ddMap[inputId];
+  var dd=document.getElementById(ddId);
+  if(!dd||!dd.classList.contains('open')){if(e.key==='Enter'){e.preventDefault();if(inputId==='vci'||inputId==='cpi'){}return;}return;}
+  var opts=dd.querySelectorAll('.so');
+  var cur=dd.querySelector('.hi');
+  var curIdx=Array.from(opts).indexOf(cur);
+  if(e.key==='ArrowDown'){e.preventDefault();var ni=Math.min(curIdx+1,opts.length-1);if(cur)cur.classList.remove('hi');opts[ni<0?0:ni].classList.add('hi');opts[ni<0?0:ni].scrollIntoView({block:'nearest'});}
+  else if(e.key==='ArrowUp'){e.preventDefault();var pi=Math.max(curIdx-1,0);if(cur)cur.classList.remove('hi');if(opts[pi])opts[pi].classList.add('hi');if(opts[pi])opts[pi].scrollIntoView({block:'nearest'});}
+  else if(e.key==='Enter'){e.preventDefault();if(cur){cur.dispatchEvent(new MouseEvent('mousedown'));}else if(opts[0]){opts[0].dispatchEvent(new MouseEvent('mousedown'));}else{dd.classList.remove('open');var nxt=_ddNext[inputId];if(nxt)document.getElementById(nxt).focus();}}
+  else if(e.key==='Escape'){dd.classList.remove('open');}
+}
 
-  if(!hasContent){
-    empty.style.display = 'block';
+document.addEventListener('click',function(e){
+  if(!e.target.closest('.sw')){
+    document.querySelectorAll('.sd').forEach(function(d){d.classList.remove('open');});
+  }
+});
+
+// ── ADD LINES ──────────────────────────────────────────────
+function addV(){
+  var f=document.getElementById('vf').value;
+  var cl=document.getElementById('vci').value.trim();
+  var pr=document.getElementById('vpi').value.trim();
+  var q=parseInt(document.getElementById('vq').value);
+  if(!f){toast('⚠ Selecciona fecha de entrega');return;}
+  if(!cl){toast('⚠ Escribe o selecciona el cliente');return;}
+  if(!pr){toast('⚠ Escribe o selecciona el producto');return;}
+  if(!q||q<1){toast('⚠ Introduce la cantidad');return;}
+  addL('v',{id:nxtId(),f:f,cl:cl,pr:pr,q:q,t:Date.now()});
+  document.getElementById('vpi').value='';
+  document.getElementById('vq').value='';
+  document.getElementById('vpi').focus();
+  toast('✅ Línea añadida');
+}
+
+function addC(){
+  var f=document.getElementById('cf').value;
+  var pv=document.getElementById('cpv').value.trim();
+  var pr=document.getElementById('cpi').value.trim();
+  var q=parseInt(document.getElementById('cq').value);
+  if(!f){toast('⚠ Selecciona fecha de llegada');return;}
+  if(!pv){toast('⚠ Escribe el proveedor');return;}
+  if(!pr){toast('⚠ Escribe o selecciona el producto');return;}
+  if(!q||q<1){toast('⚠ Introduce la cantidad');return;}
+  addL('c',{id:nxtId(),f:f,pv:pv,pr:pr,q:q,t:Date.now()});
+  document.getElementById('cpi').value='';
+  document.getElementById('cq').value='';
+  document.getElementById('cpi').focus();
+  toast('✅ Línea añadida');
+}
+
+// Enter key on quantity
+document.getElementById('vq').addEventListener('keydown',function(e){if(e.key==='Enter')addV();});
+document.getElementById('cq').addEventListener('keydown',function(e){if(e.key==='Enter')addC();});
+
+// ── RENDER ─────────────────────────────────────────────────
+function fmtF(s){
+  if(!s)return'?';
+  var p=s.split('-');if(p.length!==3)return s;
+  var D=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  var M=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  var d=new Date(s+'T00:00:00');
+  return D[d.getDay()]+' '+d.getDate()+' '+M[d.getMonth()]+' '+d.getFullYear();
+}
+
+function renderList(k){
+  var data=ld(k);
+  var areaId=k==='v'?'lv':'lc';
+  var area=document.getElementById(areaId);
+  var isV=k==='v';
+  if(!data.length){
+    area.innerHTML=isV
+      ?'<div class="es"><span class="ei">🛒</span><div class="et">Sin pedidos de venta</div><div class="ed">Añade el pedido de un cliente con fecha de entrega.</div></div>'
+      :'<div class="es"><span class="ei">📦</span><div class="et">Sin pedidos de compra</div><div class="ed">Añade lo que pides a proveedores con fecha de llegada.</div></div>';
     return;
   }
-  empty.style.display = 'none';
-
-  // 1. Show active pedido first (not yet finalized)
-  if(active && active.lineas && active.lineas.length){
-    var div = buildGroup(active.cliente, active.num, active.lineas, false, true);
-    area.appendChild(div);
-  }
-
-  // 2. Show completed pedidos - group by num (each num = one pedido)
-  var byNum = {};
-  var numOrder = [];
-  pedidos.forEach(function(l, i){
-    var key = l.num || 'sin-num';
-    if(!byNum[key]){
-      byNum[key] = { num: l.num, cliente: l.cliente, lineas: [] };
-      numOrder.push(key);
-    }
-    byNum[key].lineas.push(Object.assign({}, l, { _i: i }));
+  var byF={};var fOrd=[];
+  data.forEach(function(l,i){
+    if(!byF[l.f]){byF[l.f]=[];fOrd.push(l.f);}
+    byF[l.f].push(Object.assign({},l,{_i:i}));
   });
-
-  numOrder.forEach(function(key){
-    var g = byNum[key];
-    // Skip if same as active (avoid duplicates when active just finalized)
-    if(active && active.num === g.num) return;
-    var div = buildGroup(g.cliente, g.num, g.lineas, true, false);
-    area.appendChild(div);
-  });
-
-  area.scrollTop = area.scrollHeight;
-}
-
-function buildGroup(cliente, num, lineas, finalizado, isActive){
-  var div = document.createElement('div');
-  div.className = 'cliente-group' + (finalizado ? ' cg-finalizado' : '');
-
-  var headHtml = '<div class="cg-head">' +
-    '<div style="display:flex;align-items:center;gap:8px;">' +
-      '<span class="cg-nombre">🏪 ' + cliente + '</span>' +
-      '<span class="cg-num">' + (num||'') + '</span>' +
-    '</div>' +
-    '<div style="display:flex;align-items:center;gap:8px;">' +
-      '<span class="cg-total">' + lineas.length + ' línea' + (lineas.length!==1?'s':'') + '</span>' +
-      (isActive ? '<span class="cg-estado">● activo</span>' : '<span class="cg-estado">✓</span>') +
-    '</div>' +
-  '</div>';
-
-  var rowsHtml = lineas.map(function(l, idx){
-    var delBtn = l._i !== undefined ?
-      '<button class="pr-del" onclick="delLinea(' + l._i + ')">✕</button>' :
-      '<button class="pr-del" onclick="delActivaLinea(' + idx + ')">✕</button>';
-    return '<div class="pedido-row">' +
-      '<span class="pr-var">' + (l.variedad||'—') + '</span>' +
-      '<span class="pr-cant">' + l.cantidad + '</span>' +
-      '<span class="pr-uni">' + (l.unidad||'uds') + '</span>' +
-      delBtn +
-    '</div>';
-  }).join('');
-
-  div.innerHTML = headHtml + rowsHtml;
-  return div;
-}
-
-function delLinea(i){ var p=loadPedidos(); p.splice(i,1); savePedidos(p); }
-function delActivaLinea(i){
-  activePedido = loadActive();
-  if(activePedido){ activePedido.lineas.splice(i,1); saveActive(); renderPedidos(); }
-}
-
-function updateCount(){
-  var p = loadPedidos();
-  var active = loadActive();
-  // Count unique pedidos (by num) + active if exists
-  var nums = {};
-  p.forEach(function(l){ nums[l.num||'?'] = true; });
-  var nPedidos = Object.keys(nums).length + (active && active.lineas && active.lineas.length ? 1 : 0);
-  var nLineas = p.length + (active && active.lineas ? active.lineas.length : 0);
-  document.getElementById('pedCount').textContent = nPedidos + ' pedido' + (nPedidos!==1?'s':'') + ' · ' + nLineas + ' líneas';
-}
-
-// ============================================================
-// ENVIAR PEDIDO
-// ============================================================
-var isProcessing = false;
-
-function handleKey(e){
-  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); enviarPedido(); }
-}
-function autoResize(el){
-  el.style.height='auto';
-  el.style.height=Math.min(el.scrollHeight,100)+'px';
-}
-
-async function enviarPedido(){
-  if(isProcessing) return;
-  var cliente = document.getElementById('clienteInput').value.trim();
-  var texto   = document.getElementById('pedidoInput').value.trim();
-  if(!cliente){ showToast('⚠ Escribe el nombre del cliente'); document.getElementById('clienteInput').focus(); return; }
-  if(!texto){ showToast('⚠ Escribe el pedido'); document.getElementById('pedidoInput').focus(); return; }
-
-  var apiKey = localStorage.getItem(API_KEY);
-  if(!apiKey){ openApikey(); return; }
-
-  // Ensure active pedido for this client
-  activePedido = loadActive();
-  if(!activePedido || activePedido.cliente !== cliente){
-    // Finalize previous client's pedido before starting new one
-    if(activePedido && activePedido.lineas && activePedido.lineas.length){
-      finalizarPedidoActual(true);
-    }
-    // Start fresh for new client
-    activePedido = { num: getNextNum(), cliente: cliente, lineas: [] };
-    saveActive();
-  }
-
-  isProcessing = true;
-  document.getElementById('processing').classList.add('active');
-  document.getElementById('pedidoInput').value = '';
-  document.getElementById('pedidoInput').style.height = 'auto';
-
-  var prompt = buildPrompt(cliente, texto);
-
-  try {
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 800,
-        system: buildSystem(),
-        messages: [{ role: 'user', content: prompt }]
-      })
+  fOrd=fOrd.filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
+  var html='';
+  fOrd.forEach(function(f){
+    var lines=byF[f];
+    html+='<div class="dg"><div class="dgh"><span class="dgf">'+fmtF(f)+'</span><span class="dgc">'+lines.length+' línea'+(lines.length!==1?'s':'')+'</span><div class="dgl"></div></div>';
+    var byN={};var nOrd=[];
+    lines.forEach(function(l){
+      var n=isV?l.cl:l.pv;
+      if(!byN[n]){byN[n]=[];nOrd.push(n);}
+      byN[n].push(l);
     });
-
-    if(!resp.ok){ var err=await resp.json().catch(function(){return {};}); throw new Error(err.error&&err.error.message?err.error.message:'Error '+resp.status); }
-
-    var data = await resp.json();
-    var raw = data.content && data.content.find(function(b){return b.type==='text';});
-    var text = raw ? raw.text : '';
-
-    // Extract LINEAS block
-    var lineasData = extractLineas(text);
-    if(lineasData && lineasData.length){
-      lineasData.forEach(function(l){
-        // Check if variedad exists - update instead of duplicate
-        var existing = activePedido.lineas.findIndex(function(x){
-          return x.variedad && l.variedad && x.variedad.toLowerCase() === l.variedad.toLowerCase();
-        });
-        if(existing >= 0) activePedido.lineas[existing] = l;
-        else activePedido.lineas.push(l);
+    nOrd=nOrd.filter(function(v,i,a){return a.indexOf(v)===i;});
+    nOrd.forEach(function(n){
+      var rows=byN[n];
+      html+='<div class="cg"><div class="cgh '+(isV?'ve':'co')+'"><span class="cgn">'+(isV?'🏪 ':'📦 ')+n+'</span><span class="cgl">'+rows.length+' línea'+(rows.length!==1?'s':'')+'</span></div>';
+      rows.forEach(function(l){
+        html+='<div class="pr"><span class="prv">'+l.pr+'</span><span class="prc'+(isV?'':' bl')+'">'+l.q+'</span>';
+        html+='<button class="prd" data-k="'+k+'" data-i="'+l._i+'">✕</button></div>';
       });
-      saveActive();
-      renderPedidos();
-      showToast('✅ ' + lineasData.length + ' línea' + (lineasData.length!==1?'s':'') + ' anotada' + (lineasData.length!==1?'s':''));
-    } else {
-      showToast('⚠ No pude extraer el pedido — inténtalo de nuevo');
-    }
-
-    // Check for unknown varieties
-    var unknowns = extractUnknowns(text);
-    if(unknowns) showToast('❓ ' + unknowns);
-
-  } catch(e){
-    showToast('⚠ Error: ' + e.message);
-  }
-
-  isProcessing = false;
-  document.getElementById('processing').classList.remove('active');
-  document.getElementById('pedidoInput').focus();
-}
-
-function buildSystem(){
-  var aliases = localStorage.getItem('bf_aliases') || '{}';
-  return 'Eres el gestor de pedidos de Buscaflor, empresa mayorista de flores en Sevilla.\n\n' +
-    'Tu única función: extraer líneas de pedido de flores del texto que te mande Javier.\n\n' +
-    'Reglas de unidades:\n' +
-    '- Rosas y gypsophila: paquetes de 25 tallos\n' +
-    '- Alstroemeria: paquetes de 10 tallos\n' +
-    '- Claveles y hortensias: tallos individuales\n\n' +
-    'Aliases conocidos: ' + aliases + '\n' +
-    'Aliases típicos: rojas=Rosa roja, blancas=Rosa Mondial, gypso=Gypsophila, alstro=Alstroemeria\n\n' +
-    'SIEMPRE responde SOLO con el bloque LINEAS en JSON. Sin texto adicional.\n' +
-    'Si hay variedad desconocida, inclúyela tal cual en el campo variedad y añade al final:\n' +
-    'DESCONOCIDA: [nombre] — ¿qué variedad es?\n\n' +
-    'Formato de respuesta:\n' +
-    '<LINEAS>\n' +
-    '[{"variedad":"Rosa Freedom 60cm","cantidad":20,"unidad":"paquetes"},{"variedad":"Hortensia blanca","cantidad":5,"unidad":"tallos"}]\n' +
-    '</LINEAS>';
-}
-
-function buildPrompt(cliente, texto){
-  return 'Cliente: ' + cliente + '\nPedido: ' + texto;
-}
-
-function extractLineas(text){
-  if(!text) return null;
-  var m = text.match(/<LINEAS>([\s\S]*?)<\/LINEAS>/);
-  if(!m) return null;
-  try{ return JSON.parse(m[1].trim()); }catch{ return null; }
-}
-
-function extractUnknowns(text){
-  if(!text) return null;
-  var m = text.match(/DESCONOCIDA: (.+)/);
-  return m ? m[1] : null;
-}
-
-// ============================================================
-// FINALIZAR / NUEVO DIA
-// ============================================================
-function finalizarPedidoActual(silent){
-  activePedido = loadActive();
-  if(!activePedido || !activePedido.lineas || !activePedido.lineas.length){
-    if(!silent) showToast('No hay pedido activo');
-    return;
-  }
-  var p = loadPedidos();
-  activePedido.lineas.forEach(function(l){
-    p.push(Object.assign({}, l, { cliente: activePedido.cliente, num: activePedido.num, finalizado: true }));
-  });
-  var numFinalizado = activePedido.num;
-  savePedidos(p);
-  localStorage.removeItem('bf_active');
-  activePedido = null;
-  if(!silent) showToast('✅ Pedido ' + numFinalizado + ' finalizado');
-  renderPedidos();
-}
-
-function nuevoDia(){
-  var p = loadPedidos();
-  var active = loadActive();
-  if(!p.length && (!active || !active.lineas || !active.lineas.length)){
-    showToast('Ya está a cero');
-    return;
-  }
-  if(confirm('¿Ver el informe antes de resetear?')){
-    generarInforme();
-    setTimeout(function(){
-      if(confirm('¿Resetear todos los pedidos?')){
-        resetear();
-      }
-    }, 500);
-  } else {
-    if(confirm('¿Resetear todos los pedidos?')) resetear();
-  }
-}
-
-function resetear(){
-  localStorage.removeItem(STORE_KEY);
-  localStorage.removeItem('bf_active');
-  activePedido = null;
-  renderPedidos();
-  showToast('🌅 Nuevo día — pedidos a cero');
-}
-
-// ============================================================
-// INFORME
-// ============================================================
-function generarInforme(){
-  // Merge active + completed
-  var pedidos = loadPedidos();
-  var active = loadActive();
-  var allLineas = [];
-
-  if(active && active.lineas && active.lineas.length){
-    active.lineas.forEach(function(l){
-      allLineas.push(Object.assign({}, l, { cliente: active.cliente, num: active.num }));
+      html+='</div>';
     });
-  }
-  pedidos.forEach(function(p){ allLineas.push(p); });
-
-  if(!allLineas.length){
-    showToast('Sin pedidos para el informe');
-    return;
-  }
-
-  var ahora = new Date();
-  var fecha = ahora.toLocaleDateString('es-ES',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  var hora  = ahora.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
-
-  // Group by pedido number to avoid duplicates
-  var byNum = {};
-  var numOrder = [];
-  allLineas.forEach(function(l){
-    var key = l.num || 'sin-num';
-    if(!byNum[key]){
-      byNum[key] = { num: l.num, cliente: l.cliente||'Sin cliente', lineas: [] };
-      numOrder.push(key);
-    }
-    // Dedup by variedad within same pedido
-    var exists = byNum[key].lineas.find(function(x){ return x.variedad===l.variedad && x.unidad===l.unidad; });
-    if(!exists) byNum[key].lineas.push(l);
+    html+='</div>';
   });
+  area.innerHTML=html;
+  area.querySelectorAll('.prd').forEach(function(btn){
+    btn.addEventListener('click',function(){delL(btn.getAttribute('data-k'),parseInt(btn.getAttribute('data-i')));});
+  });
+  area.scrollTop=area.scrollHeight;
+}
 
-  // Totales from deduped byNum groups
-  var totales = {};
-  numOrder.forEach(function(key){
-    byNum[key].lineas.forEach(function(l){
-      var k = (l.variedad||'?') + '||' + (l.unidad||'uds');
-      totales[k] = (totales[k]||0) + (parseFloat(l.cantidad)||0);
+function updBadges(){
+  document.getElementById('bv').textContent=ld('v').length;
+  document.getElementById('bc').textContent=ld('c').length;
+}
+
+// ── INVENTARIO ─────────────────────────────────────────────
+var _invTxt='';
+function abrirInv(){
+  var v=ld('v'),c=ld('c');
+  if(!v.length&&!c.length){toast('Sin datos todavía');return;}
+  var fechas={};
+  v.forEach(function(l){fechas[l.f]=true;});
+  c.forEach(function(l){fechas[l.f]=true;});
+  var fs=Object.keys(fechas).sort();
+  var html='';var lines=['BUSCAFLOR - INVENTARIO POR FECHA','='.repeat(36),''];
+  fs.forEach(function(f){
+    var vf=v.filter(function(l){return l.f===f;});
+    var cf=c.filter(function(l){return l.f===f;});
+    var prods={};
+    vf.forEach(function(l){if(!prods[l.pr])prods[l.pr]={v:0,c:0};prods[l.pr].v+=l.q;});
+    cf.forEach(function(l){if(!prods[l.pr])prods[l.pr]={v:0,c:0};prods[l.pr].c+=l.q;});
+    var pk=Object.keys(prods).sort();if(!pk.length)return;
+    html+='<div class="ifg"><div class="ifh">'+fmtF(f)+'</div>';
+    html+='<div class="ifr" style="background:var(--cr);padding:5px 12px;"><span class="ifv1" style="font-size:10px;font-weight:700;color:var(--ts);text-transform:uppercase;">Producto</span><span class="ifv2" style="font-size:10px;font-weight:700;color:var(--vm);">Venta</span><span class="ifv3" style="font-size:10px;font-weight:700;color:var(--az);">Compra</span><span class="ifb" style="font-size:10px;font-weight:700;color:var(--ts);">Balance</span></div>';
+    lines.push(fmtF(f).toUpperCase());lines.push('-'.repeat(36));
+    pk.forEach(function(pr){
+      var p=prods[pr];var b=p.c-p.v;
+      var cls=b>0?'ok':b<0?'ko':'eq';
+      var sym=b>0?'+':'';
+      html+='<div class="ifr"><span class="ifv1">'+pr+'</span><span class="ifv2">'+(p.v||'-')+'</span><span class="ifv3">'+(p.c||'-')+'</span><span class="ifb '+cls+'">'+sym+b+'</span></div>';
+      lines.push('  '+pr.substring(0,24).padEnd(24)+' V:'+String(p.v||0).padStart(4)+' C:'+String(p.c||0).padStart(4)+' B:'+String(sym+b).padStart(5));
     });
+    html+='</div>';lines.push('');
   });
+  lines.push('='.repeat(36));lines.push('+ Excedente  - Falta  0 Exacto');
+  _invTxt=lines.join('\n');
+  document.getElementById('mInvC').innerHTML=html||'<div class="es"><span class="ei">📊</span><div class="et">Sin datos</div></div>';
+  document.getElementById('mInv').classList.add('open');
+}
+function sWAInv(){if(_invTxt)window.open('https://wa.me/?text='+encodeURIComponent(_invTxt),'_blank');}
+function sCopyInv(){if(_invTxt)navigator.clipboard.writeText(_invTxt).then(function(){toast('📋 Copiado');});}
 
-  var lines = [];
-  lines.push('================================');
-  lines.push('  BUSCAFLOR - PEDIDOS DEL DIA');
-  lines.push('================================');
-  lines.push('  ' + fecha);
-  lines.push('  ' + hora);
-  lines.push('  ' + numOrder.length + ' pedidos · ' + allLineas.length + ' lineas');
-  lines.push('================================');
-  lines.push('');
-
-  numOrder.forEach(function(key){
-    var g = byNum[key];
-    lines.push('[' + (g.num||'?') + '] ' + g.cliente.toUpperCase());
-    lines.push('  ' + '-'.repeat(30));
-    g.lineas.forEach(function(l){
-      var cant = String(l.cantidad).padStart(4);
-      var uni = (l.unidad||'uds').padEnd(9);
-      lines.push('  ' + cant + ' ' + uni + ' ' + (l.variedad||'—'));
+// ── INFORME ────────────────────────────────────────────────
+var _infTxt='';
+function genInf(k){
+  var data=ld(k);
+  if(!data.length){toast('Sin datos para el informe');return;}
+  var isV=k==='v';
+  var now=new Date();
+  var fecha=now.toLocaleDateString('es-ES',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  var hora=now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+  var byF={};var fOrd=[];
+  data.forEach(function(l){if(!byF[l.f]){byF[l.f]=[];fOrd.push(l.f);}byF[l.f].push(l);});
+  fOrd=fOrd.filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
+  var lines=['================================',isV?'  BUSCAFLOR - PEDIDOS DE VENTA':'  BUSCAFLOR - PEDIDOS DE COMPRA','================================','  '+fecha,'  '+hora,'  '+data.length+' lineas · '+fOrd.length+' fecha'+(fOrd.length!==1?'s':''),'================================',''];
+  fOrd.forEach(function(f){
+    lines.push(fmtF(f).toUpperCase());lines.push('-'.repeat(32));
+    var byN={};
+    byF[f].forEach(function(l){var n=isV?l.cl:l.pv;if(!byN[n])byN[n]=[];byN[n].push(l);});
+    Object.keys(byN).forEach(function(n){
+      lines.push('  '+n);
+      byN[n].forEach(function(l){lines.push('    '+String(l.q).padStart(4)+'  '+l.pr);});
     });
     lines.push('');
   });
+  var tots={};data.forEach(function(l){tots[l.pr]=(tots[l.pr]||0)+l.q;});
+  lines.push('================================');lines.push('TOTALES POR PRODUCTO');lines.push('-'.repeat(32));
+  Object.keys(tots).sort().forEach(function(p){lines.push('  '+String(tots[p]).padStart(4)+'  '+p);});
+  lines.push('================================');lines.push('  Buscaflor · La Mejor S.L.');lines.push('================================');
+  _infTxt=lines.join('\n');
+  document.getElementById('mInfT').textContent=isV?'🛒 Informe de ventas':'📦 Informe de compras';
+  document.getElementById('mInfC').textContent=_infTxt;
+  document.getElementById('mInf').classList.add('open');
+}
+function sWA(){if(_infTxt)window.open('https://wa.me/?text='+encodeURIComponent(_infTxt),'_blank');}
+function sEM(){if(!_infTxt)return;var s=encodeURIComponent('Informe Buscaflor · '+new Date().toLocaleDateString('es-ES'));window.location.href='mailto:?subject='+s+'&body='+encodeURIComponent(_infTxt);}
+function sCopy(){if(_infTxt)navigator.clipboard.writeText(_infTxt).then(function(){toast('📋 Copiado');});}
 
-  lines.push('================================');
-  lines.push('TOTALES POR VARIEDAD');
-  lines.push('  ' + '─'.repeat(28));
-  Object.keys(totales).forEach(function(k){
-    var parts = k.split('||');
-    var cant = String(totales[k]).padStart(4);
-    lines.push('  ' + cant + ' ' + (parts[1]||'').padEnd(8) + ' ' + parts[0]);
-  });
-  lines.push('================================');
-  lines.push('  Buscaflor · La Mejor S.L.');
-  lines.push('================================');
-
-  document.getElementById('informeContent').textContent = lines.join('\n');
-  document.getElementById('informeModal').classList.add('open');
+// ── RESETEAR ───────────────────────────────────────────────
+function rst(k){
+  if(!ld(k).length){toast('Ya está vacío');return;}
+  var label=k==='v'?'ventas':'compras';
+  if(confirm('¿Resetear todos los pedidos de '+label+'?')){localStorage.removeItem(SK[k]);renderList(k);updBadges();toast('🗑 Reseteado');}
 }
 
-function closeModal(){ document.getElementById('informeModal').classList.remove('open'); }
-document.getElementById('informeModal').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
-
-function copyInforme(){
-  var txt = document.getElementById('informeContent').textContent;
-  navigator.clipboard.writeText(txt).then(function(){ showToast('📋 Copiado'); });
+// ── TABS ───────────────────────────────────────────────────
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active');});
+  document.querySelectorAll('.view').forEach(function(x){x.classList.remove('active');});
+  document.getElementById('tab-'+t).classList.add('active');
+  document.getElementById('view-'+t).classList.add('active');
+  document.querySelectorAll('.sd').forEach(function(d){d.classList.remove('open');});
 }
 
-function shareWhatsApp(){
-  var txt = document.getElementById('informeContent').textContent;
-  window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
-}
+// ── MODALS ─────────────────────────────────────────────────
+function closeM(id){document.getElementById(id).classList.remove('open');}
+document.getElementById('mInf').addEventListener('click',function(e){if(e.target===this)closeM('mInf');});
+document.getElementById('mInv').addEventListener('click',function(e){if(e.target===this)closeM('mInv');});
 
-function shareEmail(){
-  var txt = document.getElementById('informeContent').textContent;
-  var ahora = new Date();
-  var fecha = ahora.toLocaleDateString('es-ES');
-  var subject = encodeURIComponent('Pedidos Buscaflor · ' + fecha);
-  window.location.href = 'mailto:?subject=' + subject + '&body=' + encodeURIComponent(txt);
-}
+// ── API KEY ────────────────────────────────────────────────
+function openAK(){document.getElementById('mAK').classList.add('open');var ex=localStorage.getItem('bf_ak');if(ex)document.getElementById('aki').value=ex;setTimeout(function(){document.getElementById('aki').focus();},200);}
+function chkAK(){var k=document.getElementById('aki').value.trim();var st=document.getElementById('akst');if(k.startsWith('sk-ant-')&&k.length>50){st.className='akst ok';st.textContent='✓ Correcto';}else if(k.length>10){st.className='akst er';st.textContent='⚠ Formato incorrecto';}else{st.textContent='';}}
+function saveAK(){var k=document.getElementById('aki').value.trim();if(!k){toast('⚠ Introduce la key');return;}localStorage.setItem('bf_ak',k);document.getElementById('mAK').classList.remove('open');toast('✅ API Key guardada');}
+document.getElementById('mAK').addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});
 
-// ============================================================
-// API KEY
-// ============================================================
-function openApikey(){
-  var modal = document.getElementById('apikeyModal');
-  modal.classList.add('open');
-  var existing = localStorage.getItem(API_KEY);
-  if(existing) document.getElementById('apikeyInput').value = existing;
-  setTimeout(function(){ document.getElementById('apikeyInput').focus(); }, 200);
-}
-function checkApikey(){
-  var k = document.getElementById('apikeyInput').value.trim();
-  var st = document.getElementById('apikeySt');
-  if(k.startsWith('sk-ant-') && k.length > 50){ st.className='apikey-st ok'; st.textContent='✓ Formato correcto'; }
-  else if(k.length > 10){ st.className='apikey-st err'; st.textContent='⚠ Formato incorrecto'; }
-  else { st.textContent=''; }
-}
-function saveApikey(){
-  var k = document.getElementById('apikeyInput').value.trim();
-  if(!k){ showToast('⚠ Introduce la API Key'); return; }
-  localStorage.setItem(API_KEY, k);
-  document.getElementById('apikeyModal').classList.remove('open');
-  showToast('✅ API Key guardada');
-}
-document.getElementById('apikeyModal').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('open'); });
+// ── TOAST ──────────────────────────────────────────────────
+function toast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2800);}
 
-// ============================================================
-// VOICE
-// ============================================================
-var recognition = null, isRecording = false, micMode = null;
+// ── INIT ───────────────────────────────────────────────────
+// Wire dropdown events dynamically
+var ddInputIds = ['vci','vpi','cpi','cpv'];
+ddInputIds.forEach(function(id){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.addEventListener('input', function(){ ddInput(id); });
+  el.addEventListener('focus', function(){ ddFocus(id); });
+  el.addEventListener('keydown', function(e){ ddKey(e,id); });
+});
 
-function setupRec(){
-  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR) return null;
-  var r = new SR();
-  r.lang = 'es-ES'; r.continuous = false; r.interimResults = true;
-  r.onresult = function(e){
-    var f='', ii='';
-    for(var i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal) f+=e.results[i][0].transcript;
-      else ii+=e.results[i][0].transcript;
-    }
-    var target = micMode==='cliente' ? 'clienteInput' : 'pedidoInput';
-    var el = document.getElementById(target);
-    if(el){ el.value=f||ii; autoResize(el); }
-  };
-  r.onend = function(){
-    stopMic();
-    if(micMode === 'pedido'){
-      var txt = document.getElementById('pedidoInput').value.trim();
-      if(txt) setTimeout(enviarPedido, 300);
-    } else if(micMode === 'cliente'){
-      setTimeout(function(){ document.getElementById('pedidoInput').focus(); }, 200);
-    }
-    micMode = null;
-  };
-  r.onerror = function(e){ stopMic(); if(e.error!=='no-speech') showToast('⚠ Error micrófono'); };
-  return r;
-}
-
-function toggleMic(mode){
-  if(isRecording){ stopMic(); if(recognition) recognition.stop(); return; }
-  if(!recognition) recognition = setupRec();
-  if(!recognition){ showToast('⚠ Sin soporte de voz'); return; }
-  micMode = mode;
-  try{
-    recognition.start();
-    isRecording = true;
-    document.getElementById(mode==='cliente' ? 'micCliente' : 'micPedido').classList.add('recording');
-    document.getElementById('micHint').classList.add('active');
-  }catch(e){ showToast('⚠ Error al iniciar micrófono'); }
-}
-
-function stopMic(){
-  isRecording = false;
-  document.getElementById('micCliente').classList.remove('recording');
-  document.getElementById('micPedido').classList.remove('recording');
-  document.getElementById('micHint').classList.remove('active');
-}
-
-// ============================================================
-// TOAST
-// ============================================================
-function showToast(msg){
-  var t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(function(){ t.classList.remove('show'); }, 2800);
-}
-
-// ============================================================
-// INIT
-// ============================================================
-renderPedidos();
-updateCount();
-
-// Auto-open API key if not set
-if(!localStorage.getItem(API_KEY)){
-  setTimeout(openApikey, 600);
-}
-
-// Focus cliente input
-document.getElementById('clienteInput').focus();
+var hoy=new Date().toISOString().split('T')[0];
+document.getElementById('vf').value=hoy;
+document.getElementById('cf').value=hoy;
+renderList('v');
+renderList('c');
+updBadges();
 </script>
 </body>
 </html>
