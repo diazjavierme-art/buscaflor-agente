@@ -123,6 +123,18 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
 .ifb.ko{color:var(--ro);}
 .ifb.eq{color:var(--do);}
 .ifl{display:flex;gap:12px;padding:7px 14px;background:var(--cr);border-top:1px solid var(--co);font-size:10.5px;color:var(--ts);flex-shrink:0;}
+.inv-filter-modal{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:400;display:none;align-items:flex-end;justify-content:center;}
+.inv-filter-modal.open{display:flex;}
+.inv-filter-sheet{background:var(--wh);border-radius:18px 18px 0 0;width:100%;max-width:520px;padding:20px 18px 28px;animation:su 0.25s ease;}
+.inv-filter-sheet h3{font-family:'DM Serif Display',serif;font-size:17px;color:var(--v);margin-bottom:14px;}
+.inv-filter-opt{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+.inv-filter-row{display:flex;align-items:center;gap:10px;}
+.inv-filter-label{font-size:10px;font-weight:700;color:var(--ts);text-transform:uppercase;letter-spacing:0.08em;min-width:70px;}
+.inv-filter-sel{flex:1;border:1.5px solid var(--co);border-radius:8px;padding:8px 10px;font-family:'Sora',sans-serif;font-size:13px;background:var(--cr);outline:none;}
+.inv-filter-sel:focus{border-color:var(--vc);}
+.inv-filter-btn{width:100%;background:var(--v);color:var(--cr);border:none;padding:13px;border-radius:9px;font-size:13px;font-family:'Sora',sans-serif;font-weight:700;cursor:pointer;margin-bottom:7px;}
+.inv-filter-btn:active{background:var(--vc);}
+.inv-filter-cancel{width:100%;background:transparent;color:var(--ts);border:none;padding:8px;font-size:12px;font-family:'Sora',sans-serif;cursor:pointer;}
 .akm{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;display:none;align-items:flex-end;justify-content:center;}
 .akm.open{display:flex;}
 .aks{background:var(--wh);border-radius:18px 18px 0 0;width:100%;max-width:520px;padding:20px 18px 30px;animation:su 0.25s ease;}
@@ -157,15 +169,12 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
 .pra-add{background:var(--az);color:white;}
 .pra-cancel{background:var(--co);color:var(--ts);}
 /* CAMPAIGN FILTER BAR */
-.filter-bar{background:var(--wh);border-bottom:1px solid var(--co);padding:8px 12px;display:flex;gap:6px;overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch;}
-.filter-bar::-webkit-scrollbar{display:none;}
-.fb-btn{flex-shrink:0;padding:5px 12px;border-radius:16px;border:1.5px solid var(--co);background:var(--wh);color:var(--ts);font-family:'Sora',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all 0.15s;}
+.filter-bar{background:var(--wh);border-bottom:1px solid var(--co);padding:7px 12px;display:flex;align-items:center;gap:7px;flex-shrink:0;}
+.fb-btn{flex-shrink:0;padding:5px 14px;border-radius:16px;border:1.5px solid var(--co);background:var(--wh);color:var(--ts);font-family:'Sora',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all 0.15s;}
 .fb-btn.active{background:var(--v);color:var(--cr);border-color:var(--v);}
-.fb-btn.campaign{border-color:var(--do);color:#6a4e10;}
-.fb-btn.campaign.active{background:var(--do);color:var(--v);border-color:var(--do);}
-.fb-btn.week{border-color:var(--vc);color:var(--vm);}
-.fb-btn.week.active{background:var(--vc);color:white;border-color:var(--vc);}
-.fb-add-camp{flex-shrink:0;padding:5px 10px;border-radius:16px;border:1.5px dashed var(--co);background:transparent;color:var(--ts);font-family:'Sora',sans-serif;font-size:11.5px;cursor:pointer;white-space:nowrap;}
+.fb-sel{flex:1;min-width:0;border:1.5px solid var(--co);border-radius:16px;padding:5px 10px;font-family:'Sora',sans-serif;font-size:11.5px;font-weight:600;background:var(--wh);outline:none;cursor:pointer;color:var(--ts);appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:26px;}
+.fb-sel.has-value{border-color:var(--v);color:var(--v);background-color:#f0f7f3;}
+.fb-sel.has-value-gold{border-color:var(--do);color:#6a4e10;background-color:#fdf8ee;}
 
 /* CAMPAIGN QUICK BUTTONS */
 .camp-quick{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
@@ -202,6 +211,7 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
   <div class="logo"><div class="li">🌸</div><div class="lt">Busca<span>flor</span></div></div>
   <div style="display:flex;gap:6px;">
     <button class="hb" onclick="abrirInv()">📦 Stock</button>
+    <button class="hb" onclick="openCampModal()">🌸 Campañas</button>
     <button class="hb" onclick="openAK()">🔑</button>
   </div>
 </header>
@@ -213,12 +223,11 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
 
   <!-- FILTER BAR -->
   <div class="filter-bar" id="filterBar">
-    <button class="fb-btn active" id="fbTodos" onclick="setFilter('todos')">📋 Todos</button>
-    <select id="fbSemana" style="border:1.5px solid var(--vc);border-radius:14px;padding:4px 10px;font-family:Sora,sans-serif;font-size:11.5px;font-weight:600;color:var(--vm);background:#edf7ef;outline:none;cursor:pointer;">
-      <option value="">📅 Semana...</option>
+    <button class="fb-btn active" id="fbTodos" onclick="setFilter('todos')">Todos</button>
+    <select id="fbSemana" class="fb-sel">
+      <option value="">📅 Semana</option>
     </select>
-    <div id="fbCampaigns"></div>
-    <button class="fb-add-camp" onclick="openCampModal()">＋ Campaña</button>
+    <div id="fbCampaigns" style="flex:1;min-width:0;"></div>
   </div>
 
   <!-- VENTAS -->
@@ -254,12 +263,14 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
           </select>
         </div>
       </div>
-      <button class="ba ve" onclick="addV()">＋ Añadir línea de venta</button>
+      <div style="display:flex;gap:7px;">
+        <button class="ba ve" onclick="addV()" style="flex:1;">＋ Añadir línea</button>
+        <button onclick="nuevoPedidoForm()" style="background:var(--crema-oscuro,var(--co));color:var(--ts);border:none;border-radius:9px;padding:11px 14px;font-family:Sora,sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🔄 Nuevo cliente</button>
+      </div>
     </div>
     <div class="ab">
       <button class="abinv" onclick="abrirInv()">📦 Inventario</button>
       <button class="abinf" onclick="genInf('v')">📊 Informe</button>
-      <button class="abrst" onclick="rst('v')">🗑 Resetear</button>
     </div>
   </div>
 
@@ -322,7 +333,6 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
     <div class="ab">
       <button class="abinv" onclick="abrirInv()">📦 Inventario</button>
       <button class="abinf" onclick="genInf('c')">📊 Informe</button>
-      <button class="abrst" onclick="rst('c')">🗑 Resetear</button>
     </div>
   </div>
 </main>
@@ -368,6 +378,37 @@ main{flex:1;display:flex;flex-direction:column;overflow:hidden;height:calc(100vh
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- INVENTORY FILTER MODAL -->
+<div class="inv-filter-modal" id="invFilterModal">
+  <div class="inv-filter-sheet">
+    <h3>📦 ¿Qué inventario quieres ver?</h3>
+    <div class="inv-filter-opt">
+      <div class="inv-filter-row">
+        <span class="inv-filter-label">📅 Semana</span>
+        <select id="invFilterSemana" class="inv-filter-sel">
+          <option value="">Todas las semanas</option>
+        </select>
+      </div>
+      <div class="inv-filter-row">
+        <span class="inv-filter-label">🌸 Campaña</span>
+        <select id="invFilterCamp" class="inv-filter-sel">
+          <option value="">Todas las campañas</option>
+        </select>
+      </div>
+      <div class="inv-filter-row">
+        <span class="inv-filter-label">📋 Tipo</span>
+        <select id="invFilterTipo" class="inv-filter-sel">
+          <option value="ambos">Ventas + Compras</option>
+          <option value="ventas">Solo ventas</option>
+          <option value="compras">Solo compras</option>
+        </select>
+      </div>
+    </div>
+    <button class="inv-filter-btn" onclick="confirmarInvFilter()">📊 Ver inventario</button>
+    <button class="inv-filter-cancel" onclick="closeInvFilter()">Cancelar</button>
+  </div>
+</div>
 
 <!-- EDIT MODAL -->
 <div class="mo" id="mEdit">
@@ -675,14 +716,86 @@ var _invTxt='';
 function abrirInv(){
   var v=ld('v'),c=ld('c');
   if(!v.length&&!c.length){toast('Sin datos todavía');return;}
+  // Populate filter selects
+  var semanas={};
+  v.forEach(function(l){if(l.semana||l.f){var s=l.semana||getWeekNum(l.f);semanas[s]=true;}});
+  c.forEach(function(l){if(l.semana||l.f){var s=l.semana||getWeekNum(l.f);semanas[s]=true;}});
+  var semOpts='<option value="">Todas las semanas</option>'+Object.keys(semanas).sort().map(function(s){
+    return '<option value="'+s+'">'+s+'</option>';
+  }).join('');
+  document.getElementById('invFilterSemana').innerHTML=semOpts;
+  var camps=loadCamps();
+  var allCamps={};
+  v.forEach(function(l){if(l.camp)allCamps[l.camp]=true;});
+  c.forEach(function(l){if(l.camp)allCamps[l.camp]=true;});
+  var campOpts='<option value="">Todas las campañas</option>'+
+    Object.keys(allCamps).map(function(n){return '<option value="'+n+'">🌸 '+n+'</option>';}).join('');
+  if(camps.length){
+    campOpts='<option value="">Todas las campañas</option>'+
+      camps.map(function(cp){var n=campName(cp);return '<option value="'+n+'">🌸 '+n+'</option>';}).join('');
+  }
+  document.getElementById('invFilterCamp').innerHTML=campOpts;
+  // Pre-select current filter if active
+  if(_currentFilter==='semana'&&_currentSemana) document.getElementById('invFilterSemana').value=_currentSemana;
+  if(_currentFilter==='camp'&&_currentCamp) document.getElementById('invFilterCamp').value=_currentCamp;
+  document.getElementById('invFilterModal').classList.add('open');
+}
+
+function closeInvFilter(){ document.getElementById('invFilterModal').classList.remove('open'); }
+document.addEventListener('DOMContentLoaded',function(){
+  var m=document.getElementById('invFilterModal');
+  if(m) m.addEventListener('click',function(e){if(e.target===this)closeInvFilter();});
+});
+
+function confirmarInvFilter(){
+  var semana=document.getElementById('invFilterSemana').value;
+  var camp=document.getElementById('invFilterCamp').value;
+  var tipo=document.getElementById('invFilterTipo').value;
+  closeInvFilter();
+  mostrarInventario(semana, camp, tipo);
+}
+
+function mostrarInventario(semana, camp, tipo){
+  var v=ld('v'),c=ld('c');
+  if(!v.length&&!c.length){toast('Sin datos todavía');return;}
+  // Apply filters
+  function matchFilter(l){
+    var lSemana=l.semana||getWeekNum(l.f);
+    if(semana && lSemana!==semana) return false;
+    if(camp && (l.camp||'')!==camp) return false;
+    return true;
+  }
+  var vFiltered = tipo==='compras' ? [] : v.filter(matchFilter);
+  var cFiltered = tipo==='ventas' ? [] : c.filter(matchFilter);
+
+  if(!vFiltered.length&&!cFiltered.length){
+    var msg='Sin datos';
+    if(camp) msg='Sin pedidos para campaña 🌸 '+camp;
+    else if(semana) msg='Sin pedidos para '+semana;
+    toast(msg);
+    return;
+  }
+
+  // Build title
+  var titulo='INVENTARIO';
+  if(camp) titulo+=' · 🌸 '+camp.toUpperCase();
+  else if(semana) titulo+=' · '+semana;
+
   var fechas={};
-  v.forEach(function(l){fechas[l.f]=true;});
-  c.forEach(function(l){fechas[l.f]=true;});
+  vFiltered.forEach(function(l){fechas[l.f]=true;});
+  cFiltered.forEach(function(l){fechas[l.f]=true;});
   var fs=Object.keys(fechas).sort();
-  var html='';var lines=['BUSCAFLOR - INVENTARIO POR FECHA','='.repeat(36),''];
+  var html='';
+  var lines=['BUSCAFLOR - '+titulo,'='.repeat(36),''];
+
+  // Summary totals across all dates
+  var totalVenta={}, totalCompra={};
+  vFiltered.forEach(function(l){totalVenta[l.pr]=(totalVenta[l.pr]||0)+l.q;});
+  cFiltered.forEach(function(l){totalCompra[l.pr]=(totalCompra[l.pr]||0)+l.q;});
+
   fs.forEach(function(f){
-    var vf=v.filter(function(l){return l.f===f;});
-    var cf=c.filter(function(l){return l.f===f;});
+    var vf=vFiltered.filter(function(l){return l.f===f;});
+    var cf=cFiltered.filter(function(l){return l.f===f;});
     var prods={};
     vf.forEach(function(l){if(!prods[l.pr])prods[l.pr]={v:0,c:0};prods[l.pr].v+=l.q;});
     cf.forEach(function(l){if(!prods[l.pr])prods[l.pr]={v:0,c:0};prods[l.pr].c+=l.q;});
@@ -703,8 +816,32 @@ function abrirInv(){
     });
     html+='</div>';lines.push('');
   });
-  lines.push('='.repeat(36));lines.push('+ Excedente  - Falta  0 Exacto');
+  // Global summary section
+  var allProds=Object.keys(Object.assign({},totalVenta,totalCompra)).sort();
+  if(allProds.length){
+    html+='<div class="ifg"><div class="ifh" style="background:#1a1a2a;">📊 RESUMEN TOTAL'+
+      (camp?' · 🌸 '+camp:semana?' · '+semana:'')+'</div>';
+    html+='<div class="ifr" style="background:var(--cr);padding:5px 12px;"><span class="ifv1" style="font-size:10px;font-weight:700;color:var(--ts);text-transform:uppercase;">Producto</span><span class="ifv2" style="font-size:10px;font-weight:700;color:var(--vm);">Venta</span><span class="ifv3" style="font-size:10px;font-weight:700;color:var(--az);">Compra</span><span class="ifb" style="font-size:10px;font-weight:700;color:var(--ts);">Balance</span></div>';
+    lines.push('');lines.push('RESUMEN TOTAL');lines.push('='.repeat(36));
+    allProds.forEach(function(pr){
+      var tv=totalVenta[pr]||0;var tc=totalCompra[pr]||0;var b=tc-tv;
+      var cls=b>0?'ok':b<0?'ko':'eq';var sym=b>0?'+':'';
+      html+='<div class="ifr"><span class="ifv1" style="font-weight:600;">'+pr+'</span><span class="ifv2">'+(tv||'-')+'</span><span class="ifv3">'+(tc||'-')+'</span><span class="ifb '+cls+'">'+sym+b+'</span></div>';
+      lines.push('  '+pr.substring(0,22).padEnd(22)+' V:'+String(tv).padStart(4)+' C:'+String(tc).padStart(4)+' B:'+String(sym+b).padStart(5));
+    });
+    html+='</div>';
+  }
+
+  lines.push('');lines.push('='.repeat(36));lines.push('+ Excedente  - Falta  0 Exacto');
   _invTxt=lines.join('\n');
+  // Update modal title
+  var invTitle=document.querySelector('#mInv .msh h3');
+  if(invTitle){
+    var t='📦 Inventario';
+    if(camp) t+=' · 🌸 '+camp;
+    else if(semana) t+=' · '+semana;
+    invTitle.textContent=t;
+  }
   document.getElementById('mInvC').innerHTML=html||'<div class="es"><span class="ei">📊</span><div class="et">Sin datos</div></div>';
   document.getElementById('mInv').classList.add('open');
 }
@@ -853,6 +990,21 @@ function sEM(){
 function sCopy(){var t=window._informeText||'';navigator.clipboard.writeText(t).then(function(){toast('📋 Copiado');});}
 
 // ── RESETEAR ───────────────────────────────────────────────
+function nuevoPedidoForm(){
+  // Clear form fields only — data stays
+  document.getElementById('vci').value='';
+  document.getElementById('vpi').value='';
+  document.getElementById('vq').value='';
+  var campSel=document.getElementById('campSelectV');
+  if(campSel) campSel.selectedIndex=0;
+  var semSel=document.getElementById('semanaSelectV');
+  if(semSel) semSel.selectedIndex=0;
+  // Set today as default date
+  document.getElementById('vf').value=new Date().toISOString().split('T')[0];
+  document.getElementById('vci').focus();
+  showToast('✅ Listo para nuevo cliente');
+}
+
 function rst(k){
   if(!ld(k).length){toast('Ya está vacío');return;}
   var label=k==='v'?'ventas':'compras';
@@ -907,7 +1059,12 @@ function finalizarGrupo(k, nombre, fecha, finalizar){
   });
   if(changed > 0){
     sv(k, data);
-    toast(finalizar ? '✅ Pedido de '+nombre+' cerrado' : '↩ Pedido de '+nombre+' reabierto');
+    if(finalizar && k==='v'){
+      toast('✅ Pedido cerrado — listo para nuevo cliente');
+      setTimeout(nuevoPedidoForm, 400);
+    } else {
+      toast(finalizar ? '✅ Pedido cerrado' : '↩ Pedido reabierto');
+    }
   }
 }
 
@@ -928,24 +1085,19 @@ function renderFilterBar(){
   var camps=loadCamps();
   var fb=document.getElementById('fbCampaigns');
   if(!fb) return;
-  if(!camps.length){
-    fb.innerHTML='';
-    return;
-  }
-  // Use a select for campaigns in filter bar
   var curVal=_currentFilter==='camp'&&_currentCamp?_currentCamp:'';
-  fb.innerHTML='<select id="campFilterSel" style="border:1.5px solid var(--do);border-radius:14px;padding:4px 10px;font-family:Sora,sans-serif;font-size:11.5px;font-weight:600;color:#6a4e10;background:#fdf8ee;outline:none;cursor:pointer;">'+
-    '<option value="">🌸 Campaña...</option>'+
+  // Always show campaign select + manage button
+  var campOptions='<option value="">🌸 Campaña</option>'+
     camps.map(function(c){
       var n=campName(c);var f=campFecha(c);
-      var label=n+(f?' ('+fmtF(f).split(' ').slice(0,2).join(' ')+')':'');
+      var label=n+(f?' · '+fmtF(f).split(' ').slice(0,2).join(' '):'');
       return '<option value="'+n+'"'+(curVal===n?' selected':'')+'>'+label+'</option>';
-    }).join('')+
-  '</select>';
+    }).join('');
+  fb.innerHTML='<select id="campFilterSel" class="fb-sel'+(curVal?' has-value-gold':'')+'">'+campOptions+'</select>';
   var sel=document.getElementById('campFilterSel');
   if(sel){
-    if(curVal) sel.classList.add('active');
     sel.addEventListener('change',function(){
+      sel.className='fb-sel'+(sel.value?' has-value-gold':'');
       if(sel.value) setFilter('camp',encodeURIComponent(sel.value));
       else setFilter('todos');
     });
@@ -980,7 +1132,10 @@ function setFilter(type,val){
   document.querySelectorAll('.fb-btn').forEach(function(b){b.classList.remove('active');});
   if(type==='todos'){
     document.getElementById('fbTodos').classList.add('active');
-    var fs=document.getElementById('fbSemana');if(fs)fs.value='';
+    var fs=document.getElementById('fbSemana');
+    if(fs){fs.value='';fs.className='fb-sel';}
+    var fc=document.getElementById('campFilterSel');
+    if(fc){fc.value='';fc.className='fb-sel';}
   } else if(type==='semana'){
     _currentSemana=val||null;
   } else if(type==='camp'){
@@ -1044,13 +1199,15 @@ function populateWeekSelect(){
   }
   var sorted=Object.keys(weeks).sort();
   var cur=_currentFilter==='semana'&&_currentSemana?_currentSemana:'';
-  sel.innerHTML='<option value="">📅 Semana...</option>'+
+  sel.className='fb-sel'+(cur?' has-value':'');
+  sel.innerHTML='<option value="">📅 Semana</option>'+
     sorted.map(function(wk){
       var w=weeks[wk];
       var label=wk+' · '+w.label+(w.count?' ('+w.count+')':'');
       return '<option value="'+wk+'"'+(cur===wk?' selected':'')+'>'+label+'</option>';
     }).join('');
   sel.onchange=function(){
+    sel.className='fb-sel'+(sel.value?' has-value':'');
     if(sel.value) setFilter('semana',sel.value);
     else setFilter('todos');
   };
