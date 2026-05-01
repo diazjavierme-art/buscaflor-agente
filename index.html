@@ -753,24 +753,27 @@ document.addEventListener('click',function(e){
 });
 
 // ── STOCK CALCULATIONS ─────────────────────────────────────
-// Calcula disponible para una variedad+medida en una fecha concreta
-// Disponible = Físico inicial + Compras programadas hasta esa fecha (inclusive) - Pedidos venta hasta esa fecha (inclusive)
+// Calcula el disponible para una variedad en una fecha concreta.
+// Comprometido = TODAS las ventas abiertas (sin filtrar por fecha — los paquetes ya están reservados).
+// Compras = solo las que llegan hasta esa fecha (porque las posteriores aún no han llegado).
+// Disponible = Físico + compras hasta esa fecha − ventas abiertas
 function disponibleEnFecha(productName, fecha){
   var stock=ldStock();
   var key=productKey(productName);
   if(!stock[key] && !hayMovimiento(key)) return null;
   var fisico = stock[key] ? (stock[key].cantidad||0) : 0;
-  // Sumar compras programadas con fecha <= fecha
+  // Compras programadas con fecha <= fecha
   var compras=ld('c');
   var sumC=0;
   compras.forEach(function(l){
     if(productKey(l.pr)===key && l.f<=fecha) sumC += (l.q||0);
   });
-  // Restar ventas con fecha <= fecha
+  // TODAS las ventas abiertas (no finalizadas), sin importar fecha
   var ventas=ld('v');
   var sumV=0;
   ventas.forEach(function(l){
-    if(productKey(l.pr)===key && l.f<=fecha) sumV += (l.q||0);
+    if(l.finalizado) return;
+    if(productKey(l.pr)===key) sumV += (l.q||0);
   });
   return fisico + sumC - sumV;
 }
@@ -1057,12 +1060,15 @@ function renderStock(){
     items.forEach(function(it){
       var key = it._key;
       var fisico = it.cantidad||0;
-      // Compromiso = ventas hasta _stkFecha
+      // Comprometido = TODOS los pedidos de venta abiertos (sin filtrar por fecha de entrega).
+      // Aunque un pedido sea para mañana, esos paquetes ya están reservados HOY.
+      // Solo se excluyen los pedidos finalizados (ya cerrados en cierre del día).
       var comp = 0;
       ventas.forEach(function(l){
-        if(productKey(l.pr)===key && l.f<=_stkFecha) comp += (l.q||0);
+        if(l.finalizado) return;
+        if(productKey(l.pr)===key) comp += (l.q||0);
       });
-      // Compras programadas que llegan hasta _stkFecha (no incluye fisico inicial)
+      // Compras programadas que llegan hasta _stkFecha (suma al físico)
       var comprasPlus = 0;
       compras.forEach(function(l){
         if(productKey(l.pr)===key && l.f<=_stkFecha) comprasPlus += (l.q||0);
