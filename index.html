@@ -1176,17 +1176,31 @@ function handleInventoryExcel(e){
           break;
         }
       }
-      // Encontrar fila de cabeceras "CULTIVO | VARIEDAD | MEDIDA | TALLOS | PAQUETES"
+      // Encontrar fila de cabeceras y mapear columnas por nombre
       var headerRow = -1;
+      var colMap = { cultivo:-1, variedad:-1, medida:-1, tallos:-1, paquetes:-1 };
       for(var j=0;j<Math.min(10,rows.length);j++){
         var r=rows[j]||[];
-        if(r[0] && String(r[0]).toUpperCase()==='CULTIVO' && r[1] && String(r[1]).toUpperCase()==='VARIEDAD'){
-          headerRow=j; break;
+        var hits = 0;
+        var tmp = { cultivo:-1, variedad:-1, medida:-1, tallos:-1, paquetes:-1 };
+        for(var ci=0; ci<r.length; ci++){
+          var v = r[ci]==null ? '' : String(r[ci]).toUpperCase().trim();
+          if(v==='CULTIVO'){ tmp.cultivo=ci; hits++; }
+          else if(v==='VARIEDAD'){ tmp.variedad=ci; hits++; }
+          else if(v==='MEDIDA'){ tmp.medida=ci; hits++; }
+          else if(v==='TALLOS'){ tmp.tallos=ci; hits++; }
+          else if(v==='PAQUETES'){ tmp.paquetes=ci; hits++; }
+        }
+        // Necesitamos al menos CULTIVO + VARIEDAD + (TALLOS o PAQUETES)
+        if(tmp.cultivo>=0 && tmp.variedad>=0 && (tmp.tallos>=0 || tmp.paquetes>=0)){
+          headerRow = j;
+          colMap = tmp;
+          break;
         }
       }
       if(headerRow<0){
         document.getElementById('pdfProcessing').classList.remove('active');
-        toast('⚠ Estructura del Excel no reconocida (no encontré cabecera CULTIVO/VARIEDAD)');
+        toast('⚠ Estructura del Excel no reconocida (no encontré CULTIVO/VARIEDAD/TALLOS/PAQUETES)');
         return;
       }
 
@@ -1195,29 +1209,48 @@ function handleInventoryExcel(e){
       var lineas = [];
       for(var k=headerRow+1; k<rows.length; k++){
         var r = rows[k] || [];
-        var c0 = r[0]==null?'':String(r[0]).trim();
-        var c1 = r[1]==null?'':String(r[1]).trim();
-        var c2 = r[2]==null?'':String(r[2]).trim();
-        var c3 = r[3];
-        var c4 = r[4];
+        var cCultivo = colMap.cultivo>=0 ? (r[colMap.cultivo]==null?'':String(r[colMap.cultivo]).trim()) : '';
+        var cVariedad = colMap.variedad>=0 ? (r[colMap.variedad]==null?'':String(r[colMap.variedad]).trim()) : '';
+        var cMedida = colMap.medida>=0 ? (r[colMap.medida]==null?'':String(r[colMap.medida]).trim()) : '';
+        var cTallos = colMap.tallos>=0 ? r[colMap.tallos] : null;
+        var cPaquetes = colMap.paquetes>=0 ? r[colMap.paquetes] : null;
         // Línea TOTAL → fin
-        if(c0.toUpperCase()==='TOTAL') break;
-        // Cabecera de cultivo: c0 lleno, c1 vacío
-        if(c0 && !c1){ cultivoActivo = c0.toUpperCase(); continue; }
-        // Línea de producto: c1 con variedad
-        if(c1){
-          var tallos = (c3==null||c3==='')?0:parseFloat(c3);
-          var paquetes = (c4==null||c4==='')?0:parseFloat(c4);
+        if(cCultivo.toUpperCase()==='TOTAL') break;
+        // Cabecera de cultivo: hay texto en CULTIVO y nada en VARIEDAD
+        if(cCultivo && !cVariedad){
+          // Algunas cabeceras de la versión Colombia traen anotaciones tipo "ALSTROEMERIA  ·  (paq 10t)"
+          // Nos quedamos con la primera palabra significativa antes del separador "·"
+          var raw = cCultivo.split(/[·\(]/)[0].trim().toUpperCase();
+          cultivoActivo = raw;
+          continue;
+        }
+        // Línea de producto: VARIEDAD con valor
+        if(cVariedad){
+          var tallos = (cTallos==null||cTallos==='')?0:parseFloat(cTallos);
+          var paquetes = (cPaquetes==null||cPaquetes==='')?0:parseFloat(cPaquetes);
           if(isNaN(tallos)) tallos=0;
           if(isNaN(paquetes)) paquetes=0;
+          // Redondear a entero por si acaso
+          tallos = Math.round(tallos);
+          paquetes = Math.round(paquetes);
           if(tallos<=0 && paquetes<=0) continue;
           var unidad = unidadDeCultivo(cultivoActivo);
           var cantidad = unidad==='paquetes' ? paquetes : tallos;
+          // Fallback: si la unidad esperada no tiene valor pero la otra sí, usar la disponible
+          if(cantidad<=0){
+            cantidad = unidad==='paquetes' ? tallos : paquetes;
+            if(cantidad>0){
+              // recalibrar: si cogemos el otro, ajustar la unidad
+              unidad = unidad==='paquetes' ? 'tallos' : 'paquetes';
+            }
+          }
           if(cantidad<=0) continue;
+          // Validación extra: si la cantidad tiene decimales tras redondeo extraño (>10000 con coma), abortar — está cogiendo mal una columna
+          if(cantidad > 1000000){ continue; }
           lineas.push({
             cultivo: cultivoActivo,
-            variedad: c1.toUpperCase(),
-            medida: c2 || '—',
+            variedad: cVariedad.toUpperCase(),
+            medida: cMedida || '—',
             cantidad: cantidad,
             unidad: unidad,
             tallos: tallos,
