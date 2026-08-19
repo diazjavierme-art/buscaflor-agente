@@ -605,12 +605,20 @@ function renderStock(){
   document.getElementById('resVariedades').textContent = claves.length;
   document.getElementById('resTotal').textContent = total;
   var meta = cargarMeta();
-  document.getElementById('resVuelos').textContent = meta.length;
+  var metaUnica = [];
+  var vistos = {};
+  meta.forEach(function(m){
+    var id = m.awb || m.titulo || 'carga';
+    if(vistos[id]) return;
+    vistos[id] = true;
+    metaUnica.push(m);
+  });
+  document.getElementById('resVuelos').textContent = metaUnica.length;
 
-  // Vuelos cargados
+  // Vuelos cargados (sin repetir, aunque en el histórico antiguo hubiera duplicados)
   var vHtml = '';
-  if(meta.length){
-    vHtml = '<span class="vuelos-lbl">Compras:</span>' + meta.map(function(m){
+  if(metaUnica.length){
+    vHtml = '<span class="vuelos-lbl">Compras:</span>' + metaUnica.map(function(m){
       return '<span class="vuelo-tag">'+(m.awb||m.titulo||'carga')+'</span>';
     }).join('');
   }
@@ -941,7 +949,7 @@ function leerVerdnatura(e){
       body: JSON.stringify({
         model:'claude-sonnet-4-6',
         max_tokens:2000,
-        system:'Lees albaranes y pedidos de Verdnatura (proveedor de flor cortada). Extrae SOLO las líneas de flor (variedad, no accesorios como "Blonda", cajas, cintas, embalajes ni portes). El "Concepto" suele venir como "Rosa <variedad> EXT", "RS <variedad> SEL" u otro cultivo similar — quita prefijos (Rosa/RS/GY/CL) y sufijos de calidad (EXT/SEL/EXTRA/PRIMERA) para quedarte solo con el nombre de variedad en mayúsculas. La medida es el valor de ALTURA en cm (solo el número). La cantidad es el número de TALLOS INDIVIDUALES del pedido (columna Cant., o "N x precio" en pantallas de pedido — coge N). Identifica el cultivo (ROSAS por defecto si no se indica otra cosa; CLAVELES, ALSTROEMERIA, HORTENSIAS, GYPSOPHILA si el nombre lo indica claramente). Devuelve SOLO este JSON, sin texto adicional: {"fecha":"YYYY-MM-DD o vacío (fecha de entrega o del albarán)","proveedor":"Verdnatura","lineas":[{"cultivo":"ROSAS","variedad":"NOMBRE","medida":"50","tallos":100}]}',
+        system:'Lees albaranes y pedidos de Verdnatura (proveedor de flor cortada). Extrae SOLO las líneas de flor (variedad, no accesorios como "Blonda", cajas, cintas, embalajes ni portes). El "Concepto" suele venir como "Rosa <variedad> EXT", "RS <variedad> SEL" u otro cultivo similar — quita prefijos (Rosa/RS/GY/CL) y sufijos de calidad (EXT/SEL/EXTRA/PRIMERA) para quedarte solo con el nombre de variedad en mayúsculas. La medida es el valor de ALTURA en cm (solo el número). La cantidad es el número de TALLOS INDIVIDUALES del pedido (columna Cant., o "N x precio" en pantallas de pedido — coge N). Identifica el cultivo (ROSAS por defecto si no se indica otra cosa; CLAVELES, ALSTROEMERIA, HORTENSIAS, GYPSOPHILA si el nombre lo indica claramente). Busca también el número identificador del documento: "ALBARÁN" (ej. 13238631) o, si no hay albarán, el número de "Pedido"/"#" (ej. 13237234) — es el identificador único de ESTE documento concreto, no lo confundas con el código "CLIENTE". Devuelve SOLO este JSON, sin texto adicional: {"identificador":"13238631 o vacío","fecha":"YYYY-MM-DD o vacío (fecha de entrega o del albarán)","proveedor":"Verdnatura","lineas":[{"cultivo":"ROSAS","variedad":"NOMBRE","medida":"50","tallos":100}]}',
         messages:[{ role:'user', content:[
           contenidoDoc,
           { type:'text', text:'Extrae las líneas de flor de este albarán/pedido de Verdnatura.' }
@@ -972,7 +980,9 @@ function leerVerdnatura(e){
       });
       if(!lineas.length) throw new Error('Ninguna línea válida tras convertir tallos a paquetes');
 
-      _excelPreview = { lineas:lineas, awb:'Verdnatura', fecha:(parsed.fecha||''), titulo:'Albarán Verdnatura' };
+      var identificador = (parsed.identificador||'').toString().trim();
+      var awbDoc = identificador ? ('Verdnatura '+identificador) : ('Verdnatura '+new Date().toISOString().slice(0,16));
+      _excelPreview = { lineas:lineas, awb:awbDoc, fecha:(parsed.fecha||''), titulo:'Albarán Verdnatura' };
 
       var porCult={};
       lineas.forEach(function(l){ if(!porCult[l.cultivo])porCult[l.cultivo]=[]; porCult[l.cultivo].push(l); });
@@ -984,7 +994,7 @@ function leerVerdnatura(e){
           html += '<div class="prev-linea"><span>'+l.variedad+(l.medida!=='—'?' '+l.medida:'')+conv+'</span><span class="num">'+l.cantidad+'</span></div>';
         });
       });
-      document.getElementById('previewTitulo').textContent = 'Verdnatura — '+lineas.length+' líneas';
+      document.getElementById('previewTitulo').textContent = awbDoc+' — '+lineas.length+' líneas';
       document.getElementById('previewLineas').innerHTML = html;
       document.getElementById('xlFechaDisponible').value = parsed.fecha || hoyISO();
       actualizarAvisoFecha();
@@ -1008,11 +1018,14 @@ function confirmarExcel(){
   if(!_excelPreview || !_excelPreview.lineas.length) return;
   var existente = cargarStock();
 
-  // Siempre suma al stock actual — nunca reemplaza. Si el mismo AWB ya estaba cargado,
-  // solo avisamos (no bloqueamos): puede ser una corrección legítima de la misma compra.
+  // 1 guía = 1 stock. 1 albarán = 1 stock. Si ese identificador ya está cargado, se
+  // BLOQUEA por completo — no hay forma de subirlo dos veces por error.
   var meta = cargarMeta();
-  var yaCargado = meta.some(function(m){ return m.awb && _excelPreview.awb && m.awb===_excelPreview.awb; });
-  if(yaCargado && !confirm('«'+_excelPreview.awb+'» ya está cargado antes.\n\nSi lo subes otra vez, esas cantidades se sumarán de nuevo (duplicado).\n\n¿Seguro que quieres continuar?')) return;
+  var yaCargado = _excelPreview.awb && meta.some(function(m){ return m.awb===_excelPreview.awb; });
+  if(yaCargado){
+    toast('⛔ «'+_excelPreview.awb+'» ya está cargado — no se puede subir dos veces');
+    return;
+  }
 
   var fechaCarga = document.getElementById('xlFechaDisponible').value || hoyISO();
   var esFutura = fechaCarga > hoyISO();
