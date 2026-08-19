@@ -6,6 +6,8 @@
 <title>Buscaflor · Stock</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <style>
 /* ══ BUSCAFLOR STOCK · estilo marca (navy/blanco) ══ */
 :root{
@@ -442,24 +444,47 @@ header{
 <script>
 'use strict';
 
-/* ══ ALMACENAMIENTO ══
-   Claves compatibles con la versión anterior: no se pierde el stock ya cargado. */
-var CLAVES = { stock:'bf_stock1', log:'bf_log1', meta:'bf_stock_meta', apikey:'bf_ak' };
+/* ══ FIREBASE — stock compartido en tiempo real ══
+   Cualquiera con el link ve el mismo stock, sin login. La API Key de Claude (para leer
+   PDFs) sigue guardándose solo en el navegador de cada uno — no hace falta compartirla. */
+var firebaseConfig = {
+  apiKey: "AIzaSyD0UwaxdqoAgei-pqr1abceXVj5jTzYw2o",
+  authDomain: "stock-buscaflor.firebaseapp.com",
+  databaseURL: "https://stock-buscaflor-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "stock-buscaflor",
+  storageBucket: "stock-buscaflor.firebasestorage.app",
+  messagingSenderId: "724662381940",
+  appId: "1:724662381940:web:b72b12168bb6dada4f9021"
+};
+firebase.initializeApp(firebaseConfig);
+var fbDB = firebase.database();
+var refStock = fbDB.ref('buscaflor/stock');
+var refLog   = fbDB.ref('buscaflor/log');
+var refMeta  = fbDB.ref('buscaflor/meta');
 
-function cargarStock(){ try{ return JSON.parse(localStorage.getItem(CLAVES.stock)||'{}'); }catch(e){ return {}; } }
-function guardarStock(s){ localStorage.setItem(CLAVES.stock, JSON.stringify(s)); renderStock(); }
-function cargarLog(){ try{ return JSON.parse(localStorage.getItem(CLAVES.log)||'[]'); }catch(e){ return []; } }
-function cargarMeta(){
-  try{ var m=JSON.parse(localStorage.getItem(CLAVES.meta)||'[]'); return Array.isArray(m)?m:(m.awb?[m]:[]); }
-  catch(e){ return []; }
-}
+// Copias locales en memoria — se mantienen sincronizadas solas por los listeners de abajo.
+var _stockCache = {};
+var _logCache = [];
+var _metaCache = [];
+var _stockListo = false;
+
+/* ══ ALMACENAMIENTO ══
+   La API Key de Claude (para leer PDFs/fotos) sigue siendo local a cada dispositivo. */
+var CLAVES = { apikey:'bf_ak' };
+
+function cargarStock(){ return _stockCache || {}; }
+function guardarStock(s){ _stockCache = s; refStock.set(s); renderStock(); }
+function cargarLog(){ return _logCache || []; }
+function cargarMeta(){ return _metaCache || []; }
 function registrarMovimiento(mov){
-  var log = cargarLog();
+  var log = (_logCache||[]).slice();
   mov.t = Date.now();
   log.push(mov);
   if(log.length>500) log = log.slice(-500);
-  localStorage.setItem(CLAVES.log, JSON.stringify(log));
+  _logCache = log;
+  refLog.set(log);
 }
+function guardarMeta(m){ _metaCache = m; refMeta.set(m); }
 
 /* ══ REGLAS DE CULTIVO (unidades Buscaflor) ══ */
 function unidadDeCultivo(cultivo){
@@ -530,7 +555,8 @@ function reconciliarFuturas(){
     it.futuras = quedan;
   });
   if(huboCambios){
-    localStorage.setItem(CLAVES.stock, JSON.stringify(stock));
+    _stockCache = stock;
+    refStock.set(stock);
     registrarMovimiento({ tipo:'llegada', detalle:'Llegadas consolidadas al stock: '+llegadas.length+' línea(s)', lineas:llegadas });
   }
 }
@@ -1019,7 +1045,7 @@ function confirmarExcel(){
 
   var nuevaMeta = { awb:_excelPreview.awb, fecha_carga:new Date().toISOString(), fecha_inventario:fechaCarga, titulo:_excelPreview.titulo, lineas:_excelPreview.lineas.length };
   var metaFinal = (modo==='merge') ? cargarMeta().concat([nuevaMeta]) : [nuevaMeta];
-  localStorage.setItem(CLAVES.meta, JSON.stringify(metaFinal));
+  guardarMeta(metaFinal);
 
   registrarMovimiento({
     tipo: esFutura ? 'vuelo_futuro' : (modo==='merge'?'vuelo_anadido':'vuelo_reemplazo'),
@@ -1341,7 +1367,8 @@ function abrirHistorico(){
 
 function borrarHistorico(){
   if(!confirm('¿Borrar todo el histórico? El stock no se toca.')) return;
-  localStorage.removeItem(CLAVES.log);
+  _logCache = [];
+  refLog.remove();
   cerrar('mHistorico');
   toast('Histórico borrado');
 }
@@ -1392,9 +1419,25 @@ function exportarWhatsApp(){
   window.open('https://wa.me/?text='+encodeURIComponent(lineas.join('\n')), '_blank');
 }
 
-/* ══ INICIO ══ */
-reconciliarFuturas();
-renderStock();
+/* ══ INICIO ══
+   Espera a que lleguen los datos reales de Firebase antes de dibujar nada — así no se ve
+   un "sin stock" falso durante el segundo que tarda en conectar. A partir de ahí, cualquier
+   cambio (tuyo o de un compañero, desde cualquier dispositivo) se refleja solo, en vivo. */
+document.getElementById('contenido').innerHTML = '<div class="vacio"><p>Conectando…</p></div>';
+
+refMeta.on('value', function(snap){
+  var v = snap.val();
+  _metaCache = Array.isArray(v) ? v : (v ? Object.values(v) : []);
+});
+refLog.on('value', function(snap){
+  var v = snap.val();
+  _logCache = Array.isArray(v) ? v : (v ? Object.values(v) : []);
+});
+refStock.on('value', function(snap){
+  _stockCache = snap.val() || {};
+  if(!_stockListo){ _stockListo = true; reconciliarFuturas(); }
+  renderStock();
+});
 </script>
 </body>
 </html>
