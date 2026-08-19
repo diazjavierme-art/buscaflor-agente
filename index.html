@@ -413,8 +413,13 @@ header{
   <div class="hoja">
     <div class="hoja-head"><h3>Histórico</h3><button class="cerrar" onclick="cerrar('mHistorico')">✕</button></div>
     <div class="hoja-cuerpo" id="histCuerpo"></div>
+    <div style="padding:14px 18px;border-top:1px solid var(--filo);">
+      <div style="font-size:10px;color:var(--rojo);text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:7px;">Zona peligrosa</div>
+      <button class="btn" style="width:100%;border-color:var(--rojo);color:var(--rojo);" onclick="resetearStock()">🗑 Resetear todo el stock</button>
+      <p class="nota" style="margin:6px 0 0;font-size:11px;">Borra todas las variedades y cantidades. El stock dinámico no se resetea nunca solo — esta es la única forma, y es irreversible.</p>
+    </div>
     <div class="hoja-pie">
-      <button class="btn" style="border-color:var(--rojo);color:var(--rojo);flex:0 0 auto;padding:11px 14px;" onclick="borrarHistorico()">Borrar</button>
+      <button class="btn" style="border-color:var(--rojo);color:var(--rojo);flex:0 0 auto;padding:11px 14px;" onclick="borrarHistorico()">Borrar historial</button>
       <button class="btn" style="flex:0 0 auto;padding:11px 14px;" onclick="abrirApiKey()">API Key</button>
       <button class="btn primario" onclick="cerrar('mHistorico')">Cerrar</button>
     </div>
@@ -1002,33 +1007,18 @@ function cancelarExcel(){
 function confirmarExcel(){
   if(!_excelPreview || !_excelPreview.lineas.length) return;
   var existente = cargarStock();
-  var hayDatos = Object.keys(existente).length>0;
-  var modo = 'replace';
 
-  if(hayDatos){
-    var meta = cargarMeta();
-    var yaCargado = meta.some(function(m){ return m.awb && _excelPreview.awb && m.awb===_excelPreview.awb; });
-    var aviso = yaCargado ? '\n\n⚠ Este AWB ya está cargado — si sumas, duplicarás cantidades.' : '';
-    var resp = prompt(
-      'Ya hay stock cargado ('+Object.keys(existente).length+' variedades).'+aviso+'\n\n'+
-      'SUMAR → añade esta compra al stock actual\n'+
-      'REEMPLAZAR → borra todo y deja solo este Excel\n\n'+
-      'Escribe SUMAR o REEMPLAZAR:'
-    );
-    if(!resp) return;
-    var r = resp.trim().toUpperCase();
-    if(r==='SUMAR'||r==='S'||r==='AÑADIR'||r==='ANADIR') modo='merge';
-    else if(r==='REEMPLAZAR'||r==='R') modo='replace';
-    else { toast('Operación cancelada'); return; }
-  } else {
-    if(!confirm('Cargar '+_excelPreview.lineas.length+' variedades como stock inicial. ¿Continuar?')) return;
-  }
+  // Siempre suma al stock actual — nunca reemplaza. Si el mismo AWB ya estaba cargado,
+  // solo avisamos (no bloqueamos): puede ser una corrección legítima de la misma compra.
+  var meta = cargarMeta();
+  var yaCargado = meta.some(function(m){ return m.awb && _excelPreview.awb && m.awb===_excelPreview.awb; });
+  if(yaCargado && !confirm('«'+_excelPreview.awb+'» ya está cargado antes.\n\nSi lo subes otra vez, esas cantidades se sumarán de nuevo (duplicado).\n\n¿Seguro que quieres continuar?')) return;
 
   var fechaCarga = document.getElementById('xlFechaDisponible').value || hoyISO();
   var esFutura = fechaCarga > hoyISO();
   var origen = _excelPreview.awb || 'compra';
 
-  var stock = (modo==='merge') ? Object.assign({}, existente) : {};
+  var stock = Object.assign({}, existente);
   var nuevas=0, sumadas=0, futuras=0;
   _excelPreview.lineas.forEach(function(l){
     var k = claveProducto(nombreProducto(l.variedad,l.medida));
@@ -1044,12 +1034,11 @@ function confirmarExcel(){
   });
 
   var nuevaMeta = { awb:_excelPreview.awb, fecha_carga:new Date().toISOString(), fecha_inventario:fechaCarga, titulo:_excelPreview.titulo, lineas:_excelPreview.lineas.length };
-  var metaFinal = (modo==='merge') ? cargarMeta().concat([nuevaMeta]) : [nuevaMeta];
-  guardarMeta(metaFinal);
+  guardarMeta(meta.concat([nuevaMeta]));
 
   registrarMovimiento({
-    tipo: esFutura ? 'vuelo_futuro' : (modo==='merge'?'vuelo_anadido':'vuelo_reemplazo'),
-    detalle: (esFutura ? 'Próxima entrada ('+fmtFecha(fechaCarga)+'): ' : (modo==='merge'?'Compra sumada: ':'Stock reemplazado: '))+(_excelPreview.awb||'(sin AWB)')+' · '+_excelPreview.lineas.length+' líneas'
+    tipo: esFutura ? 'vuelo_futuro' : 'vuelo_anadido',
+    detalle: (esFutura ? 'Próxima entrada ('+fmtFecha(fechaCarga)+'): ' : 'Compra sumada: ')+(_excelPreview.awb||'(sin AWB)')+' · '+_excelPreview.lineas.length+' líneas'
   });
 
   guardarStock(stock);
@@ -1371,6 +1360,17 @@ function borrarHistorico(){
   refLog.remove();
   cerrar('mHistorico');
   toast('Histórico borrado');
+}
+
+function resetearStock(){
+  var claves = Object.keys(cargarStock());
+  if(!confirm('⚠ Vas a borrar TODO el stock ('+claves.length+' variedades) y las compras cargadas.\n\nEsto NO se puede deshacer.\n\n¿Seguro?')) return;
+  if(!confirm('Confirmación final: se borra TODO ahora mismo. ¿Continuar?')) { toast('Cancelado — no se ha tocado nada'); return; }
+  registrarMovimiento({ tipo:'reset_stock', detalle:'Reseteo manual de todo el stock ('+claves.length+' variedades borradas)' });
+  guardarStock({});
+  guardarMeta([]);
+  cerrar('mHistorico');
+  toast('Stock reseteado por completo');
 }
 
 /* ══ API KEY ══ */
