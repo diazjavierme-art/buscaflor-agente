@@ -77,7 +77,7 @@ header{
 .contenido{padding:10px 14px 90px;}
 .cultivo{margin-bottom:18px;}
 .cult-head{
-  display:grid;grid-template-columns:1fr repeat(6,26px) 24px;gap:2px;align-items:end;
+  display:grid;grid-template-columns:1fr repeat(4,minmax(44px,1fr)) 26px;gap:3px;align-items:end;
   padding:7px 6px;background:var(--navy-suave);border-radius:6px 6px 0 0;
 }
 .cult-nombre{
@@ -85,18 +85,18 @@ header{
   letter-spacing:0.02em;text-transform:uppercase;
 }
 .cult-unidad{font-size:9px;color:var(--gris);text-transform:uppercase;letter-spacing:0.02em;font-family:'IBM Plex Mono',monospace;font-weight:400;margin-left:4px;}
-.col-dia{font-size:8px;color:var(--gris);text-align:right;font-weight:700;line-height:1.15;}
-.col-dia b{display:block;font-size:7.5px;color:var(--navy);font-weight:700;}
+.col-dia{font-size:8.5px;color:var(--gris);text-align:right;font-weight:700;line-height:1.15;}
+.col-dia b{display:block;font-size:8px;color:var(--navy);font-weight:700;}
 .fila{
-  display:grid;grid-template-columns:1fr repeat(6,26px) 24px;gap:2px;align-items:center;
-  padding:7px 6px;border-bottom:1px solid var(--filo);background:var(--papel);
+  display:grid;grid-template-columns:1fr repeat(4,minmax(44px,1fr)) 26px;gap:3px;align-items:center;
+  padding:8px 6px;border-bottom:1px solid var(--filo);background:var(--papel);
 }
 .fila:last-child{border-radius:0 0 6px 6px;}
-.f-nombre{font-size:11.5px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.f-nombre{font-size:11.5px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
 .f-nombre .f-med{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--gris);}
 .f-cant{
-  font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;text-align:right;
-  color:var(--verde);
+  font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;text-align:right;
+  color:var(--verde);white-space:nowrap;overflow:hidden;font-variant-numeric:tabular-nums;
 }
 .f-cant.cero{color:var(--gris);}
 .f-cant.neg{color:var(--rojo);}
@@ -194,11 +194,18 @@ header{
   border-left:3px solid var(--oro);padding:7px 10px;margin-bottom:6px;
   font-size:12.5px;background:var(--navy-suave);border-radius:0 6px 6px 0;
 }
+.hist-mov.deshecha{border-left-color:var(--filo);opacity:0.6;}
 .hist-mov .hora{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--gris);float:right;}
 .hist-mov details{margin-top:4px;}
 .hist-mov summary{font-size:11px;color:var(--gris);cursor:pointer;}
 .hist-mov .det-linea{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--gris);padding:1px 0 1px 10px;}
 .hist-mov .det-linea.error{color:var(--rojo);}
+.deshacer-btn{
+  display:block;margin-top:6px;background:none;border:1px solid var(--rojo);color:var(--rojo);
+  border-radius:5px;padding:3px 9px;font-size:11px;font-family:'IBM Plex Sans',sans-serif;
+  font-weight:600;cursor:pointer;
+}
+.deshacer-btn:active{background:rgba(192,70,58,0.08);}
 
 /* ── Toast ── */
 .toast{
@@ -524,7 +531,7 @@ function fmtFecha(iso){
    item.cantidad = disponible físico HOY (lo de siempre).
    item.futuras  = [{cantidad, fecha, origen}] compras que llegan más adelante.
    Proyectado a una fecha X = cantidad + suma de futuras con fecha <= X. */
-var _fechaProyeccion = '';  // solo se usa para el total de "otra fecha" — la tabla ya muestra Hoy/Mañana/+7d siempre
+var _fechaBase = '';  // fecha que hace de "hoy" en la tabla — vacío = hoy real
 
 function sumaFuturasHasta(item, fecha){
   if(!item.futuras || !item.futuras.length) return 0;
@@ -563,18 +570,8 @@ function reconciliarFuturas(){
 }
 
 function fijarProyeccion(fecha){
-  _fechaProyeccion = fecha || '';
-  var lbl = document.getElementById('proyFechaLbl');
-  if(!_fechaProyeccion || _fechaProyeccion<=hoyISO()){
-    lbl.textContent = '';
-    return;
-  }
-  var stock = cargarStock();
-  var total = 0;
-  Object.keys(stock).forEach(function(k){
-    total += (stock[k].cantidad||0) + sumaFuturasHasta(stock[k], _fechaProyeccion);
-  });
-  lbl.textContent = 'Total a '+fmtFecha(_fechaProyeccion)+': '+total+' uds';
+  _fechaBase = fecha || hoyISO();
+  renderStock(); // ya actualiza la etiqueta al final, vía actualizarLabelFecha()
 }
 
 function renderStock(){
@@ -582,16 +579,19 @@ function renderStock(){
   var claves = Object.keys(stock);
   var busqueda = (document.getElementById('buscador').value||'').toLowerCase().trim();
 
-  // Hoy + los próximos 5 días — semana corrida, cada uno con su fecha real
+  // La fecha base normalmente es hoy — pero si se elige "Otra fecha", esa fecha pasa a
+  // hacer de "hoy" para toda la tabla: se recalculan las 4 columnas desde ahí.
+  var fechaBase = _fechaBase || hoyISO();
+  var esHoyReal = fechaBase===hoyISO();
   var dias = [];
-  for(var i=0;i<6;i++){
-    var d = new Date(); d.setDate(d.getDate()+i);
+  for(var i=0;i<4;i++){
+    var d = new Date(fechaBase+'T00:00:00'); d.setDate(d.getDate()+i);
     dias.push(d.toISOString().split('T')[0]);
   }
   var D=['D','L','M','X','J','V','S'];
   var cabecerasDias = dias.map(function(f,i){
     var d = new Date(f+'T00:00:00');
-    var letra = i===0 ? 'HOY' : D[d.getDay()];
+    var letra = (i===0 && esHoyReal) ? 'HOY' : D[d.getDay()];
     return '<span class="col-dia">'+letra+'<b>'+d.getDate()+'</b></span>';
   }).join('');
 
@@ -628,29 +628,44 @@ function renderStock(){
     }
     html += '<div class="cultivo">';
     html += '<div class="cult-head"><span class="cult-nombre">'+cult+'<span class="cult-unidad">'+unidadDeCultivo(cult)+'</span></span>'+cabecerasDias+'<span></span></div>';
+    var filasHtml = '';
     items.forEach(function(it){
-      var base = it.cantidad||0;
+      var fisico = it.cantidad||0;
+      var cRef = fisico + sumaFuturasHasta(it, dias[0]);
+      if(cRef===0) return; // sin stock en la fecha de referencia — no se muestra
       var medidaTxt = (it.medida && it.medida!=='—') ? ' <span class="f-med">'+it.medida+'</span>' : '';
-      html += '<div class="fila">';
-      html += '<span class="f-nombre">'+(it.variedad||'')+medidaTxt+'</span>';
+      filasHtml += '<div class="fila">';
+      filasHtml += '<span class="f-nombre">'+(it.variedad||'')+medidaTxt+'</span>';
       dias.forEach(function(f,i){
-        var v = base + sumaFuturasHasta(it, f);
-        var cls = v<0 ? 'neg' : v===0 ? 'cero' : (i>0 && v>base) ? 'futuro' : '';
-        html += '<span class="f-cant '+cls+'">'+v+'</span>';
+        var v = fisico + sumaFuturasHasta(it, f);
+        var cls = v<0 ? 'neg' : v===0 ? 'cero' : (i>0 && v>cRef) ? 'futuro' : '';
+        filasHtml += '<span class="f-cant '+cls+'">'+v+'</span>';
       });
-      html += '<button class="f-edit" data-k="'+it._k+'" title="Ajustar">✎</button>';
-      html += '</div>';
+      filasHtml += '<button class="f-edit" data-k="'+it._k+'" title="Ajustar">✎</button>';
+      filasHtml += '</div>';
     });
+    if(!filasHtml) return; // todas a cero en esta fecha — no se muestra ni el cultivo
+    html += filasHtml;
     html += '</div>';
   });
   if(!html){
-    html = '<div class="vacio"><p>Sin resultados para «<b>'+busqueda+'</b>»</p></div>';
+    html = busqueda
+      ? '<div class="vacio"><p>Sin resultados para «<b>'+busqueda+'</b>»</p></div>'
+      : '<div class="vacio"><p>Sin stock disponible '+(esHoyReal?'hoy':'el '+fmtFecha(fechaBase))+'</p></div>';
   }
   cont.innerHTML = html;
   cont.querySelectorAll('.f-edit').forEach(function(b){
     b.addEventListener('click', function(){ abrirAjuste(b.getAttribute('data-k')); });
   });
-  fijarProyeccion(_fechaProyeccion);
+  actualizarLabelFecha();
+}
+
+function actualizarLabelFecha(){
+  var lbl = document.getElementById('proyFechaLbl');
+  if(!lbl) return;
+  lbl.innerHTML = (_fechaBase && _fechaBase!==hoyISO())
+    ? 'Viendo '+fmtFecha(_fechaBase)+' — <a href="#" onclick="event.preventDefault();document.getElementById(\'proyFechaCustom\').value=\'\';fijarProyeccion(\'\');" style="color:var(--navy);text-decoration:underline;">volver a hoy</a>'
+    : '';
 }
 
 /* ══ COMPRA MANUAL (proveedores sin Excel, ej. Verdnatura) ══ */
@@ -691,6 +706,9 @@ function guardarCompraManual(){
 
   registrarMovimiento({
     tipo: esFutura ? 'compra_futura' : 'compra_manual',
+    fechaCarga: fecha,
+    esFutura: esFutura,
+    lineas: [{ clave:k, cantidad:cantidad, nombre:nombreProducto(variedad,medida), origen:proveedor||'compra manual' }],
     detalle: (esFutura?'Próxima entrada ('+fmtFecha(fecha)+'): ':'Compra manual: ')+cantidad+' '+unidad+' de '+nombreProducto(variedad,medida)+(proveedor?' · '+proveedor:'')
   });
 
@@ -1156,8 +1174,16 @@ function confirmarExcel(){
     });
     guardarMeta(meta.concat(metaNuevas));
 
+    // Guardamos el detalle línea a línea (clave + cantidad) para poder deshacer
+    // ESTA compra en concreto más adelante, sin tocar el resto del stock.
     registrarMovimiento({
       tipo: esFutura ? 'vuelo_futuro' : 'vuelo_anadido',
+      awbs: documentos.map(function(d){return d.awb;}),
+      fechaCarga: fechaCarga,
+      esFutura: esFutura,
+      lineas: _excelPreview.lineas.map(function(l){
+        return { clave: claveProducto(nombreProducto(l.variedad,l.medida)), cantidad: l.cantidad, nombre: nombreProducto(l.variedad,l.medida), origen: origen };
+      }),
       detalle: (esFutura ? 'Próxima entrada ('+fmtFecha(fechaCarga)+'): ' : 'Compra sumada: ')+documentos.map(function(d){return d.awb;}).join(', ')+' · '+_excelPreview.lineas.length+' líneas'
     });
 
@@ -1458,12 +1484,18 @@ function abrirHistorico(){
     if(!porDia[d]) porDia[d]=[];
     porDia[d].push(e);
   });
+  var TIPOS_DESHACIBLES = ['vuelo_anadido','vuelo_futuro','compra_manual','compra_futura'];
   var html='';
   Object.keys(porDia).sort().reverse().forEach(function(dia){
     html += '<div class="hist-dia">'+fmtFecha(dia)+'</div>';
     porDia[dia].forEach(function(e){
       var hora = new Date(e.t).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
-      html += '<div class="hist-mov"><span class="hora">'+hora+'</span>'+(e.detalle||e.tipo);
+      html += '<div class="hist-mov'+(e.deshecha?' deshecha':'')+'"><span class="hora">'+hora+'</span>'+(e.detalle||e.tipo);
+      if(e.deshecha){
+        html += ' <span style="color:var(--rojo);font-weight:600;">(deshecha)</span>';
+      } else if(TIPOS_DESHACIBLES.indexOf(e.tipo)>=0 && e.lineas && e.lineas.length){
+        html += ' <button class="deshacer-btn" onclick="deshacerCompra(\''+e.id+'\')">↩ Deshacer</button>';
+      }
       if(e.tipo==='cierre' && e.descuentos && e.descuentos.length){
         html += '<details><summary>Ver descuentos ('+e.descuentos.length+')</summary>';
         e.descuentos.forEach(function(d){
@@ -1482,6 +1514,52 @@ function abrirHistorico(){
   });
   cuerpo.innerHTML = html;
   abrir('mHistorico');
+}
+
+// Revierte SOLO las líneas de una compra concreta (identificada por el id del movimiento
+// en el histórico) — resta lo que sumó, o quita la entrada de "futuras" si aún no había
+// llegado. No toca el resto del stock. Si algo ya se vendió desde entonces, el número
+// puede quedar negativo (se ve en rojo) — es la forma honesta de reflejar el desajuste,
+// mejor que ocultarlo redondeando a cero.
+function deshacerCompra(id){
+  var log = cargarLog();
+  var mov = log.find(function(e){ return e.id===id; });
+  if(!mov){ toast('No encuentro ese movimiento'); return; }
+  if(mov.deshecha){ toast('Esta compra ya estaba deshecha'); return; }
+  if(!mov.lineas || !mov.lineas.length){ toast('Este movimiento es antiguo y no guarda el detalle necesario para deshacerlo'); return; }
+
+  var resumen = mov.lineas.map(function(l){ return l.nombre+' (-'+l.cantidad+')'; }).join(', ');
+  if(!confirm('¿Deshacer esta compra?\n\n'+resumen+'\n\nSi ya vendiste parte de esto, el stock puede quedar en negativo — revísalo después.\n\n¿Seguro?')) return;
+
+  var stock = cargarStock();
+  mov.lineas.forEach(function(l){
+    var it = stock[l.clave];
+    if(!it) return; // ya no existe esa variedad en el stock (se resetió, etc.) — nada que revertir
+    if(mov.esFutura){
+      if(!it.futuras) return;
+      var idx = it.futuras.findIndex(function(f){
+        return f.cantidad===l.cantidad && f.fecha===mov.fechaCarga && f.origen===l.origen;
+      });
+      if(idx>=0) it.futuras.splice(idx,1);
+    } else {
+      it.cantidad = (it.cantidad||0) - l.cantidad;
+    }
+  });
+  guardarStock(stock);
+
+  // Si esta compra generó entradas en "Compras" (meta), las quitamos también
+  if(mov.awbs && mov.awbs.length){
+    var meta = cargarMeta().filter(function(m){ return mov.awbs.indexOf(m.awb)<0; });
+    guardarMeta(meta);
+  }
+
+  mov.deshecha = true;
+  _logCache = log;
+  refLog.set(log);
+  registrarMovimiento({ tipo:'deshacer', detalle:'Deshecha: '+(mov.awbs?mov.awbs.join(', '):resumen) });
+
+  toast('Compra deshecha');
+  abrirHistorico(); // refresca la lista para que se vea marcada
 }
 
 function borrarHistorico(){
