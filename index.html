@@ -467,6 +467,19 @@ header{
         <label>Nota (opcional)</label>
         <input type="text" id="ajNota" placeholder="Ej: caja 14 dañada">
       </div>
+      <div style="border-top:1px solid var(--filo);margin-top:6px;padding-top:14px;">
+        <p class="nota" style="margin-bottom:8px;"><b style="color:var(--tinta);">¿Es un duplicado?</b> Si esta variedad es en realidad la misma que otra ya tienes con otro nombre, fusiónalas en vez de ajustar el número — se suman las cantidades y esta desaparece.</p>
+        <div class="sw">
+          <input class="si" id="fusVariedad" placeholder="Buscar la variedad correcta…" autocomplete="off" oninput="buscarFusion(this.value)" onfocus="buscarFusion(this.value)">
+          <div class="sd" id="fusDD"></div>
+        </div>
+        <input type="hidden" id="fusClaveDestino">
+        <button class="btn" style="width:100%;margin-top:8px;border-color:var(--oro);color:#8a6a1f;" onclick="confirmarFusion()">🔗 Fusionar con la elegida</button>
+      </div>
+      <div style="border-top:1px solid var(--filo);margin-top:14px;padding-top:14px;">
+        <p class="nota" style="margin-bottom:8px;"><b style="color:var(--rojo);">Zona peligrosa.</b> Borra este producto por completo (no solo pone la cantidad a 0) — para cuando se creó por error y no debería existir como línea. No se puede deshacer.</p>
+        <button class="btn" style="width:100%;border-color:var(--rojo);color:var(--rojo);" onclick="borrarProducto()">🗑 Borrar este producto</button>
+      </div>
     </div>
     <div class="hoja-pie">
       <button class="btn" onclick="cerrar('mAjuste')">Cancelar</button>
@@ -1927,8 +1940,111 @@ function abrirAjuste(clave){
   document.getElementById('ajNota').value = '';
   document.getElementById('ajConvertirPetalos').checked = false;
   document.getElementById('ajConvertirWrap').style.display = 'none';
+  document.getElementById('fusVariedad').value = '';
+  document.getElementById('fusClaveDestino').value = '';
   abrir('mAjuste');
   setTimeout(function(){ var el=document.getElementById('ajNuevo'); el.focus(); el.select(); },180);
+}
+
+/* ══ FUSIONAR DOS VARIEDADES DUPLICADAS ══
+   Para cuando la misma flor entró dos veces con nombres distintos (ej. "XLENCE MF 30 GR"
+   en Gypsophila y "XLENCE" en Paniculata) — junta cantidades, futuras, pedidos activos y
+   códigos del CRM ya aprendidos en la variedad de destino, y borra la duplicada. */
+function buscarFusion(texto){
+  var stock = cargarStock();
+  var q = (texto||'').toLowerCase().trim();
+  var dd = document.getElementById('fusDD');
+  var claves = Object.keys(stock).filter(function(k){
+    if(k===_ajClave) return false; // no puede fusionarse consigo misma
+    var nombre = nombreProducto(stock[k].variedad, stock[k].medida).toLowerCase();
+    return !q || nombre.indexOf(q)>=0;
+  }).slice(0,40);
+  if(!claves.length){ dd.innerHTML = '<div class="so" style="color:var(--gris);font-style:italic;">Sin resultados</div>'; dd.classList.add('open'); return; }
+  dd.innerHTML = claves.map(function(k){
+    var it = stock[k];
+    return '<div class="so" data-k="'+k+'">'+nombreProducto(it.variedad,it.medida)+' <span class="disp-badge">'+(it.cantidad||0)+'</span></div>';
+  }).join('');
+  dd.classList.add('open');
+  dd.querySelectorAll('.so[data-k]').forEach(function(el){
+    el.addEventListener('mousedown', function(e){
+      e.preventDefault();
+      var k = el.getAttribute('data-k');
+      var stock2 = cargarStock();
+      document.getElementById('fusVariedad').value = nombreProducto(stock2[k].variedad, stock2[k].medida);
+      document.getElementById('fusClaveDestino').value = k;
+      dd.classList.remove('open');
+    });
+  });
+}
+document.addEventListener('click', function(e){
+  if(!e.target.closest('#mAjuste .sw')){
+    var dd = document.getElementById('fusDD');
+    if(dd) dd.classList.remove('open');
+  }
+});
+
+function confirmarFusion(){
+  var claveOrigen = _ajClave;
+  var claveDestino = document.getElementById('fusClaveDestino').value;
+  if(!claveDestino){ toast('Busca y elige la variedad correcta primero'); return; }
+  var stock = cargarStock();
+  var origen = stock[claveOrigen], destino = stock[claveDestino];
+  if(!origen || !destino){ toast('Alguna de las dos ya no existe'); return; }
+
+  if(!confirm('¿Fusionar «'+nombreProducto(origen.variedad,origen.medida)+'» ('+(origen.cantidad||0)+') dentro de «'+nombreProducto(destino.variedad,destino.medida)+'» ('+(destino.cantidad||0)+')?\n\nQuedará todo junto en «'+nombreProducto(destino.variedad,destino.medida)+'» = '+((origen.cantidad||0)+(destino.cantidad||0))+'.\n\nEsto no se puede deshacer solo — tendrías que separarlas a mano si te equivocas.\n\n¿Seguro?')) return;
+
+  destino.cantidad = (destino.cantidad||0) + (origen.cantidad||0);
+  destino.futuras = (destino.futuras||[]).concat(origen.futuras||[]);
+  delete stock[claveOrigen];
+  guardarStock(stock);
+
+  // Los pedidos activos de la variedad que desaparece pasan a apuntar a la de destino
+  var pedidos = (_pedidosCache||[]).slice();
+  var pedidosMovidos = 0;
+  pedidos.forEach(function(p){ if(p.clave===claveOrigen){ p.clave=claveDestino; p.nombre=nombreProducto(destino.variedad,destino.medida); pedidosMovidos++; } });
+  if(pedidosMovidos) guardarPedidosCambiados(pedidos);
+
+  // Los códigos del CRM que ya apuntaban a la variedad que desaparece, se redirigen también
+  var mapeo = Object.assign({}, cargarMapeo());
+  var codigosMovidos = 0;
+  Object.keys(mapeo).forEach(function(cod){ if(mapeo[cod]===claveOrigen){ mapeo[cod]=claveDestino; codigosMovidos++; } });
+  if(codigosMovidos){
+    _mapeoCache = mapeo;
+    refMapeo.set(mapeo).catch(function(err){ console.error('refMapeo.set (fusión):', err); });
+  }
+
+  registrarMovimiento({
+    tipo:'fusion',
+    detalle:'🔗 Fusionada: '+nombreProducto(origen.variedad,origen.medida)+' → '+nombreProducto(destino.variedad,destino.medida)+' ('+(pedidosMovidos?pedidosMovidos+' pedido(s) movido(s)':'sin pedidos afectados')+(codigosMovidos?' · '+codigosMovidos+' código(s) redirigido(s)':'')+')'
+  });
+
+  cerrar('mAjuste');
+  toast('Fusionado en «'+nombreProducto(destino.variedad,destino.medida)+'»');
+}
+
+function borrarProducto(){
+  var clave = _ajClave;
+  var stock = cargarStock();
+  var it = stock[clave];
+  if(!it){ toast('Ese producto ya no existe'); return; }
+
+  var pedidosAfectados = pedidosActivosDe(clave);
+  if(pedidosAfectados.length){
+    alert('⚠ No se puede borrar «'+nombreProducto(it.variedad,it.medida)+'» — tiene '+pedidosAfectados.length+' pedido(s) bloqueado(s) activo(s) para clientes ('+pedidosAfectados.map(function(p){return p.cliente;}).join(', ')+').\n\nCancela o entrega esos pedidos primero (📋 Pedidos), y luego podrás borrar el producto.');
+    return;
+  }
+
+  var resumen = nombreProducto(it.variedad,it.medida)+' — '+(it.cantidad||0)+' físico'+((it.futuras&&it.futuras.length)?' + '+it.futuras.length+' próxima(s) entrada(s)':'');
+  if(!confirm('⚠ Vas a borrar por completo:\n\n'+resumen+'\n\nEsto NO se puede deshacer. Si solo quieres ponerlo a 0, cierra esto y usa el campo "Nuevo" en su lugar.\n\n¿Seguro que quieres borrarlo?')) return;
+
+  delete stock[clave];
+  guardarStock(stock);
+
+  registrarMovimiento({ tipo:'borrado', detalle:'🗑 Producto borrado: '+resumen });
+
+  cerrar('mAjuste');
+  _ajClave = null;
+  toast('Producto borrado');
 }
 
 function previewDelta(){
