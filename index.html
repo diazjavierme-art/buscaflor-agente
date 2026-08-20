@@ -77,8 +77,8 @@ header{
 .contenido{padding:10px 14px 90px;}
 .cultivo{margin-bottom:18px;}
 .cult-head{
-  display:grid;grid-template-columns:1fr repeat(4,minmax(44px,1fr)) 26px;gap:3px;align-items:end;
-  padding:7px 6px;background:var(--navy-suave);border-radius:6px 6px 0 0;
+  display:grid;grid-template-columns:1fr repeat(4,minmax(44px,1fr)) 20px;gap:2px;align-items:end;
+  padding:7px 4px;background:var(--navy-suave);border-radius:6px 6px 0 0;
 }
 .cult-nombre{
   font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;font-weight:700;color:var(--navy);
@@ -88,8 +88,8 @@ header{
 .col-dia{font-size:8.5px;color:var(--gris);text-align:right;font-weight:700;line-height:1.15;}
 .col-dia b{display:block;font-size:8px;color:var(--navy);font-weight:700;}
 .fila{
-  display:grid;grid-template-columns:1fr repeat(4,minmax(44px,1fr)) 26px;gap:3px;align-items:center;
-  padding:8px 6px;border-bottom:1px solid var(--filo);background:var(--papel);
+  display:grid;grid-template-columns:1fr repeat(4,minmax(44px,1fr)) 20px;gap:2px;align-items:center;
+  padding:8px 4px;border-bottom:1px solid var(--filo);background:var(--papel);
 }
 .fila:last-child{border-radius:0 0 6px 6px;}
 .f-nombre{font-size:11.5px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
@@ -517,6 +517,24 @@ function nombreProducto(variedad, medida){
   return v+' '+m;
 }
 
+/* ══ NOMBRE CORTO PARA LA TABLA (solo visual) ══
+   En claveles el nombre guardado es "CLAVEL FANCY BURGUNDY" — la cabecera de la sección
+   ya dice "CLAVELES", así que en pantalla sobra repetirlo. Se muestra solo "BURGUNDY FCY"
+   (color + grado). El dato real guardado en el stock no cambia, solo cómo se pinta aquí. */
+function nombreCorto(cultivo, variedad){
+  var v = String(variedad||'').trim();
+  if((cultivo||'').toUpperCase().indexOf('CLAVEL')>=0){
+    var sinPrefijo = v.replace(/^CLAVEL(ES)?\s+/i,'');
+    var partes = sinPrefijo.split(/\s+/);
+    var grado = '';
+    if(partes[0] && partes[0].toUpperCase()==='FANCY'){ grado='FCY'; partes.shift(); }
+    else if(partes[0] && partes[0].toUpperCase()==='SELECT'){ grado='SELECT'; partes.shift(); }
+    var resto = partes.join(' ');
+    return (resto ? resto : v) + (grado ? ' '+grado : '');
+  }
+  return v;
+}
+
 /* ══ FECHAS ══ */
 // IMPORTANTE: nunca usar toISOString() para "qué día es hoy" — toISOString() da la fecha
 // en UTC, no en la hora local. De madrugada en España (UTC+1/+2), UTC todavía va "ayer",
@@ -642,9 +660,9 @@ function renderStock(){
       var fisico = it.cantidad||0;
       var cRef = fisico + sumaFuturasHasta(it, dias[0]);
       if(cRef===0) return; // sin stock en la fecha de referencia — no se muestra
-      var medidaTxt = (it.medida && it.medida!=='—') ? ' <span class="f-med">'+it.medida+'</span>' : '';
+      var medidaTxt = (it.medida && it.medida!=='—' && it.medida!=='-') ? ' <span class="f-med">'+it.medida+'</span>' : '';
       filasHtml += '<div class="fila">';
-      filasHtml += '<span class="f-nombre">'+(it.variedad||'')+medidaTxt+'</span>';
+      filasHtml += '<span class="f-nombre">'+nombreCorto(cult, it.variedad)+medidaTxt+'</span>';
       dias.forEach(function(f,i){
         var v = fisico + sumaFuturasHasta(it, f);
         var cls = v<0 ? 'neg' : v===0 ? 'cero' : (i>0 && v>cRef) ? 'futuro' : '';
