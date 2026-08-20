@@ -1456,6 +1456,36 @@ function aplicarCierre(){
   var validas = _cierreLineas.filter(function(r){return r.clave;});
   var sinStock = _cierreLineas.filter(function(r){return !r.clave;});
   if(!validas.length){ toast('Sin líneas válidas'); return; }
+
+  // Si ya se aplicó un cierre hoy (y no está ya deshecho), ofrecemos reemplazarlo en vez
+  // de simplemente avisar: el CRM da un total ACUMULADO del día, así que lo correcto casi
+  // siempre es deshacer el anterior y aplicar este nuevo limpio, no sumar los dos.
+  var hoy = hoyISO();
+  var cierresHoy = cargarLog().filter(function(e){
+    return e.tipo==='cierre' && !e.deshecha && fechaLocalISO(new Date(e.t))===hoy;
+  });
+  if(cierresHoy.length){
+    var ultimo = cierresHoy[cierresHoy.length-1];
+    var hora = new Date(ultimo.t).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    var reemplazar = confirm(
+      '⚠ YA APLICASTE UN CIERRE HOY a las '+hora+'.\n\n'+
+      'El CRM suele dar un total ACUMULADO del día — si este nuevo listado incluye otra vez '+
+      'las ventas de esta mañana, aplicar los dos sumaría de más.\n\n'+
+      '¿DESHACER el cierre de las '+hora+' y aplicar este nuevo en su lugar? (recomendado casi siempre)\n\n'+
+      'Aceptar = deshacer el anterior y aplicar este\nCancelar = decidir otra cosa'
+    );
+    if(reemplazar){
+      if(!deshacerCierre(ultimo.id, true)){ toast('No se pudo deshacer el cierre anterior'); return; }
+    } else {
+      var sumarIgual = confirm(
+        '¿Sumar este cierre ADEMÁS del anterior, sin deshacer nada?\n\n'+
+        'Solo hazlo si estás seguro de que este archivo trae ÚNICAMENTE ventas nuevas desde las '+hora+', no el acumulado del día.\n\n'+
+        '¿Continuar así?'
+      );
+      if(!sumarIgual) return;
+    }
+  }
+
   if(sinStock.length && !confirm(sinStock.length+' línea(s) fuera del stock se ignorarán.\n¿Aplicar el cierre igualmente?')) return;
   if(!confirm('Se descontarán '+validas.length+' línea(s) del stock.\n¿Confirmar cierre del día?')) return;
 
@@ -1469,7 +1499,7 @@ function aplicarCierre(){
     var antes = it.cantidad||0;
     it.cantidad = antes - r.cantidad;
     total += r.cantidad;
-    detalle.push({ producto:nombreProducto(it.variedad,it.medida), cantidad:r.cantidad, antes:antes, despues:it.cantidad });
+    detalle.push({ producto:nombreProducto(it.variedad,it.medida), clave:r.clave, cantidad:r.cantidad, antes:antes, despues:it.cantidad });
     // Aprende el código→clave si venía de un artículo del CRM y aún no lo sabíamos —
     // la próxima vez que salga ese código, se casará directo sin depender del texto.
     if(r.codigo && cargarMapeo()[r.codigo]!==r.clave){
@@ -1571,6 +1601,8 @@ function abrirHistorico(){
         html += ' <span style="color:var(--rojo);font-weight:600;">(deshecha)</span>';
       } else if(TIPOS_DESHACIBLES.indexOf(e.tipo)>=0 && e.lineas && e.lineas.length){
         html += ' <button class="deshacer-btn" onclick="deshacerCompra(\''+e.id+'\')">↩ Deshacer</button>';
+      } else if(e.tipo==='cierre' && e.descuentos && e.descuentos.length){
+        html += ' <button class="deshacer-btn" onclick="deshacerCierre(\''+e.id+'\')">↩ Deshacer</button>';
       }
       if(e.tipo==='cierre' && e.descuentos && e.descuentos.length){
         html += '<details><summary>Ver descuentos ('+e.descuentos.length+')</summary>';
@@ -1636,6 +1668,39 @@ function deshacerCompra(id){
 
   toast('Compra deshecha');
   abrirHistorico(); // refresca la lista para que se vea marcada
+}
+
+// Revierte un cierre concreto — SUMA de vuelta lo que ese cierre restó (usando el detalle
+// guardado por clave, no el texto), para poder aplicar un cierre nuevo limpio en su lugar.
+// silencioso=true cuando se llama automáticamente desde "reemplazar cierre" (sin volver a
+// preguntar, ya se confirmó antes en ese flujo).
+function deshacerCierre(id, silencioso){
+  var log = cargarLog();
+  var mov = log.find(function(e){ return e.id===id; });
+  if(!mov){ if(!silencioso) toast('No encuentro ese cierre'); return false; }
+  if(mov.deshecha){ if(!silencioso) toast('Ese cierre ya estaba deshecho'); return false; }
+  if(!mov.descuentos || !mov.descuentos.length){ if(!silencioso) toast('Este cierre es antiguo y no guarda el detalle necesario para deshacerlo'); return false; }
+
+  if(!silencioso){
+    var resumen = mov.descuentos.map(function(d){ return d.producto+' (+'+d.cantidad+')'; }).join(', ');
+    if(!confirm('¿Deshacer este cierre?\n\n'+resumen+'\n\n¿Seguro?')) return false;
+  }
+
+  var stock = cargarStock();
+  mov.descuentos.forEach(function(d){
+    if(!d.clave) return; // cierres muy antiguos, de antes de guardar la clave — se ignoran
+    var it = stock[d.clave];
+    if(!it) return;
+    it.cantidad = (it.cantidad||0) + d.cantidad;
+  });
+  guardarStock(stock);
+
+  mov.deshecha = true;
+  _logCache = log;
+  refLog.set(log);
+  registrarMovimiento({ tipo:'deshacer', detalle:'Cierre de las '+new Date(mov.t).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+' deshecho'+(silencioso?' (para reemplazarlo por uno nuevo)':'') });
+  if(!silencioso){ toast('Cierre deshecho'); abrirHistorico(); }
+  return true;
 }
 
 function borrarHistorico(){
