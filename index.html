@@ -352,7 +352,8 @@ header{
       <p class="nota">Para compras que no vienen de un Excel de AWB (ej. Verdnatura). Si la fecha es futura, se guarda como próxima entrada y no se suma al disponible de hoy.</p>
       <div class="campo">
         <label>Variedad</label>
-        <input type="text" id="cpVariedad" placeholder="Ej: FREEDOM">
+        <div class="sw"><input class="si" id="cpVariedad" placeholder="Buscar en tu stock o escribir nueva…" autocomplete="off" oninput="buscarVariedadCompra(this.value)" onfocus="buscarVariedadCompra(this.value)"><div class="sd" id="cpVariedadDD"></div></div>
+        <p class="nota" style="margin:4px 0 0;font-size:11px;">Si ya la tienes, elígela de la lista para que se sume ahí (así casa con tu CRM). Si es nueva, sigue escribiendo y se creará.</p>
       </div>
       <div style="display:flex;gap:10px;">
         <div class="campo" style="flex:1;">
@@ -526,7 +527,7 @@ header{
   <div class="hoja">
     <div class="hoja-head"><h3>Histórico</h3><button class="cerrar" onclick="cerrar('mHistorico')">✕</button></div>
     <div class="hoja-cuerpo" id="histCuerpo"></div>
-    <div style="padding:8px 18px 0;text-align:center;font-size:9.5px;color:var(--filo);font-family:'IBM Plex Mono',monospace;">v2026-08-20-2000-wa-filtro-y-fecha-pedido</div>
+    <div style="padding:8px 18px 0;text-align:center;font-size:9.5px;color:var(--filo);font-family:'IBM Plex Mono',monospace;">v2026-08-20-2015-compra-manual-buscador</div>
     <div style="padding:14px 18px;border-top:1px solid var(--filo);">
       <div style="font-size:10px;color:var(--rojo);text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:7px;">Zona peligrosa</div>
       <button class="btn" style="width:100%;border-color:var(--rojo);color:var(--rojo);" onclick="resetearStock()">🗑 Resetear todo el stock</button>
@@ -914,6 +915,45 @@ function abrirCompra(){
   document.getElementById('cpProveedor').value = '';
   abrir('mCompra');
 }
+
+function buscarVariedadCompra(texto){
+  var stock = cargarStock();
+  var q = (texto||'').toLowerCase().trim();
+  var dd = document.getElementById('cpVariedadDD');
+  if(!q){ dd.classList.remove('open'); return; }
+  var claves = Object.keys(stock).filter(function(k){
+    var it = stock[k];
+    return nombreProducto(it.variedad, it.medida).toLowerCase().indexOf(q)>=0;
+  }).slice(0,40);
+  if(!claves.length){
+    dd.innerHTML = '<div class="so" style="color:var(--gris);font-style:italic;">Sin coincidencias — se creará como variedad nueva</div>';
+    dd.classList.add('open');
+    return;
+  }
+  dd.innerHTML = claves.map(function(k){
+    var it = stock[k];
+    return '<div class="so" data-k="'+k+'">'+nombreProducto(it.variedad,it.medida)+' <span class="disp-badge">'+(it.cantidad||0)+' '+(it.unidad||'')+'</span></div>';
+  }).join('');
+  dd.classList.add('open');
+  dd.querySelectorAll('.so[data-k]').forEach(function(el){
+    el.addEventListener('mousedown', function(e){
+      e.preventDefault();
+      var k = el.getAttribute('data-k');
+      var it = stock[k];
+      document.getElementById('cpVariedad').value = it.variedad;
+      document.getElementById('cpMedida').value = (it.medida && it.medida!=='—' && it.medida!=='-') ? it.medida : '';
+      document.getElementById('cpCultivo').value = it.cultivo || '';
+      document.getElementById('cpUnidad').value = it.unidad || 'paquetes';
+      dd.classList.remove('open');
+    });
+  });
+}
+document.addEventListener('click', function(e){
+  if(!e.target.closest('#mCompra .sw')){
+    var dd = document.getElementById('cpVariedadDD');
+    if(dd) dd.classList.remove('open');
+  }
+});
 
 function guardarCompraManual(){
   var variedad = document.getElementById('cpVariedad').value.trim().toUpperCase();
