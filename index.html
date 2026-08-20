@@ -404,6 +404,11 @@ header{
         <input type="text" id="pdCliente" placeholder="Nombre del cliente">
       </div>
       <div class="campo">
+        <label>Fecha de entrega</label>
+        <input type="date" id="pdFechaEntrega" onchange="cambioFechaPedido()">
+        <p class="nota" style="margin:4px 0 0;font-size:11px;" id="pdFechaAviso"></p>
+      </div>
+      <div class="campo">
         <label>Variedad</label>
         <div class="sw"><input class="si" id="pdVariedadTxt" placeholder="Buscar variedad…" autocomplete="off" oninput="buscarVariedadPedido(this.value)" onfocus="buscarVariedadPedido(this.value)"><div class="sd" id="pdVariedadDD"></div></div>
         <input type="hidden" id="pdClave">
@@ -414,7 +419,7 @@ header{
           <input type="number" id="pdCantidad" min="1">
         </div>
         <div class="campo" style="flex:1;">
-          <label>Disponible ahora</label>
+          <label>Disponible esa fecha</label>
           <input type="text" id="pdDisponible" disabled style="background:var(--fondo);color:var(--gris);font-family:'IBM Plex Mono',monospace;">
         </div>
       </div>
@@ -521,7 +526,7 @@ header{
   <div class="hoja">
     <div class="hoja-head"><h3>Histórico</h3><button class="cerrar" onclick="cerrar('mHistorico')">✕</button></div>
     <div class="hoja-cuerpo" id="histCuerpo"></div>
-    <div style="padding:8px 18px 0;text-align:center;font-size:9.5px;color:var(--filo);font-family:'IBM Plex Mono',monospace;">v2026-08-20-1330-pedidos</div>
+    <div style="padding:8px 18px 0;text-align:center;font-size:9.5px;color:var(--filo);font-family:'IBM Plex Mono',monospace;">v2026-08-20-2000-wa-filtro-y-fecha-pedido</div>
     <div style="padding:14px 18px;border-top:1px solid var(--filo);">
       <div style="font-size:10px;color:var(--rojo);text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:7px;">Zona peligrosa</div>
       <button class="btn" style="width:100%;border-color:var(--rojo);color:var(--rojo);" onclick="resetearStock()">🗑 Resetear todo el stock</button>
@@ -952,6 +957,8 @@ var _pdClaveElegida = null;
 
 function abrirPedido(){
   document.getElementById('pdCliente').value = '';
+  document.getElementById('pdFechaEntrega').value = hoyISO();
+  document.getElementById('pdFechaAviso').textContent = '';
   document.getElementById('pdVariedadTxt').value = '';
   document.getElementById('pdClave').value = '';
   document.getElementById('pdCantidad').value = '';
@@ -959,6 +966,19 @@ function abrirPedido(){
   document.getElementById('pdNota').value = '';
   _pdClaveElegida = null;
   abrir('mPedido');
+}
+
+function fechaEntregaPedidoElegida(){
+  return document.getElementById('pdFechaEntrega').value || hoyISO();
+}
+
+function cambioFechaPedido(){
+  var fecha = fechaEntregaPedidoElegida();
+  var aviso = document.getElementById('pdFechaAviso');
+  aviso.textContent = fecha>hoyISO() ? '📅 Mirando el disponible para el '+fmtFecha(fecha)+' (incluye lo que llegue hasta entonces).' : '';
+  // Si ya había una variedad elegida, recalcula el disponible con la nueva fecha
+  if(_pdClaveElegida) seleccionarVariedadPedido(_pdClaveElegida);
+  else if(document.getElementById('pdVariedadTxt').value) buscarVariedadPedido(document.getElementById('pdVariedadTxt').value);
 }
 
 function buscarVariedadPedido(texto){
@@ -971,10 +991,10 @@ function buscarVariedadPedido(texto){
     return !q || nombre.indexOf(q)>=0;
   }).slice(0,40);
   if(!claves.length){ dd.innerHTML = '<div class="so" style="color:var(--gris);font-style:italic;">Sin resultados</div>'; dd.classList.add('open'); return; }
-  var hoy = hoyISO();
+  var fecha = fechaEntregaPedidoElegida();
   dd.innerHTML = claves.map(function(k){
     var it = stock[k];
-    var disp = (it.cantidad||0) + sumaFuturasHasta(it, hoy) - sumaPedidosActivos(k);
+    var disp = (it.cantidad||0) + sumaFuturasHasta(it, fecha) - sumaPedidosActivos(k);
     var cls = disp>0 ? '' : 'cero';
     return '<div class="so" data-k="'+k+'">'+nombreProducto(it.variedad,it.medida)+' <span class="disp-badge '+cls+'">'+disp+'</span></div>';
   }).join('');
@@ -1002,12 +1022,14 @@ function seleccionarVariedadPedido(clave){
   document.getElementById('pdVariedadTxt').value = nombreProducto(it.variedad,it.medida);
   document.getElementById('pdClave').value = clave;
   document.getElementById('pdVariedadDD').classList.remove('open');
-  var hoy = hoyISO();
+  var fecha = fechaEntregaPedidoElegida();
   var fisico = it.cantidad||0;
   var comprometido = sumaPedidosActivos(clave);
-  var disp = fisico + sumaFuturasHasta(it, hoy) - comprometido;
+  var disp = fisico + sumaFuturasHasta(it, fecha) - comprometido;
+  var llegan = sumaFuturasHasta(it, fecha); // cuánto de ese disponible es "aún no ha llegado hoy"
   document.getElementById('pdDisponible').value = disp+' '+(it.unidad||'')
-    + (comprometido>0 ? '  (📦'+fisico+' físico, 🔒'+comprometido+' bloqueado)' : '');
+    + (comprometido>0 ? '  (📦'+fisico+' físico, 🔒'+comprometido+' bloqueado)' : '')
+    + (llegan>0 && fecha>hoyISO() ? '  (+'+llegan+' llega antes del '+fmtFecha(fecha)+')' : '');
 }
 
 function guardarPedido(){
@@ -1015,6 +1037,7 @@ function guardarPedido(){
   var clave = _pdClaveElegida;
   var cantidad = parseInt(document.getElementById('pdCantidad').value);
   var nota = document.getElementById('pdNota').value.trim();
+  var fechaEntrega = fechaEntregaPedidoElegida();
 
   if(!cliente){ toast('Escribe el cliente'); return; }
   if(!clave){ toast('Elige una variedad de la lista'); return; }
@@ -1023,9 +1046,8 @@ function guardarPedido(){
   var stock = cargarStock();
   var it = stock[clave];
   if(!it){ toast('Esa variedad ya no existe'); return; }
-  var hoy = hoyISO();
-  var disp = (it.cantidad||0) + sumaFuturasHasta(it, hoy) - sumaPedidosActivos(clave);
-  if(cantidad > disp && !confirm('Solo hay '+disp+' disponible y estás bloqueando '+cantidad+'.\n\n¿Bloquear igualmente? (quedará en negativo)')) return;
+  var disp = (it.cantidad||0) + sumaFuturasHasta(it, fechaEntrega) - sumaPedidosActivos(clave);
+  if(cantidad > disp && !confirm('Solo hay '+disp+' disponible para el '+fmtFecha(fechaEntrega)+' y estás bloqueando '+cantidad+'.\n\n¿Bloquear igualmente? (quedará en negativo)')) return;
 
   var pedidos = (_pedidosCache||[]).slice();
   var nuevo = {
@@ -1035,6 +1057,7 @@ function guardarPedido(){
     nombre: nombreProducto(it.variedad,it.medida),
     cantidad: cantidad,
     cliente: cliente,
+    fechaEntrega: fechaEntrega,
     nota: nota,
     estado: 'activo'
   };
@@ -1042,7 +1065,7 @@ function guardarPedido(){
   _pedidosCache = pedidos;
   refPedidos.set(pedidos).catch(function(err){ toast('⚠ No se guardó en la nube: '+err.message); console.error(err); });
 
-  registrarMovimiento({ tipo:'pedido_bloqueado', detalle:'🔒 Bloqueado: '+cantidad+' '+(it.unidad||'')+' de '+nuevo.nombre+' para '+cliente });
+  registrarMovimiento({ tipo:'pedido_bloqueado', detalle:'🔒 Bloqueado: '+cantidad+' '+(it.unidad||'')+' de '+nuevo.nombre+' para '+cliente+(fechaEntrega!==hoyISO()?' (entrega '+fmtFecha(fechaEntrega)+')':'') });
 
   cerrar('mPedido');
   toast('🔒 Bloqueado para '+cliente);
@@ -1057,10 +1080,13 @@ function abrirListaPedidos(){
     cuerpo.innerHTML = activos.map(function(p){
       var fecha = new Date(p.t);
       var cuando = fmtFecha(fechaLocalISO(fecha))+' · '+fecha.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+      var entrega = p.fechaEntrega && p.fechaEntrega!==hoyISO()
+        ? ' · <span style="color:var(--oro);font-weight:600;">📅 entrega '+fmtFecha(p.fechaEntrega)+'</span>'
+        : '';
       return '<div class="pedido-item">'+
         '<div class="top"><span class="cliente">'+p.cliente+'</span><span class="cant">'+p.cantidad+'</span></div>'+
         '<div class="variedad">'+p.nombre+'</div>'+
-        '<div class="meta">'+cuando+(p.nota?' · «'+p.nota+'»':'')+'</div>'+
+        '<div class="meta">'+cuando+entrega+(p.nota?' · «'+p.nota+'»':'')+'</div>'+
         '<div class="acciones-pedido">'+
           '<button class="btn-entregar" onclick="marcarEntregado(\''+p.id+'\')">✓ Entregado</button>'+
           '<button class="btn-cancelar" onclick="cancelarPedido(\''+p.id+'\')">✕ Cancelar</button>'+
