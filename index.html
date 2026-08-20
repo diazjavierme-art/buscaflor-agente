@@ -684,7 +684,11 @@ function renderStock(){
     items.forEach(function(it){
       var fisico = it.cantidad||0;
       var cRef = fisico + sumaFuturasHasta(it, dias[0]);
-      if(cRef===0) return; // sin stock en la fecha de referencia — no se muestra
+      // Se oculta solo si está a cero en TODA la ventana visible (hoy y los 3 días siguientes)
+      // — si hay algo disponible o llegando en cualquiera de esos días, se muestra igual,
+      // aunque hoy en concreto sea 0 (ej. una compra que llega mañana).
+      var hayAlgoEnVentana = dias.some(function(f){ return (fisico + sumaFuturasHasta(it, f)) !== 0; });
+      if(!hayAlgoEnVentana) return;
       var medidaTxt = (it.medida && it.medida!=='—' && it.medida!=='-') ? ' <span class="f-med">'+it.medida+'</span>' : '';
       filasHtml += '<div class="fila">';
       filasHtml += '<span class="f-nombre">'+nombreCorto(cult, it.variedad)+medidaTxt+'</span>';
@@ -696,7 +700,7 @@ function renderStock(){
       filasHtml += '<button class="f-edit" data-k="'+it._k+'" title="Ajustar">✎</button>';
       filasHtml += '</div>';
     });
-    if(!filasHtml) return; // todas a cero en esta fecha — no se muestra ni el cultivo
+    if(!filasHtml) return; // todas a cero en toda la ventana — no se muestra ni el cultivo
     html += filasHtml;
     html += '</div>';
   });
@@ -1792,25 +1796,33 @@ function exportarWhatsApp(){
   var stock = cargarStock();
   var claves = Object.keys(stock);
   if(!claves.length){ toast('No hay stock cargado'); return; }
+
+  var fechaRef = _fechaBase || hoyISO();
+  var esHoyReal = fechaRef===hoyISO();
+
   var porCult = {};
   claves.forEach(function(k){
     var it = stock[k];
-    if((it.cantidad||0) <= 0) return;
+    var disp = (it.cantidad||0) + sumaFuturasHasta(it, fechaRef);
+    if(disp <= 0) return;
     var c = it.cultivo||'OTROS';
     if(!porCult[c]) porCult[c]=[];
-    porCult[c].push(it);
+    porCult[c].push({it:it, disp:disp});
   });
+  if(!Object.keys(porCult).length){ toast('Nada disponible para esa fecha'); return; }
+
   var orden = ['ROSAS','ALSTROEMERIAS','ALSTROEMERIA','CLAVELES','CLAVEL','HORTENSIAS','GYPSOPHILA','OTROS'];
-  var lineas = ['🌸 *BUSCAFLOR — Disponibilidad*', fmtFecha(hoyISO()), ''];
+  var tituloFecha = esHoyReal ? fmtFecha(hoyISO()) : 'Disponible a '+fmtFecha(fechaRef);
+  var lineas = ['🌸 *BUSCAFLOR — Disponibilidad*', tituloFecha, ''];
   Object.keys(porCult).sort(function(a,b){
     var ia=orden.indexOf(a), ib=orden.indexOf(b);
     if(ia<0)ia=99; if(ib<0)ib=99;
     return ia-ib || a.localeCompare(b);
   }).forEach(function(c){
     lineas.push('*'+c+'*  _('+unidadDeCultivo(c)+')_');
-    porCult[c].sort(function(a,b){ return ((a.variedad||'')+(a.medida||'')).localeCompare((b.variedad||'')+(b.medida||'')); })
-      .forEach(function(it){
-        lineas.push('• '+nombreProducto(it.variedad,it.medida)+' — '+it.cantidad);
+    porCult[c].sort(function(a,b){ return ((a.it.variedad||'')+(a.it.medida||'')).localeCompare((b.it.variedad||'')+(b.it.medida||'')); })
+      .forEach(function(x){
+        lineas.push('• '+nombreProducto(x.it.variedad,x.it.medida)+' — '+x.disp);
       });
     lineas.push('');
   });
