@@ -173,6 +173,15 @@ header{
 .pedido-item .btn-entregar{background:var(--verde);color:#fff;border:none;}
 .pedido-item .btn-cancelar{background:none;color:var(--rojo);border:1px solid var(--rojo);}
 
+/* ── Selección de cultivos para WhatsApp ── */
+.cultivo-check{
+  display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--filo);
+  border-radius:8px;margin-bottom:6px;cursor:pointer;background:var(--papel);
+}
+.cultivo-check input{width:18px;height:18px;flex-shrink:0;}
+.cultivo-check .nombre{font-weight:600;font-size:13px;color:var(--tinta);flex:1;}
+.cultivo-check .cuenta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gris);}
+
 .nota{font-size:12px;color:var(--gris);line-height:1.55;margin-bottom:12px;}
 .subir-zona{
   width:100%;padding:14px;border:1.5px dashed var(--navy);border-radius:8px;
@@ -266,7 +275,7 @@ header{
   <button class="btn" onclick="abrirCompra()">＋ Compra manual</button>
   <button class="btn destacado" onclick="abrirPedido()">📞 Pedido</button>
   <button class="btn" onclick="abrirCierre()">Cierre</button>
-  <button class="btn" onclick="exportarWhatsApp()">WhatsApp</button>
+  <button class="btn" onclick="abrirSeleccionWhatsApp()">WhatsApp</button>
   <button class="btn" onclick="abrirListaPedidos()">📋 Pedidos</button>
   <button class="btn" onclick="abrirHistorico()" style="flex:0 0 44px;">☰</button>
 </div>
@@ -428,6 +437,25 @@ header{
     <div class="hoja-cuerpo" id="listaPedidosCuerpo"></div>
     <div class="hoja-pie">
       <button class="btn primario" onclick="cerrar('mListaPedidos')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL · Elegir qué mandar por WhatsApp -->
+<div class="modal" id="mSeleccionWhatsApp">
+  <div class="hoja">
+    <div class="hoja-head"><h3>💬 Enviar por WhatsApp</h3><button class="cerrar" onclick="cerrar('mSeleccionWhatsApp')">✕</button></div>
+    <div class="hoja-cuerpo">
+      <p class="nota">Elige qué cultivos incluir en el mensaje.</p>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <button class="btn" style="flex:1;" onclick="marcarTodosCultivosWA(true)">Marcar todo</button>
+        <button class="btn" style="flex:1;" onclick="marcarTodosCultivosWA(false)">Ninguno</button>
+      </div>
+      <div id="listaCultivosWA"></div>
+    </div>
+    <div class="hoja-pie">
+      <button class="btn" onclick="cerrar('mSeleccionWhatsApp')">Cancelar</button>
+      <button class="btn primario" onclick="confirmarEnvioWhatsApp()">💬 Enviar</button>
     </div>
   </div>
 </div>
@@ -1084,7 +1112,7 @@ function cancelarPedido(id){
 /* ══ MODALES base ══ */
 function abrir(id){ document.getElementById(id).classList.add('abierto'); }
 function cerrar(id){ document.getElementById(id).classList.remove('abierto'); }
-['mSubida','mCierre','mAjuste','mHistorico','mApiKey','mCompra','mPedido','mListaPedidos'].forEach(function(id){
+['mSubida','mCierre','mAjuste','mHistorico','mApiKey','mCompra','mPedido','mListaPedidos','mSeleccionWhatsApp'].forEach(function(id){
   document.getElementById(id).addEventListener('click', function(e){ if(e.target===this) cerrar(id); });
 });
 
@@ -2284,7 +2312,45 @@ function guardarApiKey(){
 }
 
 /* ══ EXPORTAR WHATSAPP ══ */
-function exportarWhatsApp(){
+function abrirSeleccionWhatsApp(){
+  var stock = cargarStock();
+  var fechaRef = _fechaBase || hoyISO();
+  var porCult = {};
+  Object.keys(stock).forEach(function(k){
+    var it = stock[k];
+    var disp = (it.cantidad||0) + sumaFuturasHasta(it, fechaRef) - sumaPedidosActivos(k);
+    if(disp<=0) return;
+    var c = it.cultivo||'OTROS';
+    porCult[c] = (porCult[c]||0) + 1;
+  });
+  var cultivos = Object.keys(porCult);
+  if(!cultivos.length){ toast('Nada disponible para mandar'); return; }
+
+  var orden = ['ROSAS','ALSTROEMERIAS','ALSTROEMERIA','CLAVELES','CLAVEL','HORTENSIAS','GYPSOPHILA','OTROS'];
+  cultivos.sort(function(a,b){
+    var ia=orden.indexOf(a), ib=orden.indexOf(b);
+    if(ia<0)ia=99; if(ib<0)ib=99;
+    return ia-ib || a.localeCompare(b);
+  });
+
+  document.getElementById('listaCultivosWA').innerHTML = cultivos.map(function(c){
+    return '<label class="cultivo-check"><input type="checkbox" class="wa-cultivo-chk" value="'+c.replace(/"/g,'&quot;')+'" checked><span class="nombre">'+c+'</span><span class="cuenta">'+porCult[c]+' variedad'+(porCult[c]!==1?'es':'')+'</span></label>';
+  }).join('');
+  abrir('mSeleccionWhatsApp');
+}
+
+function marcarTodosCultivosWA(marcar){
+  document.querySelectorAll('.wa-cultivo-chk').forEach(function(chk){ chk.checked = marcar; });
+}
+
+function confirmarEnvioWhatsApp(){
+  var elegidos = Array.prototype.map.call(document.querySelectorAll('.wa-cultivo-chk:checked'), function(chk){ return chk.value; });
+  if(!elegidos.length){ toast('Marca al menos un cultivo'); return; }
+  cerrar('mSeleccionWhatsApp');
+  exportarWhatsApp(elegidos);
+}
+
+function exportarWhatsApp(cultivosElegidos){
   var stock = cargarStock();
   var claves = Object.keys(stock);
   if(!claves.length){ toast('No hay stock cargado'); return; }
@@ -2295,13 +2361,14 @@ function exportarWhatsApp(){
   var porCult = {};
   claves.forEach(function(k){
     var it = stock[k];
+    var c = it.cultivo||'OTROS';
+    if(cultivosElegidos && cultivosElegidos.indexOf(c)<0) return; // no seleccionado — se omite
     var disp = (it.cantidad||0) + sumaFuturasHasta(it, fechaRef) - sumaPedidosActivos(k);
     if(disp <= 0) return;
-    var c = it.cultivo||'OTROS';
     if(!porCult[c]) porCult[c]=[];
     porCult[c].push({it:it, disp:disp});
   });
-  if(!Object.keys(porCult).length){ toast('Nada disponible para esa fecha'); return; }
+  if(!Object.keys(porCult).length){ toast('Nada disponible para esa selección'); return; }
 
   var orden = ['ROSAS','ALSTROEMERIAS','ALSTROEMERIA','CLAVELES','CLAVEL','HORTENSIAS','GYPSOPHILA','OTROS'];
   var tituloFecha = esHoyReal ? fmtFecha(hoyISO()) : 'Disponible a '+fmtFecha(fechaRef);
