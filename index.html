@@ -60,18 +60,10 @@ header{
   display:flex;align-items:center;gap:7px;flex-wrap:wrap;
 }
 .proy-lbl{font-size:10.5px;color:var(--gris);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;}
-.proy-chips{display:flex;gap:5px;flex-wrap:wrap;}
-.proy-chip{
-  padding:4px 11px;border-radius:20px;border:1px solid var(--filo);background:var(--papel);
-  font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;font-weight:600;color:var(--gris);cursor:pointer;
-}
-.proy-chip.activo{background:var(--navy);color:#fff;border-color:var(--navy);}
 .proy-custom{
   border:1px solid var(--filo);border-radius:20px;padding:4px 9px;font-size:11px;
   font-family:'IBM Plex Sans',sans-serif;background:var(--papel);color:var(--gris);outline:none;
 }
-.proy-custom.activo{background:var(--navy);color:#fff;border-color:var(--navy);color-scheme:dark;}
-.f-mas{font-size:10px;color:var(--oro);font-weight:700;margin-left:3px;}
 
 /* ── Buscador ── */
 .busca-wrap{padding:10px 14px 4px;}
@@ -85,30 +77,33 @@ header{
 .contenido{padding:10px 14px 90px;}
 .cultivo{margin-bottom:18px;}
 .cult-head{
-  display:flex;justify-content:space-between;align-items:baseline;
-  padding:7px 10px;background:var(--navy-suave);border-radius:6px 6px 0 0;
+  display:grid;grid-template-columns:1fr repeat(6,26px) 24px;gap:2px;align-items:end;
+  padding:7px 6px;background:var(--navy-suave);border-radius:6px 6px 0 0;
 }
 .cult-nombre{
-  font-family:'IBM Plex Sans',sans-serif;font-size:13px;font-weight:700;color:var(--navy);
-  letter-spacing:0.04em;text-transform:uppercase;
+  font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;font-weight:700;color:var(--navy);
+  letter-spacing:0.02em;text-transform:uppercase;
 }
-.cult-unidad{font-size:10px;color:var(--gris);text-transform:uppercase;letter-spacing:0.08em;font-family:'IBM Plex Mono',monospace;}
+.cult-unidad{font-size:9px;color:var(--gris);text-transform:uppercase;letter-spacing:0.02em;font-family:'IBM Plex Mono',monospace;font-weight:400;margin-left:4px;}
+.col-dia{font-size:8px;color:var(--gris);text-align:right;font-weight:700;line-height:1.15;}
+.col-dia b{display:block;font-size:7.5px;color:var(--navy);font-weight:700;}
 .fila{
-  display:flex;align-items:center;padding:9px 10px;border-bottom:1px solid var(--filo);gap:8px;
-  background:var(--papel);
+  display:grid;grid-template-columns:1fr repeat(6,26px) 24px;gap:2px;align-items:center;
+  padding:7px 6px;border-bottom:1px solid var(--filo);background:var(--papel);
 }
 .fila:last-child{border-radius:0 0 6px 6px;}
-.f-nombre{flex:1;font-size:13.5px;}
-.f-medida{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--gris);min-width:34px;}
+.f-nombre{font-size:11.5px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.f-nombre .f-med{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--gris);}
 .f-cant{
-  font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;min-width:52px;text-align:right;
+  font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;text-align:right;
   color:var(--verde);
 }
 .f-cant.cero{color:var(--gris);}
 .f-cant.neg{color:var(--rojo);}
+.f-cant.futuro{color:var(--oro);}
 .f-edit{
-  background:none;border:1px solid var(--filo);border-radius:6px;color:var(--gris);
-  cursor:pointer;font-size:12px;padding:4px 8px;flex-shrink:0;
+  background:none;border:1px solid var(--filo);border-radius:5px;color:var(--gris);
+  cursor:pointer;font-size:12px;padding:3px 0;flex-shrink:0;
 }
 .f-edit:active{border-color:var(--navy);color:var(--navy);}
 
@@ -237,9 +232,9 @@ header{
 </div>
 
 <div class="proyeccion">
-  <span class="proy-lbl">Disponible a fecha:</span>
-  <div class="proy-chips" id="proyChips"></div>
+  <span class="proy-lbl">Otra fecha:</span>
   <input type="date" id="proyFechaCustom" class="proy-custom" onchange="fijarProyeccion(this.value)">
+  <span class="proy-lbl" id="proyFechaLbl" style="color:var(--oro);"></span>
 </div>
 
 
@@ -390,6 +385,7 @@ header{
   <div class="hoja">
     <div class="hoja-head"><h3>Histórico</h3><button class="cerrar" onclick="cerrar('mHistorico')">✕</button></div>
     <div class="hoja-cuerpo" id="histCuerpo"></div>
+    <div style="padding:8px 18px 0;text-align:center;font-size:9.5px;color:var(--filo);font-family:'IBM Plex Mono',monospace;">v2026-08-19-2352</div>
     <div style="padding:14px 18px;border-top:1px solid var(--filo);">
       <div style="font-size:10px;color:var(--rojo);text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:7px;">Zona peligrosa</div>
       <button class="btn" style="width:100%;border-color:var(--rojo);color:var(--rojo);" onclick="resetearStock()">🗑 Resetear todo el stock</button>
@@ -458,6 +454,22 @@ function cargarStock(){ return _stockCache || {}; }
 function guardarStock(s){ _stockCache = s; refStock.set(s); renderStock(); }
 function cargarLog(){ return _logCache || []; }
 function cargarMeta(){ return _metaCache || []; }
+
+// fetch con límite de tiempo real: si la red se cuelga a mitad de camino (típico en
+// móvil), esto SIEMPRE falla pasados 30s en vez de dejar la petición esperando para
+// siempre — así ningún botón/candado puede quedarse "pillado" eternamente.
+function fetchConTimeout(url, opciones, segundos){
+  var controlador = new AbortController();
+  var timer = setTimeout(function(){ controlador.abort(); }, (segundos||30)*1000);
+  var opts = Object.assign({}, opciones, { signal: controlador.signal });
+  return fetch(url, opts)
+    .then(function(r){ clearTimeout(timer); return r; })
+    .catch(function(err){
+      clearTimeout(timer);
+      if(err.name==='AbortError') throw new Error('Sin respuesta tras 30s — revisa la conexión y reintenta');
+      throw err;
+    });
+}
 function registrarMovimiento(mov){
   var log = (_logCache||[]).slice();
   mov.t = Date.now();
@@ -505,7 +517,7 @@ function fmtFecha(iso){
    item.cantidad = disponible físico HOY (lo de siempre).
    item.futuras  = [{cantidad, fecha, origen}] compras que llegan más adelante.
    Proyectado a una fecha X = cantidad + suma de futuras con fecha <= X. */
-var _fechaProyeccion = hoyISO();
+var _fechaProyeccion = '';  // solo se usa para el total de "otra fecha" — la tabla ya muestra Hoy/Mañana/+7d siempre
 
 function sumaFuturasHasta(item, fecha){
   if(!item.futuras || !item.futuras.length) return 0;
@@ -543,38 +555,38 @@ function reconciliarFuturas(){
   }
 }
 
-function renderChipsProyeccion(){
-  var hoy = hoyISO();
-  var m = new Date(); m.setDate(m.getDate()+1);
-  var manana = m.toISOString().split('T')[0];
-  var opciones = [
-    {lbl:'Hoy', val:hoy},
-    {lbl:'Mañana', val:manana}
-  ];
-  document.getElementById('proyChips').innerHTML = opciones.map(function(o){
-    return '<button class="proy-chip'+(_fechaProyeccion===o.val?' activo':'')+'" data-f="'+o.val+'">'+o.lbl+'</button>';
-  }).join('');
-  document.querySelectorAll('.proy-chip').forEach(function(b){
-    b.addEventListener('click', function(){ fijarProyeccion(b.getAttribute('data-f')); });
-  });
-  var esOtra = _fechaProyeccion!==hoy && _fechaProyeccion!==manana;
-  var custom = document.getElementById('proyFechaCustom');
-  custom.value = esOtra ? _fechaProyeccion : '';
-  custom.classList.toggle('activo', esOtra);
-}
 function fijarProyeccion(fecha){
-  _fechaProyeccion = fecha || hoyISO();
-  renderStock();
+  _fechaProyeccion = fecha || '';
+  var lbl = document.getElementById('proyFechaLbl');
+  if(!_fechaProyeccion || _fechaProyeccion<=hoyISO()){
+    lbl.textContent = '';
+    return;
+  }
+  var stock = cargarStock();
+  var total = 0;
+  Object.keys(stock).forEach(function(k){
+    total += (stock[k].cantidad||0) + sumaFuturasHasta(stock[k], _fechaProyeccion);
+  });
+  lbl.textContent = 'Total a '+fmtFecha(_fechaProyeccion)+': '+total+' uds';
 }
 
 function renderStock(){
   var stock = cargarStock();
   var claves = Object.keys(stock);
   var busqueda = (document.getElementById('buscador').value||'').toLowerCase().trim();
-  var hoy = hoyISO();
-  var proyectando = _fechaProyeccion > hoy;
 
-  renderChipsProyeccion();
+  // Hoy + los próximos 5 días — semana corrida, cada uno con su fecha real
+  var dias = [];
+  for(var i=0;i<6;i++){
+    var d = new Date(); d.setDate(d.getDate()+i);
+    dias.push(d.toISOString().split('T')[0]);
+  }
+  var D=['D','L','M','X','J','V','S'];
+  var cabecerasDias = dias.map(function(f,i){
+    var d = new Date(f+'T00:00:00');
+    var letra = i===0 ? 'HOY' : D[d.getDay()];
+    return '<span class="col-dia">'+letra+'<b>'+d.getDate()+'</b></span>';
+  }).join('');
 
   // Vacío
   var cont = document.getElementById('contenido');
@@ -608,17 +620,18 @@ function renderStock(){
       if(!items.length) return;
     }
     html += '<div class="cultivo">';
-    html += '<div class="cult-head"><span class="cult-nombre">'+cult+'</span><span class="cult-unidad">'+unidadDeCultivo(cult)+'</span></div>';
+    html += '<div class="cult-head"><span class="cult-nombre">'+cult+'<span class="cult-unidad">'+unidadDeCultivo(cult)+'</span></span>'+cabecerasDias+'<span></span></div>';
     items.forEach(function(it){
       var base = it.cantidad||0;
-      var extra = proyectando ? sumaFuturasHasta(it, _fechaProyeccion) : 0;
-      var c = base + extra;
-      var cls = c<0 ? 'neg' : c===0 ? 'cero' : '';
+      var medidaTxt = (it.medida && it.medida!=='—') ? ' <span class="f-med">'+it.medida+'</span>' : '';
       html += '<div class="fila">';
-      html += '<span class="f-nombre">'+(it.variedad||'')+'</span>';
-      html += '<span class="f-medida">'+(it.medida && it.medida!=='—' ? it.medida : '')+'</span>';
-      html += '<span class="f-cant '+cls+'">'+c+(extra>0?'<span class="f-mas"> +'+extra+'</span>':'')+'</span>';
-      html += '<button class="f-edit" data-k="'+it._k+'">Ajustar</button>';
+      html += '<span class="f-nombre">'+(it.variedad||'')+medidaTxt+'</span>';
+      dias.forEach(function(f,i){
+        var v = base + sumaFuturasHasta(it, f);
+        var cls = v<0 ? 'neg' : v===0 ? 'cero' : (i>0 && v>base) ? 'futuro' : '';
+        html += '<span class="f-cant '+cls+'">'+v+'</span>';
+      });
+      html += '<button class="f-edit" data-k="'+it._k+'" title="Ajustar">✎</button>';
       html += '</div>';
     });
     html += '</div>';
@@ -630,6 +643,7 @@ function renderStock(){
   cont.querySelectorAll('.f-edit').forEach(function(b){
     b.addEventListener('click', function(){ abrirAjuste(b.getAttribute('data-k')); });
   });
+  fijarProyeccion(_fechaProyeccion);
 }
 
 /* ══ COMPRA MANUAL (proveedores sin Excel, ej. Verdnatura) ══ */
@@ -1012,7 +1026,7 @@ function leerUnDocumentoVerdnatura(file, apiKey){
         ? { type:'document', source:{ type:'base64', media_type:'application/pdf', data:base64 } }
         : { type:'image', source:{ type:'base64', media_type:(file.type||'image/png'), data:base64 } };
 
-      fetch('https://api.anthropic.com/v1/messages', {
+      fetchConTimeout('https://api.anthropic.com/v1/messages', {
         method:'POST',
         headers:{
           'Content-Type':'application/json',
@@ -1093,9 +1107,15 @@ function confirmarExcel(){
       }
     }
 
-    // A partir de aquí sí se sube de verdad — bloqueamos el botón para que no se pueda repetir
+    // A partir de aquí sí se sube de verdad — bloqueamos el botón para que no se pueda repetir.
+    // Red de seguridad: pase lo que pase (incluso un fallo que no hayamos previsto), el botón
+    // se libera solo a los 5s como máximo — nunca puede quedarse pillado para siempre.
     _subiendoStock = true;
     if(boton){ boton.disabled = true; boton.textContent = 'Cargando…'; }
+    var vigilante = setTimeout(function(){
+      _subiendoStock = false;
+      if(boton){ boton.disabled = false; boton.textContent = 'Cargar al stock'; }
+    }, 5000);
 
     var fechaCarga = document.getElementById('xlFechaDisponible').value || hoyISO();
     var esFutura = fechaCarga > hoyISO();
@@ -1136,6 +1156,7 @@ function confirmarExcel(){
     toast('⚠ Error al cargar: '+(err.message||err)+' — puedes reintentar');
     console.error('confirmarExcel:', err);
   } finally {
+    clearTimeout(vigilante);
     _subiendoStock = false;
     if(boton){ boton.disabled = false; boton.textContent = 'Cargar al stock'; }
   }
@@ -1174,7 +1195,7 @@ function leerCierreArchivo(e){
       var base64 = ev.target.result.split(',')[1];
       document.getElementById('cargandoCierre').classList.add('activo');
       document.getElementById('cierrePreview').innerHTML = '';
-      fetch('https://api.anthropic.com/v1/messages', {
+      fetchConTimeout('https://api.anthropic.com/v1/messages', {
         method:'POST',
         headers:{
           'Content-Type':'application/json',
