@@ -117,14 +117,6 @@ header{
 .vacio h2{font-family:'IBM Plex Sans',sans-serif;font-size:17px;color:var(--navy);margin-bottom:8px;font-weight:600;}
 .vacio p{font-size:13px;line-height:1.6;}
 
-/* ── Vuelos cargados ── */
-.vuelos{padding:2px 14px 8px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;}
-.vuelos-lbl{font-size:10px;color:var(--gris);text-transform:uppercase;letter-spacing:0.1em;}
-.vuelo-tag{
-  font-family:'IBM Plex Mono',monospace;font-size:10.5px;background:var(--navy-suave);
-  color:var(--navy);padding:2px 8px;border-radius:4px;border:1px solid var(--filo);
-}
-
 /* ── Modales (hoja inferior) ── */
 .modal{position:fixed;inset:0;background:rgba(27,34,41,0.5);z-index:100;display:none;align-items:flex-end;justify-content:center;}
 .modal.abierto{display:flex;}
@@ -251,8 +243,6 @@ header{
 </div>
 
 
-<div class="vuelos" id="vuelosCargados"></div>
-
 <div class="busca-wrap">
   <input class="busca" id="buscador" placeholder="Buscar variedad…" oninput="renderStock()">
 </div>
@@ -282,7 +272,7 @@ header{
     </div>
     <div class="hoja-pie" id="pieSubida" style="display:none;">
       <button class="btn" onclick="cancelarExcel()">Cancelar</button>
-      <button class="btn primario" onclick="confirmarExcel()">Cargar al stock</button>
+      <button class="btn primario" id="btnCargarStock" onclick="confirmarExcel()">Cargar al stock</button>
     </div>
   </div>
 </div>
@@ -586,25 +576,6 @@ function renderStock(){
 
   renderChipsProyeccion();
 
-  var meta = cargarMeta();
-  var metaUnica = [];
-  var vistos = {};
-  meta.forEach(function(m){
-    var id = m.awb || m.titulo || 'carga';
-    if(vistos[id]) return;
-    vistos[id] = true;
-    metaUnica.push(m);
-  });
-
-  // Vuelos cargados (sin repetir, aunque en el histórico antiguo hubiera duplicados)
-  var vHtml = '';
-  if(metaUnica.length){
-    vHtml = '<span class="vuelos-lbl">Compras:</span>' + metaUnica.map(function(m){
-      return '<span class="vuelo-tag">'+(m.awb||m.titulo||'carga')+'</span>';
-    }).join('');
-  }
-  document.getElementById('vuelosCargados').innerHTML = vHtml;
-
   // Vacío
   var cont = document.getElementById('contenido');
   if(!claves.length){
@@ -731,6 +702,11 @@ function abrirSubida(){
   document.getElementById('previewExcel').style.display = 'none';
   document.getElementById('pieSubida').style.display = 'none';
   _excelPreview = null;
+  _subiendoStock = false;
+  _procesandoArchivo = false;
+  bloquearZonasSubida(false);
+  var boton = document.getElementById('btnCargarStock');
+  if(boton){ boton.disabled = false; boton.textContent = 'Cargar al stock'; }
   abrir('mSubida');
 }
 
@@ -739,9 +715,22 @@ function leerExcel(e){
   e.target.value = '';
   if(file) procesarArchivoExcel(file);
 }
+var _procesandoArchivo = false;  // evita leer varios archivos a la vez (soltar/click repetido)
+
+function bloquearZonasSubida(bloquear){
+  ['dzExcel','dzVerdnatura'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.style.pointerEvents = bloquear ? 'none' : '';
+    if(el) el.style.opacity = bloquear ? '0.5' : '';
+  });
+}
+
 function procesarArchivoExcel(file){
   if(!file) return;
+  if(_procesandoArchivo){ toast('Ya se está leyendo un archivo, espera un momento…'); return; }
   if(typeof XLSX === 'undefined'){ toast('La librería de Excel no cargó — revisa la conexión'); return; }
+  _procesandoArchivo = true;
+  bloquearZonasSubida(true);
   document.getElementById('cargandoExcel').classList.add('activo');
   document.getElementById('previewExcel').style.display = 'none';
   var rd = new FileReader();
@@ -876,7 +865,16 @@ function procesarArchivoExcel(file){
     }catch(err){
       document.getElementById('cargandoExcel').classList.remove('activo');
       toast(err.message||'Error leyendo el Excel');
+    } finally {
+      _procesandoArchivo = false;
+      bloquearZonasSubida(false);
     }
+  };
+  rd.onerror = function(){
+    document.getElementById('cargandoExcel').classList.remove('activo');
+    _procesandoArchivo = false;
+    bloquearZonasSubida(false);
+    toast('No se pudo leer el archivo');
   };
   rd.readAsArrayBuffer(file);
 }
@@ -915,9 +913,12 @@ function leerVerdnatura(e){
 // duplicados, aunque se carguen juntos.
 function procesarArchivosVerdnatura(files){
   if(!files || !files.length) return;
+  if(_procesandoArchivo){ toast('Ya se está leyendo, espera un momento…'); return; }
   var apiKey = localStorage.getItem(CLAVES.apikey);
   if(!apiKey){ toast('Guarda antes la API Key (☰ Histórico → API Key)'); return; }
 
+  _procesandoArchivo = true;
+  bloquearZonasSubida(true);
   document.getElementById('cargandoExcel').classList.add('activo');
   document.getElementById('previewExcel').style.display = 'none';
 
@@ -938,6 +939,8 @@ function procesarArchivosVerdnatura(files){
   function terminar(){
     document.getElementById('cargandoExcel').classList.remove('activo');
     document.getElementById('cargandoExcel').textContent = 'Leyendo el documento…';
+    _procesandoArchivo = false;
+    bloquearZonasSubida(false);
     if(!documentos.length){
       toast(errores.length ? errores[0] : 'No se pudo leer ningún documento');
       return;
@@ -1065,57 +1068,77 @@ function cancelarExcel(){
   document.getElementById('pieSubida').style.display='none';
 }
 
+var _subiendoStock = false;  // evita que un doble-clic (o Firebase tardando) duplique la carga
+
 function confirmarExcel(){
+  if(_subiendoStock){ toast('Ya se está cargando, espera un momento…'); return; }
   if(!_excelPreview || !_excelPreview.lineas.length) return;
-  var existente = cargarStock();
-  var meta = cargarMeta();
 
-  // Si viene de un solo Excel de AWB (sin .documentos), se comporta como siempre: 1 identificador.
-  // Si viene de Verdnatura con varios archivos, .documentos trae uno por cada documento incluido
-  // (los duplicados ya se filtraron solos antes del preview) — cada uno genera su propia entrada.
-  var documentos = _excelPreview.documentos || [{ awb:_excelPreview.awb, fecha:_excelPreview.fecha, titulo:_excelPreview.titulo, lineas:_excelPreview.lineas.length }];
+  var boton = document.getElementById('btnCargarStock');
 
-  if(!_excelPreview.documentos){
-    var yaCargado = _excelPreview.awb && meta.some(function(m){ return m.awb===_excelPreview.awb; });
-    if(yaCargado){
-      var seguro = confirm('⚠ «'+_excelPreview.awb+'» YA ESTÁ CARGADO.\n\nSi confirmas, esta cantidad se sumará OTRA VEZ (quedará duplicada).\n\n¿Seguro que quieres subirlo de todos modos?');
-      if(!seguro) return;
+  try{
+    var existente = cargarStock();
+    var meta = cargarMeta();
+
+    // Si viene de un solo Excel de AWB (sin .documentos), se comporta como siempre: 1 identificador.
+    // Si viene de Verdnatura con varios archivos, .documentos trae uno por cada documento incluido
+    // (los duplicados ya se filtraron solos antes del preview) — cada uno genera su propia entrada.
+    var documentos = _excelPreview.documentos || [{ awb:_excelPreview.awb, fecha:_excelPreview.fecha, titulo:_excelPreview.titulo, lineas:_excelPreview.lineas.length }];
+
+    if(!_excelPreview.documentos){
+      var yaCargado = _excelPreview.awb && meta.some(function(m){ return m.awb===_excelPreview.awb; });
+      if(yaCargado){
+        var seguro = confirm('⚠ «'+_excelPreview.awb+'» YA ESTÁ CARGADO.\n\nSi confirmas, esta cantidad se sumará OTRA VEZ (quedará duplicada).\n\n¿Seguro que quieres subirlo de todos modos?');
+        if(!seguro) return;
+      }
     }
+
+    // A partir de aquí sí se sube de verdad — bloqueamos el botón para que no se pueda repetir
+    _subiendoStock = true;
+    if(boton){ boton.disabled = true; boton.textContent = 'Cargando…'; }
+
+    var fechaCarga = document.getElementById('xlFechaDisponible').value || hoyISO();
+    var esFutura = fechaCarga > hoyISO();
+    var origen = _excelPreview.awb || 'compra';
+
+    var stock = Object.assign({}, existente);
+    var nuevas=0, sumadas=0, futuras=0;
+    _excelPreview.lineas.forEach(function(l){
+      var k = claveProducto(nombreProducto(l.variedad,l.medida));
+      if(!stock[k]) stock[k] = {cultivo:l.cultivo, variedad:l.variedad, medida:l.medida, cantidad:0, unidad:l.unidad, futuras:[]};
+      if(!stock[k].futuras) stock[k].futuras = [];
+      if(esFutura){
+        stock[k].futuras.push({cantidad:l.cantidad, fecha:fechaCarga, origen:origen});
+        futuras++;
+      } else {
+        stock[k].cantidad += l.cantidad;
+        (stock[k].cantidad===l.cantidad) ? nuevas++ : sumadas++;
+      }
+    });
+
+    var metaNuevas = documentos.map(function(d){
+      return { awb:d.awb, fecha_carga:new Date().toISOString(), fecha_inventario:(d.fecha||fechaCarga), titulo:d.titulo, lineas:d.lineas };
+    });
+    guardarMeta(meta.concat(metaNuevas));
+
+    registrarMovimiento({
+      tipo: esFutura ? 'vuelo_futuro' : 'vuelo_anadido',
+      detalle: (esFutura ? 'Próxima entrada ('+fmtFecha(fechaCarga)+'): ' : 'Compra sumada: ')+documentos.map(function(d){return d.awb;}).join(', ')+' · '+_excelPreview.lineas.length+' líneas'
+    });
+
+    guardarStock(stock);
+    var lineasCount = _excelPreview.lineas.length;
+    cancelarExcel();
+    cerrar('mSubida');
+    toast(esFutura ? lineasCount+' líneas guardadas como próxima entrada ('+fmtFecha(fechaCarga)+')' : 'Compra sumada · '+nuevas+' nuevas, '+sumadas+' sumadas'+(documentos.length>1?' · '+documentos.length+' documentos':''));
+  } catch(err){
+    // Si algo falla a mitad, nunca se queda "colgado" en silencio — se avisa siempre
+    toast('⚠ Error al cargar: '+(err.message||err)+' — puedes reintentar');
+    console.error('confirmarExcel:', err);
+  } finally {
+    _subiendoStock = false;
+    if(boton){ boton.disabled = false; boton.textContent = 'Cargar al stock'; }
   }
-
-  var fechaCarga = document.getElementById('xlFechaDisponible').value || hoyISO();
-  var esFutura = fechaCarga > hoyISO();
-  var origen = _excelPreview.awb || 'compra';
-
-  var stock = Object.assign({}, existente);
-  var nuevas=0, sumadas=0, futuras=0;
-  _excelPreview.lineas.forEach(function(l){
-    var k = claveProducto(nombreProducto(l.variedad,l.medida));
-    if(!stock[k]) stock[k] = {cultivo:l.cultivo, variedad:l.variedad, medida:l.medida, cantidad:0, unidad:l.unidad, futuras:[]};
-    if(!stock[k].futuras) stock[k].futuras = [];
-    if(esFutura){
-      stock[k].futuras.push({cantidad:l.cantidad, fecha:fechaCarga, origen:origen});
-      futuras++;
-    } else {
-      stock[k].cantidad += l.cantidad;
-      (stock[k].cantidad===l.cantidad) ? nuevas++ : sumadas++;
-    }
-  });
-
-  var metaNuevas = documentos.map(function(d){
-    return { awb:d.awb, fecha_carga:new Date().toISOString(), fecha_inventario:(d.fecha||fechaCarga), titulo:d.titulo, lineas:d.lineas };
-  });
-  guardarMeta(meta.concat(metaNuevas));
-
-  registrarMovimiento({
-    tipo: esFutura ? 'vuelo_futuro' : 'vuelo_anadido',
-    detalle: (esFutura ? 'Próxima entrada ('+fmtFecha(fechaCarga)+'): ' : 'Compra sumada: ')+documentos.map(function(d){return d.awb;}).join(', ')+' · '+_excelPreview.lineas.length+' líneas'
-  });
-
-  guardarStock(stock);
-  cancelarExcel();
-  cerrar('mSubida');
-  toast(esFutura ? _excelPreview.lineas.length+' líneas guardadas como próxima entrada ('+fmtFecha(fechaCarga)+')' : 'Compra sumada · '+nuevas+' nuevas, '+sumadas+' sumadas'+(documentos.length>1?' · '+documentos.length+' documentos':''));
 }
 
 /* ══ CIERRE DEL DÍA (listado CRM) ══ */
