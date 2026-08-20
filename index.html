@@ -42,17 +42,19 @@ header{
 
 /* ── Barra de acciones ── */
 .acciones{
-  display:flex;gap:8px;padding:12px 14px;background:var(--fondo);
+  display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px;background:var(--fondo);
   border-bottom:1px solid var(--filo);
 }
 .btn{
-  flex:1;padding:10px 6px;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;font-weight:600;
+  flex:1 1 30%;min-width:100px;padding:10px 6px;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;font-weight:600;
   border:1px solid var(--navy);border-radius:6px;cursor:pointer;background:var(--papel);
   color:var(--navy);text-align:center;transition:background 0.1s;
 }
 .btn:active{background:var(--navy-suave);}
 .btn.primario{background:var(--navy);color:#fff;border-color:var(--navy);}
 .btn.primario:active{background:var(--navy-dark);}
+.btn.destacado{background:var(--oro);color:#fff;border-color:var(--oro);}
+.btn.destacado:active{opacity:0.85;}
 
 /* ── Proyección de fecha ── */
 .proyeccion{
@@ -94,6 +96,8 @@ header{
 .fila:last-child{border-radius:0 0 6px 6px;}
 .f-nombre{font-size:12.5px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;padding-right:4px;}
 .f-nombre .f-med{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--gris);}
+.f-nombre .f-bloqueado{font-size:9.5px;color:var(--rojo);font-weight:700;}
+.f-nombre .f-fisico{font-size:9.5px;color:var(--gris);font-weight:600;}
 .f-cant{
   font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;text-align:right;
   color:var(--verde);white-space:nowrap;overflow:hidden;font-variant-numeric:tabular-nums;
@@ -141,6 +145,33 @@ header{
 .campo input:focus,.campo select:focus,.campo textarea:focus{border-color:var(--navy);}
 .campo input[type=number]{font-family:'IBM Plex Mono',monospace;font-weight:600;}
 .campo textarea{font-family:'IBM Plex Mono',monospace;font-size:12px;resize:vertical;}
+
+/* ── Buscador con desplegable (variedad en Pedido) ── */
+.sw{position:relative;}
+.si{width:100%;border:1px solid var(--filo);border-radius:6px;padding:9px 11px;font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;background:var(--papel);color:var(--tinta);outline:none;}
+.si:focus{border-color:var(--navy);}
+.sd{position:absolute;top:calc(100% + 2px);left:0;right:0;background:var(--papel);border:1px solid var(--filo);border-radius:6px;max-height:180px;overflow-y:auto;z-index:200;display:none;box-shadow:0 8px 20px rgba(0,0,0,0.12);}
+.sd.open{display:block;}
+.so{padding:8px 11px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--filo);}
+.so:last-child{border-bottom:none;}
+.so:active{background:var(--navy-suave);}
+.so .disp-badge{float:right;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:var(--verde);}
+.so .disp-badge.cero{color:var(--rojo);}
+
+/* ── Pedidos activos ── */
+.pedido-item{background:var(--papel);border:1px solid var(--filo);border-radius:8px;padding:10px 12px;margin-bottom:8px;}
+.pedido-item .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;}
+.pedido-item .cliente{font-weight:700;color:var(--navy);font-size:13px;}
+.pedido-item .cant{font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--oro);font-size:13px;}
+.pedido-item .variedad{font-size:12px;color:var(--tinta);margin-bottom:2px;}
+.pedido-item .meta{font-size:10.5px;color:var(--gris);margin-bottom:8px;}
+.pedido-item .acciones-pedido{display:flex;gap:6px;}
+.pedido-item .acciones-pedido button{
+  flex:1;padding:6px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;
+  font-family:'IBM Plex Sans',sans-serif;
+}
+.pedido-item .btn-entregar{background:var(--verde);color:#fff;border:none;}
+.pedido-item .btn-cancelar{background:none;color:var(--rojo);border:1px solid var(--rojo);}
 
 .nota{font-size:12px;color:var(--gris);line-height:1.55;margin-bottom:12px;}
 .subir-zona{
@@ -233,8 +264,10 @@ header{
 <div class="acciones">
   <button class="btn primario" onclick="abrirSubida()">＋ Cargar compra</button>
   <button class="btn" onclick="abrirCompra()">＋ Compra manual</button>
+  <button class="btn destacado" onclick="abrirPedido()">📞 Pedido</button>
   <button class="btn" onclick="abrirCierre()">Cierre</button>
   <button class="btn" onclick="exportarWhatsApp()">WhatsApp</button>
+  <button class="btn" onclick="abrirListaPedidos()">📋 Pedidos</button>
   <button class="btn" onclick="abrirHistorico()" style="flex:0 0 44px;">☰</button>
 </div>
 
@@ -351,6 +384,54 @@ header{
   </div>
 </div>
 
+<!-- MODAL · Bloquear pedido (reserva para un cliente, no toca el físico hasta entregar) -->
+<div class="modal" id="mPedido">
+  <div class="hoja">
+    <div class="hoja-head"><h3>📞 Bloquear pedido</h3><button class="cerrar" onclick="cerrar('mPedido')">✕</button></div>
+    <div class="hoja-cuerpo">
+      <p class="nota">Reserva cantidad para un cliente. No descuenta del físico hasta que lo marques "Entregado" — mientras tanto, el disponible que ven todos ya baja al momento.</p>
+      <div class="campo">
+        <label>Cliente</label>
+        <input type="text" id="pdCliente" placeholder="Nombre del cliente">
+      </div>
+      <div class="campo">
+        <label>Variedad</label>
+        <div class="sw"><input class="si" id="pdVariedadTxt" placeholder="Buscar variedad…" autocomplete="off" oninput="buscarVariedadPedido(this.value)" onfocus="buscarVariedadPedido(this.value)"><div class="sd" id="pdVariedadDD"></div></div>
+        <input type="hidden" id="pdClave">
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div class="campo" style="flex:1;">
+          <label>Cantidad</label>
+          <input type="number" id="pdCantidad" min="1">
+        </div>
+        <div class="campo" style="flex:1;">
+          <label>Disponible ahora</label>
+          <input type="text" id="pdDisponible" disabled style="background:var(--fondo);color:var(--gris);font-family:'IBM Plex Mono',monospace;">
+        </div>
+      </div>
+      <div class="campo">
+        <label>Nota (opcional)</label>
+        <input type="text" id="pdNota" placeholder="Ej: recoge el viernes por la tarde">
+      </div>
+    </div>
+    <div class="hoja-pie">
+      <button class="btn" onclick="cerrar('mPedido')">Cancelar</button>
+      <button class="btn primario" onclick="guardarPedido()">🔒 Bloquear</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL · Ver pedidos activos -->
+<div class="modal" id="mListaPedidos">
+  <div class="hoja">
+    <div class="hoja-head"><h3>📋 Pedidos activos</h3><button class="cerrar" onclick="cerrar('mListaPedidos')">✕</button></div>
+    <div class="hoja-cuerpo" id="listaPedidosCuerpo"></div>
+    <div class="hoja-pie">
+      <button class="btn primario" onclick="cerrar('mListaPedidos')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL · Ajuste manual -->
 <div class="modal" id="mAjuste">
   <div class="hoja">
@@ -399,7 +480,7 @@ header{
   <div class="hoja">
     <div class="hoja-head"><h3>Histórico</h3><button class="cerrar" onclick="cerrar('mHistorico')">✕</button></div>
     <div class="hoja-cuerpo" id="histCuerpo"></div>
-    <div style="padding:8px 18px 0;text-align:center;font-size:9.5px;color:var(--filo);font-family:'IBM Plex Mono',monospace;">v2026-08-20-0810-firebase-key-fix</div>
+    <div style="padding:8px 18px 0;text-align:center;font-size:9.5px;color:var(--filo);font-family:'IBM Plex Mono',monospace;">v2026-08-20-1330-pedidos</div>
     <div style="padding:14px 18px;border-top:1px solid var(--filo);">
       <div style="font-size:10px;color:var(--rojo);text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:7px;">Zona peligrosa</div>
       <button class="btn" style="width:100%;border-color:var(--rojo);color:var(--rojo);" onclick="resetearStock()">🗑 Resetear todo el stock</button>
@@ -454,12 +535,16 @@ var refStock = fbDB.ref('buscaflor/stock');
 var refLog   = fbDB.ref('buscaflor/log');
 var refMeta  = fbDB.ref('buscaflor/meta');
 var refMapeo = fbDB.ref('buscaflor/mapeoCodigos');  // código CRM -> clave de stock, aprendido con el uso
+var refPedidos = fbDB.ref('buscaflor/pedidos');  // reservas activas por cliente — no toca el stock físico
+var refCierresDia = fbDB.ref('buscaflor/cierresDia');  // por día, cuánto acumulado se aplicó ya de cada artículo — permite cerrar varias veces al día sin restar de más
 
 // Copias locales en memoria — se mantienen sincronizadas solas por los listeners de abajo.
 var _stockCache = {};
 var _logCache = [];
 var _metaCache = [];
 var _mapeoCache = {};
+var _pedidosCache = [];
+var _cierresDiaCache = {};  // { "2026-08-20": { "102": 1, "clave:FREEDOM|60": 3, ... } }
 var _stockListo = false;
 
 /* ══ ALMACENAMIENTO ══
@@ -548,7 +633,8 @@ function nombreProducto(variedad, medida){
    (color + grado). El dato real guardado en el stock no cambia, solo cómo se pinta aquí. */
 function nombreCorto(cultivo, variedad){
   var v = String(variedad||'').trim();
-  if((cultivo||'').toUpperCase().indexOf('CLAVEL')>=0){
+  var cult = (cultivo||'').toUpperCase();
+  if(cult.indexOf('CLAVEL')>=0){
     var sinPrefijo = v.replace(/^CLAVEL(ES)?\s+/i,'');
     var partes = sinPrefijo.split(/\s+/);
     var grado = '';
@@ -556,6 +642,13 @@ function nombreCorto(cultivo, variedad){
     else if(partes[0] && partes[0].toUpperCase()==='SELECT'){ grado='SELECT'; partes.shift(); }
     var resto = partes.join(' ');
     return (resto ? resto : v) + (grado ? ' '+grado : '');
+  }
+  if(cult.indexOf('ALSTRO')>=0){
+    // Aquí el orden color/grado no es uniforme ("ALSTRO PINK SELECT" vs "ALSTRO FANCY
+    // ASSORTED" vs "ALSTRO SELECT OR-YW") — reordenar sería arriesgado, así que solo se
+    // quita el "ALSTRO" del principio y se deja el resto tal cual venga.
+    var sinAlstro = v.replace(/^ALSTRO(EMERIA)?\s+/i,'');
+    return sinAlstro || v;
   }
   return v;
 }
@@ -590,6 +683,41 @@ function sumaFuturasHasta(item, fecha){
   var s = 0;
   item.futuras.forEach(function(f){ if(f.fecha<=fecha) s += (f.cantidad||0); });
   return s;
+}
+
+/* ══ PEDIDOS (reservas) ══
+   Un pedido bloquea cantidad para un cliente sin tocar el stock físico — igual que
+   "futuras" suma sin tocar el físico, esto resta sin tocarlo, hasta que se marca
+   entregado (ahí sí se descuenta de verdad) o se cancela (se libera sin más).
+   Es una reserva "de ahora", no ligada a un día concreto — por eso se resta igual en
+   todas las columnas de fecha, no solo en la de hoy. */
+function pedidosActivosDe(clave){
+  return (_pedidosCache||[]).filter(function(p){ return p.clave===clave && p.estado==='activo'; });
+}
+function sumaPedidosActivos(clave){
+  return pedidosActivosDe(clave).reduce(function(s,p){ return s+(p.cantidad||0); }, 0);
+}
+
+/* ══ CIERRE — acumulado por día, para poder cerrar varias veces sin restar de más ══
+   El CRM da un total ACUMULADO del día para cada artículo, no "lo vendido desde el
+   último cierre". Se guarda cuánto se llevaba aplicado ya hoy de cada artículo (por
+   código si lo hay, o por clave de stock si no) y cada cierre nuevo solo aplica la
+   DIFERENCIA — así cerrar 3 veces al día resta lo correcto cada vez, nunca de más. */
+function claveSeguimientoCierre(codigo, clave){
+  return codigo ? String(codigo) : ('clave:'+clave);
+}
+function acumuladoAplicadoHoy(codigo, clave){
+  var hoy = hoyISO();
+  var deHoy = _cierresDiaCache[hoy] || {};
+  return deHoy[claveSeguimientoCierre(codigo, clave)] || 0;
+}
+function registrarAcumuladoCierre(codigo, clave, nuevoAcumulado){
+  var hoy = hoyISO();
+  var todo = Object.assign({}, _cierresDiaCache);
+  todo[hoy] = Object.assign({}, todo[hoy]||{});
+  todo[hoy][claveSeguimientoCierre(codigo, clave)] = nuevoAcumulado;
+  _cierresDiaCache = todo;
+  refCierresDia.set(todo).catch(function(err){ toast('⚠ No se guardó en la nube: '+err.message); console.error(err); });
 }
 
 // Al abrir la app: cualquier «próxima entrada» cuya fecha ya haya llegado se consolida
@@ -683,17 +811,22 @@ function renderStock(){
     var filasHtml = '';
     items.forEach(function(it){
       var fisico = it.cantidad||0;
-      var cRef = fisico + sumaFuturasHasta(it, dias[0]);
+      var comprometido = sumaPedidosActivos(it._k);
+      var cRef = fisico + sumaFuturasHasta(it, dias[0]) - comprometido;
       // Se oculta solo si está a cero en TODA la ventana visible (hoy y los 3 días siguientes)
       // — si hay algo disponible o llegando en cualquiera de esos días, se muestra igual,
       // aunque hoy en concreto sea 0 (ej. una compra que llega mañana).
-      var hayAlgoEnVentana = dias.some(function(f){ return (fisico + sumaFuturasHasta(it, f)) !== 0; });
+      var hayAlgoEnVentana = dias.some(function(f){ return (fisico + sumaFuturasHasta(it, f) - comprometido) !== 0; });
       if(!hayAlgoEnVentana) return;
       var medidaTxt = (it.medida && it.medida!=='—' && it.medida!=='-') ? ' <span class="f-med">'+it.medida+'</span>' : '';
+      var candado = comprometido>0
+        ? ' <span class="f-bloqueado" title="'+comprometido+' bloqueado en pedidos">🔒'+comprometido+'</span>'
+        + ' <span class="f-fisico" title="Físico real en almacén, antes de restar pedidos">📦'+fisico+'</span>'
+        : '';
       filasHtml += '<div class="fila">';
-      filasHtml += '<span class="f-nombre">'+nombreCorto(cult, it.variedad)+medidaTxt+'</span>';
+      filasHtml += '<span class="f-nombre">'+nombreCorto(cult, it.variedad)+medidaTxt+candado+'</span>';
       dias.forEach(function(f,i){
-        var v = fisico + sumaFuturasHasta(it, f);
+        var v = fisico + sumaFuturasHasta(it, f) - comprometido;
         var cls = v<0 ? 'neg' : v===0 ? 'cero' : (i>0 && v>cRef) ? 'futuro' : '';
         filasHtml += '<span class="f-cant '+cls+'">'+v+'</span>';
       });
@@ -773,10 +906,172 @@ function guardarCompraManual(){
   toast(esFutura ? 'Guardado como próxima entrada · '+fmtFecha(fecha) : 'Compra añadida al disponible de hoy');
 }
 
+/* ══ PEDIDOS — bloquear para un cliente ══ */
+var _pdClaveElegida = null;
+
+function abrirPedido(){
+  document.getElementById('pdCliente').value = '';
+  document.getElementById('pdVariedadTxt').value = '';
+  document.getElementById('pdClave').value = '';
+  document.getElementById('pdCantidad').value = '';
+  document.getElementById('pdDisponible').value = '';
+  document.getElementById('pdNota').value = '';
+  _pdClaveElegida = null;
+  abrir('mPedido');
+}
+
+function buscarVariedadPedido(texto){
+  var stock = cargarStock();
+  var q = (texto||'').toLowerCase().trim();
+  var dd = document.getElementById('pdVariedadDD');
+  var claves = Object.keys(stock).filter(function(k){
+    var it = stock[k];
+    var nombre = nombreProducto(it.variedad, it.medida).toLowerCase();
+    return !q || nombre.indexOf(q)>=0;
+  }).slice(0,40);
+  if(!claves.length){ dd.innerHTML = '<div class="so" style="color:var(--gris);font-style:italic;">Sin resultados</div>'; dd.classList.add('open'); return; }
+  var hoy = hoyISO();
+  dd.innerHTML = claves.map(function(k){
+    var it = stock[k];
+    var disp = (it.cantidad||0) + sumaFuturasHasta(it, hoy) - sumaPedidosActivos(k);
+    var cls = disp>0 ? '' : 'cero';
+    return '<div class="so" data-k="'+k+'">'+nombreProducto(it.variedad,it.medida)+' <span class="disp-badge '+cls+'">'+disp+'</span></div>';
+  }).join('');
+  dd.classList.add('open');
+  dd.querySelectorAll('.so[data-k]').forEach(function(el){
+    el.addEventListener('mousedown', function(e){
+      e.preventDefault();
+      var k = el.getAttribute('data-k');
+      seleccionarVariedadPedido(k);
+    });
+  });
+}
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.sw')){
+    var dd = document.getElementById('pdVariedadDD');
+    if(dd) dd.classList.remove('open');
+  }
+});
+
+function seleccionarVariedadPedido(clave){
+  var stock = cargarStock();
+  var it = stock[clave];
+  if(!it) return;
+  _pdClaveElegida = clave;
+  document.getElementById('pdVariedadTxt').value = nombreProducto(it.variedad,it.medida);
+  document.getElementById('pdClave').value = clave;
+  document.getElementById('pdVariedadDD').classList.remove('open');
+  var hoy = hoyISO();
+  var fisico = it.cantidad||0;
+  var comprometido = sumaPedidosActivos(clave);
+  var disp = fisico + sumaFuturasHasta(it, hoy) - comprometido;
+  document.getElementById('pdDisponible').value = disp+' '+(it.unidad||'')
+    + (comprometido>0 ? '  (📦'+fisico+' físico, 🔒'+comprometido+' bloqueado)' : '');
+}
+
+function guardarPedido(){
+  var cliente = document.getElementById('pdCliente').value.trim();
+  var clave = _pdClaveElegida;
+  var cantidad = parseInt(document.getElementById('pdCantidad').value);
+  var nota = document.getElementById('pdNota').value.trim();
+
+  if(!cliente){ toast('Escribe el cliente'); return; }
+  if(!clave){ toast('Elige una variedad de la lista'); return; }
+  if(!cantidad || cantidad<1){ toast('Cantidad inválida'); return; }
+
+  var stock = cargarStock();
+  var it = stock[clave];
+  if(!it){ toast('Esa variedad ya no existe'); return; }
+  var hoy = hoyISO();
+  var disp = (it.cantidad||0) + sumaFuturasHasta(it, hoy) - sumaPedidosActivos(clave);
+  if(cantidad > disp && !confirm('Solo hay '+disp+' disponible y estás bloqueando '+cantidad+'.\n\n¿Bloquear igualmente? (quedará en negativo)')) return;
+
+  var pedidos = (_pedidosCache||[]).slice();
+  var nuevo = {
+    id: 'P-'+Date.now()+'-'+Math.floor(Math.random()*1000),
+    t: Date.now(),
+    clave: clave,
+    nombre: nombreProducto(it.variedad,it.medida),
+    cantidad: cantidad,
+    cliente: cliente,
+    nota: nota,
+    estado: 'activo'
+  };
+  pedidos.push(nuevo);
+  _pedidosCache = pedidos;
+  refPedidos.set(pedidos).catch(function(err){ toast('⚠ No se guardó en la nube: '+err.message); console.error(err); });
+
+  registrarMovimiento({ tipo:'pedido_bloqueado', detalle:'🔒 Bloqueado: '+cantidad+' '+(it.unidad||'')+' de '+nuevo.nombre+' para '+cliente });
+
+  cerrar('mPedido');
+  toast('🔒 Bloqueado para '+cliente);
+}
+
+function abrirListaPedidos(){
+  var activos = (_pedidosCache||[]).filter(function(p){ return p.estado==='activo'; }).sort(function(a,b){return b.t-a.t;});
+  var cuerpo = document.getElementById('listaPedidosCuerpo');
+  if(!activos.length){
+    cuerpo.innerHTML = '<div class="vacio" style="padding:30px 10px;"><p>Sin pedidos bloqueados ahora mismo.</p></div>';
+  } else {
+    cuerpo.innerHTML = activos.map(function(p){
+      var fecha = new Date(p.t);
+      var cuando = fmtFecha(fechaLocalISO(fecha))+' · '+fecha.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+      return '<div class="pedido-item">'+
+        '<div class="top"><span class="cliente">'+p.cliente+'</span><span class="cant">'+p.cantidad+'</span></div>'+
+        '<div class="variedad">'+p.nombre+'</div>'+
+        '<div class="meta">'+cuando+(p.nota?' · «'+p.nota+'»':'')+'</div>'+
+        '<div class="acciones-pedido">'+
+          '<button class="btn-entregar" onclick="marcarEntregado(\''+p.id+'\')">✓ Entregado</button>'+
+          '<button class="btn-cancelar" onclick="cancelarPedido(\''+p.id+'\')">✕ Cancelar</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }
+  abrir('mListaPedidos');
+}
+
+function guardarPedidosCambiados(pedidos){
+  _pedidosCache = pedidos;
+  refPedidos.set(pedidos).catch(function(err){ toast('⚠ No se guardó en la nube: '+err.message); console.error(err); });
+}
+
+function marcarEntregado(id){
+  var pedidos = (_pedidosCache||[]).slice();
+  var p = pedidos.find(function(x){return x.id===id;});
+  if(!p) return;
+  if(!confirm('¿Marcar como entregado?\n\n'+p.cantidad+' '+p.nombre+' para '+p.cliente+'.\n\nEsto SÍ descuenta del stock físico.')) return;
+
+  var stock = cargarStock();
+  var it = stock[p.clave];
+  if(it) it.cantidad = (it.cantidad||0) - p.cantidad;
+  guardarStock(stock);
+
+  p.estado = 'entregado';
+  guardarPedidosCambiados(pedidos);
+  registrarMovimiento({ tipo:'pedido_entregado', detalle:'✓ Entregado: '+p.cantidad+' '+p.nombre+' a '+p.cliente });
+
+  toast('Entregado — descontado del stock');
+  abrirListaPedidos();
+}
+
+function cancelarPedido(id){
+  var pedidos = (_pedidosCache||[]).slice();
+  var p = pedidos.find(function(x){return x.id===id;});
+  if(!p) return;
+  if(!confirm('¿Cancelar el pedido de '+p.cliente+' ('+p.cantidad+' '+p.nombre+')?\n\nSe libera el disponible, no se toca el stock físico.')) return;
+
+  p.estado = 'cancelado';
+  guardarPedidosCambiados(pedidos);
+  registrarMovimiento({ tipo:'pedido_cancelado', detalle:'✕ Cancelado: '+p.cantidad+' '+p.nombre+' de '+p.cliente });
+
+  toast('Pedido cancelado');
+  abrirListaPedidos();
+}
+
 /* ══ MODALES base ══ */
 function abrir(id){ document.getElementById(id).classList.add('abierto'); }
 function cerrar(id){ document.getElementById(id).classList.remove('abierto'); }
-['mSubida','mCierre','mAjuste','mHistorico','mApiKey'].forEach(function(id){
+['mSubida','mCierre','mAjuste','mHistorico','mApiKey','mCompra','mPedido','mListaPedidos'].forEach(function(id){
   document.getElementById(id).addEventListener('click', function(e){ if(e.target===this) cerrar(id); });
 });
 
@@ -1444,11 +1739,22 @@ function renderCierrePreview(){
   if(sinStock.length){
     html += '<div class="alerta"><b>'+sinStock.length+' variedad'+(sinStock.length!==1?'es':'')+' sin vincular.</b> El texto del CRM no coincide con ningún nombre del stock — vincúlalas a mano una vez (abajo) y la app recordará el código para siempre.</div>';
   }
+  var hayRepetidos = resultados.some(function(r){ return r.clave && acumuladoAplicadoHoy(r.codigo, r.clave) > 0; });
+  if(hayRepetidos){
+    html += '<div class="alerta" style="border-color:var(--verde);background:rgba(47,125,92,0.06);"><b style="color:var(--verde);">Cierre repetido hoy detectado.</b> Solo se va a restar lo NUEVO desde el último cierre de cada artículo — lo ya aplicado antes hoy no se vuelve a tocar.</div>';
+  }
   resultados.forEach(function(r,i){
     if(r.clave && stock[r.clave]){
       var it = stock[r.clave];
-      var nuevo = (it.cantidad||0) - r.cantidad;
-      html += '<div class="prev-linea"><span>'+nombreProducto(it.variedad,it.medida)+(r.codigo?' <span style="color:var(--gris);font-size:10px;">#'+r.codigo+'</span>':'')+'</span><span class="num">'+(it.cantidad||0)+' − '+r.cantidad+' = '+nuevo+'</span></div>';
+      var yaAplicado = acumuladoAplicadoHoy(r.codigo, r.clave);
+      var delta = Math.max(0, r.cantidad - yaAplicado);
+      var nuevo = (it.cantidad||0) - delta;
+      if(delta<=0){
+        html += '<div class="prev-linea" style="opacity:0.55;"><span>'+nombreProducto(it.variedad,it.medida)+(r.codigo?' <span style="color:var(--gris);font-size:10px;">#'+r.codigo+'</span>':'')+' <span style="color:var(--verde);font-size:10.5px;">— sin cambios desde el último cierre</span></span><span class="num">0</span></div>';
+      } else {
+        var notaRepeticion = yaAplicado>0 ? ' <span style="color:var(--gris);font-size:10px;">('+yaAplicado+' ya aplicado hoy, +'+delta+' nuevo)</span>' : '';
+        html += '<div class="prev-linea"><span>'+nombreProducto(it.variedad,it.medida)+(r.codigo?' <span style="color:var(--gris);font-size:10px;">#'+r.codigo+'</span>':'')+notaRepeticion+'</span><span class="num">'+(it.cantidad||0)+' − '+delta+' = '+nuevo+'</span></div>';
+      }
     } else {
       html += '<div class="prev-linea error" style="flex-direction:column;align-items:stretch;gap:4px;">';
       html += '<div style="display:flex;justify-content:space-between;"><span>⚠ '+r.input+(r.codigo?' <span style="color:var(--gris);">#'+r.codigo+'</span>':'')+'</span><span class="num">'+r.cantidad+'</span></div>';
@@ -1480,46 +1786,28 @@ function aplicarCierre(){
   // Si ya se aplicó un cierre hoy (y no está ya deshecho), ofrecemos reemplazarlo en vez
   // de simplemente avisar: el CRM da un total ACUMULADO del día, así que lo correcto casi
   // siempre es deshacer el anterior y aplicar este nuevo limpio, no sumar los dos.
-  var hoy = hoyISO();
-  var cierresHoy = cargarLog().filter(function(e){
-    return e.tipo==='cierre' && !e.deshecha && fechaLocalISO(new Date(e.t))===hoy;
-  });
-  if(cierresHoy.length){
-    var ultimo = cierresHoy[cierresHoy.length-1];
-    var hora = new Date(ultimo.t).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
-    var reemplazar = confirm(
-      '⚠ YA APLICASTE UN CIERRE HOY a las '+hora+'.\n\n'+
-      'El CRM suele dar un total ACUMULADO del día — si este nuevo listado incluye otra vez '+
-      'las ventas de esta mañana, aplicar los dos sumaría de más.\n\n'+
-      '¿DESHACER el cierre de las '+hora+' y aplicar este nuevo en su lugar? (recomendado casi siempre)\n\n'+
-      'Aceptar = deshacer el anterior y aplicar este\nCancelar = decidir otra cosa'
-    );
-    if(reemplazar){
-      if(!deshacerCierre(ultimo.id, true)){ toast('No se pudo deshacer el cierre anterior'); return; }
-    } else {
-      var sumarIgual = confirm(
-        '¿Sumar este cierre ADEMÁS del anterior, sin deshacer nada?\n\n'+
-        'Solo hazlo si estás seguro de que este archivo trae ÚNICAMENTE ventas nuevas desde las '+hora+', no el acumulado del día.\n\n'+
-        '¿Continuar así?'
-      );
-      if(!sumarIgual) return;
-    }
-  }
+  // Ya no hace falta preguntar "¿ya cerraste hoy?" — cada línea se aplica por diferencia
+  // (lo nuevo desde el último cierre de ESE artículo concreto), así que cerrar varias
+  // veces al día es seguro por diseño, sin tener que deshacer nada.
 
   if(sinStock.length && !confirm(sinStock.length+' línea(s) fuera del stock se ignorarán.\n¿Aplicar el cierre igualmente?')) return;
-  if(!confirm('Se descontarán '+validas.length+' línea(s) del stock.\n¿Confirmar cierre del día?')) return;
 
   var stock = cargarStock();
   var detalle = [];
   var total = 0;
+  var sinCambios = 0;
   var nuevosAprendidos = 0;
   validas.forEach(function(r){
     var it = stock[r.clave];
     if(!it) return;
+    var yaAplicado = acumuladoAplicadoHoy(r.codigo, r.clave);
+    var delta = Math.max(0, r.cantidad - yaAplicado);
+    if(delta<=0){ sinCambios++; return; } // ya se aplicó esto en un cierre anterior hoy — no se toca de nuevo
     var antes = it.cantidad||0;
-    it.cantidad = antes - r.cantidad;
-    total += r.cantidad;
-    detalle.push({ producto:nombreProducto(it.variedad,it.medida), clave:r.clave, cantidad:r.cantidad, antes:antes, despues:it.cantidad });
+    it.cantidad = antes - delta;
+    total += delta;
+    detalle.push({ producto:nombreProducto(it.variedad,it.medida), clave:r.clave, codigo:r.codigo||null, cantidad:delta, antes:antes, despues:it.cantidad, acumuladoAntes:yaAplicado, acumuladoDespues:r.cantidad });
+    registrarAcumuladoCierre(r.codigo, r.clave, r.cantidad); // guarda el nuevo acumulado del día para este artículo
     // Aprende el código→clave si venía de un artículo del CRM y aún no lo sabíamos —
     // la próxima vez que salga ese código, se casará directo sin depender del texto.
     if(r.codigo && cargarMapeo()[r.codigo]!==r.clave){
@@ -1528,16 +1816,24 @@ function aplicarCierre(){
     }
   });
 
+  if(!detalle.length){
+    toast(sinCambios ? 'Sin novedades — ya estaba todo aplicado de un cierre anterior hoy' : 'Sin líneas válidas');
+    cerrar('mCierre');
+    return;
+  }
+
+  if(!confirm('Se descontarán '+detalle.length+' línea(s) del stock ('+total+' uds nuevas).'+(sinCambios?' '+sinCambios+' más ya estaban aplicadas de antes hoy, no se tocan.':'')+'\n\n¿Confirmar cierre?')) return;
+
   registrarMovimiento({
     tipo:'cierre',
     descuentos:detalle,
     sin_stock:sinStock.map(function(r){return {input:r.input, cantidad:r.cantidad};}),
-    detalle:'Cierre del '+fmtFecha(hoyISO())+' · '+validas.length+' descuentos · '+total+' uds'+(nuevosAprendidos?' · '+nuevosAprendidos+' código(s) aprendido(s)':'')
+    detalle:'Cierre del '+fmtFecha(hoyISO())+' · '+detalle.length+' descuentos · '+total+' uds'+(sinCambios?' · '+sinCambios+' sin cambios':'')+(nuevosAprendidos?' · '+nuevosAprendidos+' código(s) aprendido(s)':'')
   });
 
   guardarStock(stock);
   cerrar('mCierre');
-  toast('Cierre aplicado · '+validas.length+' descuento'+(validas.length!==1?'s':'')+(sinStock.length?' · '+sinStock.length+' ignorada'+(sinStock.length!==1?'s':''):''));
+  toast('Cierre aplicado · '+detalle.length+' descuento'+(detalle.length!==1?'s':'')+(sinStock.length?' · '+sinStock.length+' ignorada'+(sinStock.length!==1?'s':''):''));
 }
 
 /* ══ AJUSTE MANUAL ══ */
@@ -1736,6 +2032,11 @@ function deshacerCierre(id, silencioso){
     var it = stock[d.clave];
     if(!it) return;
     it.cantidad = (it.cantidad||0) + d.cantidad;
+    // Devuelve también el "acumulado aplicado hoy" a como estaba antes de este cierre —
+    // si no, un cierre nuevo pensaría que esto ya se aplicó y no restaría nada.
+    if(d.acumuladoAntes!=null && fechaLocalISO(new Date(mov.t))===hoyISO()){
+      registrarAcumuladoCierre(d.codigo, d.clave, d.acumuladoAntes);
+    }
   });
   guardarStock(stock);
 
@@ -1803,7 +2104,7 @@ function exportarWhatsApp(){
   var porCult = {};
   claves.forEach(function(k){
     var it = stock[k];
-    var disp = (it.cantidad||0) + sumaFuturasHasta(it, fechaRef);
+    var disp = (it.cantidad||0) + sumaFuturasHasta(it, fechaRef) - sumaPedidosActivos(k);
     if(disp <= 0) return;
     var c = it.cultivo||'OTROS';
     if(!porCult[c]) porCult[c]=[];
@@ -1822,11 +2123,12 @@ function exportarWhatsApp(){
     lineas.push('*'+c+'*  _('+unidadDeCultivo(c)+')_');
     porCult[c].sort(function(a,b){ return ((a.it.variedad||'')+(a.it.medida||'')).localeCompare((b.it.variedad||'')+(b.it.medida||'')); })
       .forEach(function(x){
-        lineas.push('• '+nombreProducto(x.it.variedad,x.it.medida)+' — '+x.disp);
+        var nombreLinea = nombreCorto(c, x.it.variedad) + (x.it.medida && x.it.medida!=='—' && x.it.medida!=='-' ? ' '+x.it.medida : '');
+        lineas.push('• '+nombreLinea+' — '+x.disp);
       });
     lineas.push('');
   });
-  lineas.push('_Rosas de Buscaflor · '+new Date().toLocaleDateString('es-ES')+'_');
+  lineas.push('_Rosas de Buscaflor · '+new Date().toLocaleDateString('es-ES')+' · '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+'_');
   window.open('https://wa.me/?text='+encodeURIComponent(lineas.join('\n')), '_blank');
 }
 
@@ -1866,6 +2168,14 @@ refLog.on('value', function(snap){
 });
 refMapeo.on('value', function(snap){
   _mapeoCache = snap.val() || {};
+});
+refPedidos.on('value', function(snap){
+  var v = snap.val();
+  _pedidosCache = Array.isArray(v) ? v : (v ? Object.values(v) : []);
+  renderStock(); // el disponible depende de los pedidos activos — repinta al cambiar
+});
+refCierresDia.on('value', function(snap){
+  _cierresDiaCache = snap.val() || {};
 });
 refStock.on('value', function(snap){
   _stockCache = snap.val() || {};
