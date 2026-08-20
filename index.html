@@ -446,11 +446,13 @@ var fbDB = firebase.database();
 var refStock = fbDB.ref('buscaflor/stock');
 var refLog   = fbDB.ref('buscaflor/log');
 var refMeta  = fbDB.ref('buscaflor/meta');
+var refMapeo = fbDB.ref('buscaflor/mapeoCodigos');  // código CRM -> clave de stock, aprendido con el uso
 
 // Copias locales en memoria — se mantienen sincronizadas solas por los listeners de abajo.
 var _stockCache = {};
 var _logCache = [];
 var _metaCache = [];
+var _mapeoCache = {};
 var _stockListo = false;
 
 /* ══ ALMACENAMIENTO ══
@@ -486,6 +488,13 @@ function registrarMovimiento(mov){
   refLog.set(log);
 }
 function guardarMeta(m){ _metaCache = m; refMeta.set(m); }
+function cargarMapeo(){ return _mapeoCache || {}; }
+function aprenderMapeo(codigo, clave){
+  if(!codigo || !clave) return;
+  if(_mapeoCache[codigo]===clave) return; // ya lo sabíamos, no reescribir sin necesidad
+  _mapeoCache[codigo] = clave;
+  refMapeo.child(codigo).set(clave);
+}
 
 /* ══ REGLAS DE CULTIVO (unidades Buscaflor) ══ */
 function unidadDeCultivo(cultivo){
@@ -1322,7 +1331,15 @@ function leerCierreArchivo(e){
   rd3.readAsText(file);
 }
 
-function casarConStock(desc, stock){
+// Empareja una línea del CRM con una entrada del stock. El CÓDIGO manda siempre que
+// exista un mapeo aprendido — es el dato fiable, porque no cambia aunque el texto de la
+// descripción sí lo haga (ej. "CLAVEL FCY MORADO" en el CRM vs "CLAVEL FANCY PURPLE" en
+// el stock). Solo se recurre al texto la primera vez que se ve ese código.
+function casarConStock(desc, stock, codigo){
+  if(codigo){
+    var clavePorCodigo = cargarMapeo()[codigo];
+    if(clavePorCodigo && stock[clavePorCodigo]) return clavePorCodigo;
+  }
   if(!desc) return null;
   var d = desc.toUpperCase().trim();
   var k = claveProducto(desc);
@@ -1356,15 +1373,15 @@ function procesarCierreTexto(){
   var arts=[], tots=[], m;
   var reArt = /Art[ií]culo:\s*(\d+)\s*-\s*([^\n\r]+)/gi;
   var reTot = /Total\s+art[ií]culo:\s*[\d.,]+\s+([\d.,]+)/gi;
-  while((m=reArt.exec(txt))!==null) arts.push({pos:m.index, desc:m[2].trim()});
+  while((m=reArt.exec(txt))!==null) arts.push({pos:m.index, codigo:m[1].trim(), desc:m[2].trim()});
   while((m=reTot.exec(txt))!==null) tots.push({pos:m.index, cant:parseFloat(m[1].replace(/\./g,'').replace(',','.'))});
   if(arts.length && tots.length){
     arts.forEach(function(a,i){
       var sig = arts[i+1] ? arts[i+1].pos : Infinity;
       var t = tots.find(function(t){ return t.pos>a.pos && t.pos<sig; });
       if(t && t.cant>0){
-        var k = casarConStock(a.desc, stock);
-        resultados.push({ input:a.desc, cantidad:t.cant, clave:k });
+        var k = casarConStock(a.desc, stock, a.codigo);
+        resultados.push({ input:a.desc, codigo:a.codigo, cantidad:t.cant, clave:k });
       }
     });
   }
@@ -1391,21 +1408,46 @@ function procesarCierreTexto(){
   }
 
   _cierreLineas = resultados;
+  renderCierrePreview();
+}
+
+// Aparte para poder repintar el preview tras vincular una línea a mano, sin reprocesar
+// todo el texto de nuevo.
+function renderCierrePreview(){
+  var stock = cargarStock();
+  var resultados = _cierreLineas || [];
   var sinStock = resultados.filter(function(r){ return !r.clave; });
+  var opciones = Object.keys(stock).sort(function(a,b){
+    return nombreProducto(stock[a].variedad,stock[a].medida).localeCompare(nombreProducto(stock[b].variedad,stock[b].medida));
+  });
   var html = '';
   if(sinStock.length){
-    html += '<div class="alerta"><b>'+sinStock.length+' variedad'+(sinStock.length!==1?'es':'')+' fuera del stock.</b> Suele faltar un AWB o factura por cargar. Si aplicas el cierre, esas líneas se ignoran.</div>';
+    html += '<div class="alerta"><b>'+sinStock.length+' variedad'+(sinStock.length!==1?'es':'')+' sin vincular.</b> El texto del CRM no coincide con ningún nombre del stock — vincúlalas a mano una vez (abajo) y la app recordará el código para siempre.</div>';
   }
-  resultados.forEach(function(r){
-    if(r.clave){
+  resultados.forEach(function(r,i){
+    if(r.clave && stock[r.clave]){
       var it = stock[r.clave];
       var nuevo = (it.cantidad||0) - r.cantidad;
-      html += '<div class="prev-linea"><span>'+nombreProducto(it.variedad,it.medida)+'</span><span class="num">'+(it.cantidad||0)+' − '+r.cantidad+' = '+nuevo+'</span></div>';
+      html += '<div class="prev-linea"><span>'+nombreProducto(it.variedad,it.medida)+(r.codigo?' <span style="color:var(--gris);font-size:10px;">#'+r.codigo+'</span>':'')+'</span><span class="num">'+(it.cantidad||0)+' − '+r.cantidad+' = '+nuevo+'</span></div>';
     } else {
-      html += '<div class="prev-linea error"><span>⚠ '+r.input+' — no en stock</span><span class="num">'+r.cantidad+'</span></div>';
+      html += '<div class="prev-linea error" style="flex-direction:column;align-items:stretch;gap:4px;">';
+      html += '<div style="display:flex;justify-content:space-between;"><span>⚠ '+r.input+(r.codigo?' <span style="color:var(--gris);">#'+r.codigo+'</span>':'')+'</span><span class="num">'+r.cantidad+'</span></div>';
+      html += '<select class="vincular-sel" data-idx="'+i+'" style="width:100%;border:1px solid var(--rojo);border-radius:6px;padding:5px 7px;font-family:\'IBM Plex Sans\',sans-serif;font-size:11.5px;background:var(--papel);color:var(--tinta);">';
+      html += '<option value="">— vincular a variedad del stock —</option>';
+      opciones.forEach(function(k){
+        html += '<option value="'+k.replace(/"/g,'&quot;')+'">'+nombreProducto(stock[k].variedad,stock[k].medida)+'</option>';
+      });
+      html += '</select></div>';
     }
   });
   document.getElementById('cierrePreview').innerHTML = html;
+  document.querySelectorAll('.vincular-sel').forEach(function(sel){
+    sel.addEventListener('change', function(){
+      var idx = parseInt(this.getAttribute('data-idx'));
+      _cierreLineas[idx].clave = this.value || null;
+      renderCierrePreview();
+    });
+  });
   actualizarBotonCierre(resultados.some(function(r){return r.clave;}));
 }
 
@@ -1420,6 +1462,7 @@ function aplicarCierre(){
   var stock = cargarStock();
   var detalle = [];
   var total = 0;
+  var nuevosAprendidos = 0;
   validas.forEach(function(r){
     var it = stock[r.clave];
     if(!it) return;
@@ -1427,13 +1470,19 @@ function aplicarCierre(){
     it.cantidad = antes - r.cantidad;
     total += r.cantidad;
     detalle.push({ producto:nombreProducto(it.variedad,it.medida), cantidad:r.cantidad, antes:antes, despues:it.cantidad });
+    // Aprende el código→clave si venía de un artículo del CRM y aún no lo sabíamos —
+    // la próxima vez que salga ese código, se casará directo sin depender del texto.
+    if(r.codigo && cargarMapeo()[r.codigo]!==r.clave){
+      aprenderMapeo(r.codigo, r.clave);
+      nuevosAprendidos++;
+    }
   });
 
   registrarMovimiento({
     tipo:'cierre',
     descuentos:detalle,
     sin_stock:sinStock.map(function(r){return {input:r.input, cantidad:r.cantidad};}),
-    detalle:'Cierre del '+fmtFecha(hoyISO())+' · '+validas.length+' descuentos · '+total+' uds'
+    detalle:'Cierre del '+fmtFecha(hoyISO())+' · '+validas.length+' descuentos · '+total+' uds'+(nuevosAprendidos?' · '+nuevosAprendidos+' código(s) aprendido(s)':'')
   });
 
   guardarStock(stock);
@@ -1687,6 +1736,9 @@ refMeta.on('value', function(snap){
 refLog.on('value', function(snap){
   var v = snap.val();
   _logCache = Array.isArray(v) ? v : (v ? Object.values(v) : []);
+});
+refMapeo.on('value', function(snap){
+  _mapeoCache = snap.val() || {};
 });
 refStock.on('value', function(snap){
   _stockCache = snap.val() || {};
