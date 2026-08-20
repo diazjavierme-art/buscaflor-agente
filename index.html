@@ -488,13 +488,20 @@ function unidadDeCultivo(cultivo){
 }
 
 /* ══ CLAVE CANÓNICA DE PRODUCTO ══
-   "BRIGHTON 60CM/25T" → "BRIGHTON|60" — para casar CRM con stock */
+   "BRIGHTON 60CM/25T" → "BRIGHTON|60" — para casar CRM con stock.
+   Firebase Realtime Database prohíbe ". # $ / [ ]" en las claves — si el nombre de una
+   variedad trae alguno de esos caracteres (ej. "MIX PURPLE/HOT PINK"), el guardado entero
+   se rechazaba sin avisar cuál era la línea culpable. Se limpia aquí, en el único sitio
+   donde nace la clave, así ningún nombre de variedad puede volver a tirar la carga entera. */
+function sanitizarClaveFirebase(k){
+  return k.replace(/[.#$\/\[\]]/g, '-');
+}
 function claveProducto(nombre){
   if(!nombre) return '';
   var s = nombre.toUpperCase().trim().replace(/\/\d+T\b/g,'');
   var m = s.match(/(.+?)\s+(\d{2,3})\s*CM\b/) || s.match(/(.+?)\s+(\d{2,3})\s*$/);
-  if(m) return m[1].trim()+'|'+m[2];
-  return s.replace(/\s+[—\-]\s*$/,'').trim()+'|—';
+  var k = m ? (m[1].trim()+'|'+m[2]) : (s.replace(/\s+[—\-]\s*$/,'').trim()+'|—');
+  return sanitizarClaveFirebase(k);
 }
 function nombreProducto(variedad, medida){
   var v = String(variedad||'').toUpperCase().trim();
@@ -830,16 +837,24 @@ function procesarArchivoExcel(file){
 
         if(!col) continue; // todavía no hemos visto la fila de columnas — nada que leer
 
-        var cVar = col.variedad>=0 ? (f[col.variedad]==null?'':String(f[col.variedad]).trim()) : '';
-        if(!cVar) continue;
         var cCul = (col.cultivo>=0 && f[col.cultivo]) ? String(f[col.cultivo]).trim().toUpperCase() : cultivoActivo;
+        var cVar = col.variedad>=0 ? (f[col.variedad]==null?'':String(f[col.variedad]).trim()) : '';
+        // Si no hay variedad propia (ej. "PANICULATA" o "NARDOS" sin variedad concreta),
+        // el propio cultivo hace de nombre — no se descarta la línea.
+        if(!cVar){
+          if(!cCul) continue; // ni variedad ni cultivo — no hay nada que registrar
+          cVar = cCul;
+        }
         var cMed = col.medida>=0 ? (f[col.medida]==null?'':String(f[col.medida]).trim()) : '';
 
         var cantidad, unidad;
         if(col.unidades>=0){
           cantidad = Math.round(parseFloat(f[col.unidades])||0);
-          // Prioridad: 1) unidad explícita en el nombre de columna, 2) texto de la sección, 3) reglas por cultivo
-          unidad = col.unidadCol || unidadActiva || unidadDeCultivo(cCul);
+          // Prioridad: 1) unidad explícita en el nombre de columna, 2) regla fija de Buscaflor
+          // para claveles/hortensias (SIEMPRE tallos, nunca paquete — esto manda por encima de
+          // cualquier cabecera de sección genérica), 3) texto de la sección, 4) resto por defecto.
+          var reglaFija = unidadDeCultivo(cCul);
+          unidad = col.unidadCol || (reglaFija==='tallos' ? 'tallos' : (unidadActiva || reglaFija));
         } else {
           // Formato antiguo: columnas TALLOS y PAQUETES separadas
           var tallos = Math.round(parseFloat(col.tallos>=0?f[col.tallos]:0)||0);
