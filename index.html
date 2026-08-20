@@ -1244,20 +1244,10 @@ function procesarArchivoExcel(file){
 
       _excelPreview = { lineas:lineas, awb:awb, fecha:fechaInv, titulo:titulo };
 
-      // Preview
-      var porCult={};
-      lineas.forEach(function(l){ if(!porCult[l.cultivo])porCult[l.cultivo]=[]; porCult[l.cultivo].push(l); });
-      var html='';
-      Object.keys(porCult).forEach(function(c){
-        html += '<div class="prev-cult">'+c+' · '+unidadDeCultivo(c)+'</div>';
-        porCult[c].forEach(function(l){
-          html += '<div class="prev-linea"><span>'+l.variedad+(l.medida!=='—'?' '+l.medida:'')+'</span><span class="num">'+l.cantidad+'</span></div>';
-        });
-      });
       document.getElementById('previewTitulo').textContent = (awb||'Inventario')+' — '+lineas.length+' líneas';
-      document.getElementById('previewLineas').innerHTML = html;
       document.getElementById('xlFechaDisponible').value = fechaInv || hoyISO();
       actualizarAvisoFecha();
+      renderPreviewCompra();
       document.getElementById('previewExcel').style.display = 'block';
       document.getElementById('pieSubida').style.display = 'flex';
     }catch(err){
@@ -1368,35 +1358,105 @@ function procesarArchivosVerdnatura(files){
       fecha: incluidos[0].fecha||''
     };
 
-    var porCult={};
-    lineas.forEach(function(l){ if(!porCult[l.cultivo])porCult[l.cultivo]=[]; porCult[l.cultivo].push(l); });
-    var html='';
-    if(incluidos.length>1){
-      html += '<div style="font-size:11px;color:var(--gris);margin-bottom:6px;">Documentos: '+incluidos.map(function(d){return d.awb;}).join(' · ')+'</div>';
-    }
-    Object.keys(porCult).forEach(function(c){
-      html += '<div class="prev-cult">'+c+' · '+unidadDeCultivo(c)+'</div>';
-      porCult[c].forEach(function(l){
-        var conv = l.unidad==='paquetes' ? ' <span style="color:var(--gris);">('+l._tallos+' tallos)</span>' : '';
-        html += '<div class="prev-linea"><span>'+l.variedad+(l.medida!=='—'?' '+l.medida:'')+conv+'</span><span class="num">'+l.cantidad+'</span></div>';
-      });
-    });
     if(omitidos.length){
-      html += '<div class="alerta" style="margin-top:8px;">Omitidos por ya estar cargados: '+omitidos.join(', ')+'</div>';
+      _excelPreview._omitidos = omitidos;
     }
     if(errores.length){
-      html += '<div class="alerta" style="margin-top:8px;">No se pudieron leer: '+errores.join(' · ')+'</div>';
+      _excelPreview._errores = errores;
     }
 
     document.getElementById('previewTitulo').textContent = _excelPreview.awb+' — '+lineas.length+' líneas';
-    document.getElementById('previewLineas').innerHTML = html;
     document.getElementById('xlFechaDisponible').value = _excelPreview.fecha || hoyISO();
     actualizarAvisoFecha();
+    renderPreviewCompra();
     document.getElementById('previewExcel').style.display = 'block';
     document.getElementById('pieSubida').style.display = 'flex';
   }
 
   siguiente();
+}
+
+// Vista previa de una carga de compra (Verdnatura, y también sirve para el Excel de AWB) —
+// por cada línea, si ya existe esa variedad+medida EXACTA en el stock, se ve normal (se va
+// a sumar a lo que ya hay). Si no existe, se marca como "variedad nueva" y se puede vincular
+// a una ya existente en vez de crear una duplicada por un nombre ligeramente distinto.
+// Busca en el stock la variedad más parecida a un nombre nuevo (por si el texto no
+// coincide exacto, como "PANICULATA XLENCE" vs tu "PANICULATA" ya cargada) — para
+// sugerirla por defecto en vez de dejar que se cree una duplicada en silencio.
+function sugerirParecida(variedadNueva, stock){
+  var v = (variedadNueva||'').toUpperCase().trim();
+  if(!v) return null;
+  var mejor = null, mejorLen = 0;
+  Object.keys(stock).forEach(function(k){
+    var ve = (stock[k].variedad||'').toUpperCase().trim();
+    if(!ve) return;
+    var contenida = v.indexOf(ve)>=0 || ve.indexOf(v)>=0;
+    if(contenida && ve.length>mejorLen){ mejor = k; mejorLen = ve.length; }
+  });
+  return mejor;
+}
+
+function renderPreviewCompra(){
+  var stock = cargarStock();
+  var lineas = _excelPreview.lineas;
+  var porCult={};
+  lineas.forEach(function(l,i){ l._i=i; if(!porCult[l.cultivo])porCult[l.cultivo]=[]; porCult[l.cultivo].push(l); });
+  var opciones = Object.keys(stock).sort(function(a,b){
+    return nombreProducto(stock[a].variedad,stock[a].medida).localeCompare(nombreProducto(stock[b].variedad,stock[b].medida));
+  });
+  var html='';
+  if(_excelPreview.documentos && _excelPreview.documentos.length>1){
+    html += '<div style="font-size:11px;color:var(--gris);margin-bottom:6px;">Documentos: '+_excelPreview.documentos.map(function(d){return d.awb;}).join(' · ')+'</div>';
+  }
+  var nuevas = 0;
+  Object.keys(porCult).forEach(function(c){
+    html += '<div class="prev-cult">'+c+' · '+unidadDeCultivo(c)+'</div>';
+    porCult[c].forEach(function(l){
+      var conv = l._tallos ? ' <span style="color:var(--gris);">('+l._tallos+' tallos)</span>' : '';
+      var clave = claveProducto(nombreProducto(l.variedad,l.medida));
+      var yaExiste = !!stock[clave];
+      if(yaExiste){
+        html += '<div class="prev-linea"><span>'+l.variedad+(l.medida!=='—'?' '+l.medida:'')+conv+'</span><span class="num">'+l.cantidad+'</span></div>';
+      } else {
+        nuevas++;
+        var sugerida = sugerirParecida(l.variedad, stock);
+        html += '<div class="prev-linea" style="flex-direction:column;align-items:stretch;gap:4px;border-color:var(--oro);">';
+        html += '<div style="display:flex;justify-content:space-between;"><span>🆕 '+l.variedad+(l.medida!=='—'?' '+l.medida:'')+conv+'</span><span class="num" style="color:var(--oro);">'+l.cantidad+'</span></div>';
+        if(sugerida){
+          html += '<div style="font-size:10.5px;color:#8a6a1f;">💡 Se parece a «'+nombreProducto(stock[sugerida].variedad,stock[sugerida].medida)+'» — ya seleccionada abajo, cambia si no es</div>';
+        }
+        html += '<select class="vincular-sel" data-idx="'+l._i+'" style="width:100%;border:1px solid var(--oro);border-radius:6px;padding:5px 7px;font-family:\'IBM Plex Sans\',sans-serif;font-size:11.5px;background:var(--papel);color:var(--tinta);">';
+        html += '<option value="">＋ Crear variedad nueva («'+l.variedad+(l.medida!=='—'?' '+l.medida:'')+'»)</option>';
+        opciones.forEach(function(k){
+          html += '<option value="'+k.replace(/"/g,'&quot;')+'"'+(k===sugerida?' selected':'')+'>Es la misma que: '+nombreProducto(stock[k].variedad,stock[k].medida)+'</option>';
+        });
+        html += '</select></div>';
+      }
+    });
+  });
+  if(nuevas>0){
+    html = '<div class="alerta" style="border-color:var(--oro);background:rgba(199,154,62,0.08);"><b style="color:#8a6a1f;">'+nuevas+' variedad'+(nuevas!==1?'es':'')+' nueva'+(nuevas!==1?'s':'')+' («🆕»).</b> Si ya tenías algo parecido con otro nombre, vincúlalo abajo para que se sume ahí en vez de crear una duplicada.</div>' + html;
+  }
+  if(_excelPreview._omitidos){
+    html += '<div class="alerta" style="margin-top:8px;">Omitidos por ya estar cargados: '+_excelPreview._omitidos.join(', ')+'</div>';
+  }
+  if(_excelPreview._errores){
+    html += '<div class="alerta" style="margin-top:8px;">No se pudieron leer: '+_excelPreview._errores.join(' · ')+'</div>';
+  }
+  document.getElementById('previewLineas').innerHTML = html;
+  document.querySelectorAll('#previewLineas .vincular-sel').forEach(function(sel){
+    sel.addEventListener('change', function(){
+      var idx = parseInt(this.getAttribute('data-idx'));
+      var linea = _excelPreview.lineas[idx];
+      if(this.value){
+        var it = stock[this.value];
+        linea.variedad = it.variedad;
+        linea.medida = it.medida;
+        linea.cultivo = it.cultivo; // para que se agrupe en la sección correcta también
+      }
+      renderPreviewCompra();
+    });
+  });
 }
 
 // Lee y extrae UN documento de Verdnatura, devuelve una promesa con {awb, fecha, lineas}
@@ -1475,6 +1535,21 @@ function confirmarExcel(){
   var boton = document.getElementById('btnCargarStock');
 
   try{
+    // Aplica los vínculos elegidos (o sugeridos por defecto) en los desplegables de
+    // "variedad nueva" — se lee el estado real del desplegable ahora mismo, así que
+    // funciona igual si el usuario tocó algo como si dejó la sugerencia tal cual estaba.
+    var stockActualParaVinculos = cargarStock();
+    document.querySelectorAll('#previewLineas .vincular-sel').forEach(function(sel){
+      var idx = parseInt(sel.getAttribute('data-idx'));
+      var valor = sel.value;
+      if(valor && stockActualParaVinculos[valor] && _excelPreview.lineas[idx]){
+        var it = stockActualParaVinculos[valor];
+        _excelPreview.lineas[idx].variedad = it.variedad;
+        _excelPreview.lineas[idx].medida = it.medida;
+        _excelPreview.lineas[idx].cultivo = it.cultivo;
+      }
+    });
+
     var existente = cargarStock();
     var meta = cargarMeta();
 
