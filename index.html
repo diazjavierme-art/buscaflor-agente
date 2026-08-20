@@ -365,7 +365,7 @@ header{
       <div class="aj-delta" id="ajDelta"></div>
       <div class="campo">
         <label>Motivo</label>
-        <select id="ajMotivo">
+        <select id="ajMotivo" onchange="previewDelta()">
           <option value="">— Selecciona —</option>
           <option value="merma">Merma / mal estado</option>
           <option value="rotura">Rotura</option>
@@ -374,6 +374,13 @@ header{
           <option value="error_carga">Corrección de error</option>
           <option value="otro">Otro</option>
         </select>
+      </div>
+      <div class="campo" id="ajConvertirWrap" style="display:none;background:var(--navy-suave);border-radius:8px;padding:10px 12px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;color:var(--navy);text-transform:none;letter-spacing:0;font-size:12.5px;">
+          <input type="checkbox" id="ajConvertirPetalos" style="width:16px;height:16px;">
+          🌸 Convertir en Pétalos (código 290) en vez de tirarlo
+        </label>
+        <p class="nota" style="margin:5px 0 0;font-size:11px;">Lo que se resta de aquí se suma directo a Pétalos, en vez de perderse.</p>
       </div>
       <div class="campo">
         <label>Nota (opcional)</label>
@@ -460,7 +467,11 @@ var _stockListo = false;
 var CLAVES = { apikey:'bf_ak' };
 
 function cargarStock(){ return _stockCache || {}; }
-function guardarStock(s){ _stockCache = s; refStock.set(s); renderStock(); }
+function guardarStock(s){
+  _stockCache = s;
+  refStock.set(s).catch(function(err){ toast('⚠ No se guardó en la nube: '+err.message+' — reintenta'); console.error('refStock.set:', err); });
+  renderStock();
+}
 function cargarLog(){ return _logCache || []; }
 function cargarMeta(){ return _metaCache || []; }
 
@@ -482,18 +493,23 @@ function fetchConTimeout(url, opciones, segundos){
 function registrarMovimiento(mov){
   var log = (_logCache||[]).slice();
   mov.t = Date.now();
+  mov.id = mov.id || ('L-'+mov.t+'-'+Math.floor(Math.random()*1000));
   log.push(mov);
   if(log.length>500) log = log.slice(-500);
   _logCache = log;
-  refLog.set(log);
+  refLog.set(log).catch(function(err){ toast('⚠ No se guardó el histórico en la nube: '+err.message); console.error('refLog.set:', err); });
+  return mov.id;
 }
-function guardarMeta(m){ _metaCache = m; refMeta.set(m); }
+function guardarMeta(m){
+  _metaCache = m;
+  refMeta.set(m).catch(function(err){ toast('⚠ No se guardó en la nube: '+err.message); console.error('refMeta.set:', err); });
+}
 function cargarMapeo(){ return _mapeoCache || {}; }
 function aprenderMapeo(codigo, clave){
   if(!codigo || !clave) return;
   if(_mapeoCache[codigo]===clave) return; // ya lo sabíamos, no reescribir sin necesidad
   _mapeoCache[codigo] = clave;
-  refMapeo.child(codigo).set(clave);
+  refMapeo.child(codigo).set(clave).catch(function(err){ console.error('refMapeo.set:', err); });
 }
 
 /* ══ REGLAS DE CULTIVO (unidades Buscaflor) ══ */
@@ -1534,6 +1550,8 @@ function abrirAjuste(clave){
   document.getElementById('ajDelta').textContent = '';
   document.getElementById('ajMotivo').value = '';
   document.getElementById('ajNota').value = '';
+  document.getElementById('ajConvertirPetalos').checked = false;
+  document.getElementById('ajConvertirWrap').style.display = 'none';
   abrir('mAjuste');
   setTimeout(function(){ var el=document.getElementById('ajNuevo'); el.focus(); el.select(); },180);
 }
@@ -1544,10 +1562,13 @@ function previewDelta(){
   if(!it) return;
   var nuevo = parseInt(document.getElementById('ajNuevo').value);
   var el = document.getElementById('ajDelta');
+  var motivo = document.getElementById('ajMotivo').value;
   if(isNaN(nuevo)){ el.textContent=''; return; }
   var d = nuevo - (it.cantidad||0);
   el.textContent = d===0 ? 'Sin cambios' : 'Diferencia: '+(d>0?'+':'')+d+' '+(it.unidad||'');
   el.style.color = d>0 ? 'var(--verde)' : d<0 ? 'var(--rojo)' : 'var(--gris)';
+  // La conversión a Pétalos solo tiene sentido si se está BAJANDO cantidad por merma
+  document.getElementById('ajConvertirWrap').style.display = (motivo==='merma' && d<0) ? 'block' : 'none';
 }
 
 function aplicarAjuste(){
@@ -1563,16 +1584,28 @@ function aplicarAjuste(){
   var delta = nuevo - antes;
   if(delta===0){ cerrar('mAjuste'); return; }
   it.cantidad = nuevo;
+
+  var convertir = motivo==='merma' && delta<0 && document.getElementById('ajConvertirPetalos').checked;
+  var cantidadConvertida = convertir ? Math.abs(delta) : 0;
+  var clavePetalos = null;
+  if(convertir){
+    clavePetalos = claveProducto('PÉTALOS');
+    if(!stock[clavePetalos]) stock[clavePetalos] = {cultivo:'PÉTALOS', variedad:'PÉTALOS', medida:'—', cantidad:0, unidad:'paquetes', futuras:[]};
+    stock[clavePetalos].cantidad = (stock[clavePetalos].cantidad||0) + cantidadConvertida;
+    aprenderMapeo('290', clavePetalos); // para que el Cierre del día lo reconozca solo por el código
+  }
+
   var etiquetas = { merma:'Merma/mal estado', rotura:'Rotura', recuento:'Recuento físico', vuelo_no_registrado:'Vuelo sin registrar', error_carga:'Corrección de error', otro:'Otro' };
   registrarMovimiento({
     tipo:'ajuste',
     nota:document.getElementById('ajNota').value.trim(),
     detalle:'Ajuste: '+nombreProducto(it.variedad,it.medida)+' '+antes+' → '+nuevo+' ('+(delta>0?'+':'')+delta+') · '+(etiquetas[motivo]||motivo)
+      + (convertir ? ' · +'+cantidadConvertida+' convertido a Pétalos' : '')
   });
   guardarStock(stock);
   cerrar('mAjuste');
   _ajClave = null;
-  toast('Stock ajustado: '+(delta>0?'+':'')+delta);
+  toast(convertir ? 'Ajustado · '+cantidadConvertida+' convertido a Pétalos' : 'Stock ajustado: '+(delta>0?'+':'')+delta);
 }
 
 /* ══ HISTÓRICO ══ */
@@ -1662,9 +1695,16 @@ function deshacerCompra(id){
   }
 
   mov.deshecha = true;
+  var entradaAuditoria = {
+    tipo:'deshacer',
+    t: Date.now(),
+    id: 'L-'+Date.now()+'-'+Math.floor(Math.random()*1000),
+    detalle:'Deshecha: '+(mov.awbs?mov.awbs.join(', '):resumen)
+  };
+  log.push(entradaAuditoria);
+  if(log.length>500) log = log.slice(-500);
   _logCache = log;
-  refLog.set(log);
-  registrarMovimiento({ tipo:'deshacer', detalle:'Deshecha: '+(mov.awbs?mov.awbs.join(', '):resumen) });
+  refLog.set(log).catch(function(err){ toast('⚠ No se guardó el histórico: '+err.message); console.error('refLog.set:', err); });
 
   toast('Compra deshecha');
   abrirHistorico(); // refresca la lista para que se vea marcada
@@ -1695,10 +1735,20 @@ function deshacerCierre(id, silencioso){
   });
   guardarStock(stock);
 
+  // Una sola escritura al histórico: marcamos deshecho Y añadimos la entrada de auditoría
+  // en el mismo array, en vez de dos llamadas seguidas a refLog.set() que podrían pisarse.
   mov.deshecha = true;
+  var entradaAuditoria = {
+    tipo:'deshacer',
+    t: Date.now(),
+    id: 'L-'+Date.now()+'-'+Math.floor(Math.random()*1000),
+    detalle:'Cierre de las '+new Date(mov.t).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+' deshecho'+(silencioso?' (para reemplazarlo por uno nuevo)':'')
+  };
+  log.push(entradaAuditoria);
+  if(log.length>500) log = log.slice(-500);
   _logCache = log;
-  refLog.set(log);
-  registrarMovimiento({ tipo:'deshacer', detalle:'Cierre de las '+new Date(mov.t).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+' deshecho'+(silencioso?' (para reemplazarlo por uno nuevo)':'') });
+  refLog.set(log).catch(function(err){ toast('⚠ No se guardó el histórico: '+err.message); console.error('refLog.set:', err); });
+
   if(!silencioso){ toast('Cierre deshecho'); abrirHistorico(); }
   return true;
 }
