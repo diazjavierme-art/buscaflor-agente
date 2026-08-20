@@ -518,7 +518,16 @@ function nombreProducto(variedad, medida){
 }
 
 /* ══ FECHAS ══ */
-function hoyISO(){ return new Date().toISOString().split('T')[0]; }
+// IMPORTANTE: nunca usar toISOString() para "qué día es hoy" — toISOString() da la fecha
+// en UTC, no en la hora local. De madrugada en España (UTC+1/+2), UTC todavía va "ayer",
+// así que la app confundía el día. Esta función usa siempre el calendario local del navegador.
+function fechaLocalISO(d){
+  var y = d.getFullYear();
+  var m = String(d.getMonth()+1).padStart(2,'0');
+  var dia = String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+dia;
+}
+function hoyISO(){ return fechaLocalISO(new Date()); }
 function fmtFecha(iso){
   if(!iso) return '?';
   var d = new Date(iso+'T00:00:00');
@@ -586,7 +595,7 @@ function renderStock(){
   var dias = [];
   for(var i=0;i<4;i++){
     var d = new Date(fechaBase+'T00:00:00'); d.setDate(d.getDate()+i);
-    dias.push(d.toISOString().split('T')[0]);
+    dias.push(fechaLocalISO(d));
   }
   var D=['D','L','M','X','J','V','S'];
   var cabecerasDias = dias.map(function(f,i){
@@ -1480,7 +1489,7 @@ function abrirHistorico(){
   }
   var porDia = {};
   log.slice().sort(function(a,b){return b.t-a.t;}).forEach(function(e){
-    var d = new Date(e.t).toISOString().split('T')[0];
+    var d = fechaLocalISO(new Date(e.t));
     if(!porDia[d]) porDia[d]=[];
     porDia[d].push(e);
   });
