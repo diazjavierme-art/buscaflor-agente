@@ -527,7 +527,12 @@ header{
   <div class="hoja">
     <div class="hoja-head"><h3>Histórico</h3><button class="cerrar" onclick="cerrar('mHistorico')">✕</button></div>
     <div class="hoja-cuerpo" id="histCuerpo"></div>
-    <div style="padding:8px 18px 0;text-align:center;font-size:9.5px;color:var(--filo);font-family:'IBM Plex Mono',monospace;">v2026-08-20-2015-compra-manual-buscador</div>
+    <div style="padding:8px 18px 0;text-align:center;font-size:9.5px;color:var(--filo);font-family:'IBM Plex Mono',monospace;">v2026-08-23-alstro-por-tamano</div>
+    <div style="padding:14px 18px;border-top:1px solid var(--filo);">
+      <div style="font-size:10px;color:var(--filo);text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:7px;">Mantenimiento</div>
+      <button class="btn" style="width:100%;" onclick="agruparAlstroStock()">🌸 Agrupar alstro por tamaño</button>
+      <p class="nota" style="margin:6px 0 0;font-size:11px;">Junta las líneas de alstro por color en dos: FANCY y SELECT (el super select sale del select). Las compras nuevas ya entran agrupadas solas. Basta con hacerlo una vez.</p>
+    </div>
     <div style="padding:14px 18px;border-top:1px solid var(--filo);">
       <div style="font-size:10px;color:var(--rojo);text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:7px;">Zona peligrosa</div>
       <button class="btn" style="width:100%;border-color:var(--rojo);color:var(--rojo);" onclick="resetearStock()">🗑 Resetear todo el stock</button>
@@ -698,6 +703,61 @@ function nombreCorto(cultivo, variedad){
     return sinAlstro || v;
   }
   return v;
+}
+
+
+/* ══ ALSTROEMERIA — se compra por color, se vende por tamaño ══
+   El proveedor la manda desglosada por color ("ALSTRO PINK SELECT", "ALSTRO FANCY WHITE"),
+   pero en Buscaflor se vende solo por grado: fancy, select y super select. El super select
+   no llega marcado como tal — se separa del propio select al abrir la caja, así que para el
+   stock es el mismo saco. Por eso, al cargar una compra, toda la alstro se agrupa en dos
+   líneas: ALSTRO FANCY y ALSTRO SELECT. Así el stock está en la misma unidad en la que se
+   vende y el cierre del día cuadra solo, sin repartir ventas entre colores a ojo.
+
+   Cuando el nombre no dice el grado (ej. "ALSTRO MIX WH-PK"), se deduce por el tamaño de
+   caja, que depende de la finca: fancy siempre 25, select 20 en Benchmark y 16 en Plazoleta.
+   Si la cantidad no encaja con un solo grado, la línea NO se adivina: se queda tal cual y
+   aparece en la vista previa como variedad nueva, donde se vincula a mano al saco correcto. */
+var CAJA_ALSTRO_FANCY = 25;
+function cajaAlstroSelect(proveedor){
+  return /PLAZOLETA/i.test(String(proveedor||'')) ? 16 : 20;
+}
+function esAlstro(cultivo, variedad){
+  return (String(cultivo||'')+' '+String(variedad||'')).toUpperCase().indexOf('ALSTRO')>=0;
+}
+function gradoAlstro(variedad, proveedor, cantidad){
+  var v = String(variedad||'').toUpperCase();
+  // El super select sale del select — mismo saco de stock, distinto precio de venta.
+  if(/SUPER\s*SELECT|\bSSEL\b/.test(v)) return 'SELECT';
+  if(/\bSELECT\b|\bSEL\b/.test(v)) return 'SELECT';
+  if(/\bFANCY\b|\bFCY\b/.test(v)) return 'FANCY';
+  var n = parseInt(cantidad,10)||0;
+  if(n>0){
+    var cs = cajaAlstroSelect(proveedor);
+    var encajaFancy  = (n % CAJA_ALSTRO_FANCY === 0);
+    var encajaSelect = (n % cs === 0);
+    if(encajaFancy && !encajaSelect) return 'FANCY';
+    if(encajaSelect && !encajaFancy) return 'SELECT';
+  }
+  return null; // ambiguo o sin pistas — mejor no adivinar
+}
+/* Agrupa las líneas de alstro de una compra en ALSTRO FANCY / ALSTRO SELECT.
+   Las que no se pueden clasificar pasan intactas, para vincularlas a mano en la vista previa. */
+function agruparAlstro(lineas){
+  var resultado = [], sacos = {};
+  (lineas||[]).forEach(function(l){
+    if(!esAlstro(l.cultivo, l.variedad)){ resultado.push(l); return; }
+    var g = gradoAlstro(l.variedad, l.proveedor, l.cantidad);
+    if(!g){ resultado.push(l); return; }
+    var nombre = 'ALSTRO '+g;
+    if(!sacos[nombre]){
+      sacos[nombre] = { cultivo:'ALSTROEMERIA', variedad:nombre, medida:'—', cantidad:0,
+                        unidad:l.unidad||'paquetes', proveedor:l.proveedor||'' };
+      resultado.push(sacos[nombre]);
+    }
+    sacos[nombre].cantidad += (parseInt(l.cantidad,10)||0);
+  });
+  return resultado;
 }
 
 /* ══ FECHAS ══ */
@@ -966,6 +1026,12 @@ function guardarCompraManual(){
 
   if(!variedad){ toast('Escribe la variedad'); return; }
   if(!cantidad || cantidad<1){ toast('Cantidad inválida'); return; }
+
+  // Alstro: va siempre al saco de su grado, aunque se escriba con el color
+  if(esAlstro(cultivo, variedad)){
+    var gManual = gradoAlstro(variedad, proveedor, cantidad);
+    if(gManual){ variedad = 'ALSTRO '+gManual; medida = '—'; cultivo = 'ALSTROEMERIA'; }
+  }
 
   var stock = cargarStock();
   var k = claveProducto(nombreProducto(variedad, medida));
@@ -1343,11 +1409,14 @@ function procesarArchivoExcel(file){
           }
         }
         if(cantidad<=0 || cantidad>1000000) continue;
-        lineas.push({ cultivo:cCul||'OTROS', variedad:cVar.toUpperCase(), medida:cMed||'—', cantidad:cantidad, unidad:unidad });
+        var cProv = (col.proveedor>=0 && f[col.proveedor]!=null) ? String(f[col.proveedor]).trim() : '';
+        lineas.push({ cultivo:cCul||'OTROS', variedad:cVar.toUpperCase(), medida:cMed||'—', cantidad:cantidad, unidad:unidad, proveedor:cProv });
       }
 
       document.getElementById('cargandoExcel').classList.remove('activo');
       if(!lineas.length) throw new Error('No encontré líneas válidas en «Por Variedad»');
+
+      lineas = agruparAlstro(lineas); // alstro: 16 colores -> 2 sacos (FANCY / SELECT)
 
       _excelPreview = { lineas:lineas, awb:awb, fecha:fechaInv, titulo:titulo };
 
@@ -1457,6 +1526,7 @@ function procesarArchivosVerdnatura(files){
 
     var lineas = [];
     incluidos.forEach(function(d){ lineas = lineas.concat(d.lineas); });
+    lineas = agruparAlstro(lineas); // mismo criterio que en el Excel de AWB
 
     _excelPreview = {
       lineas: lineas,
@@ -1841,6 +1911,14 @@ function casarConStock(desc, stock, codigo){
   var d = desc.toUpperCase().trim();
   var k = claveProducto(desc);
   if(stock[k]) return k;
+  // Alstro: el CRM vende "fancy", "select" o "super select" — los dos últimos, mismo saco.
+  if(d.indexOf('ALSTRO')>=0){
+    var gVenta = gradoAlstro(d, '', 0);
+    if(gVenta){
+      var kAlstro = claveProducto('ALSTRO '+gVenta);
+      if(stock[kAlstro]) return kAlstro;
+    }
+  }
   var hit = null;
   Object.keys(stock).forEach(function(key){
     if(hit) return;
@@ -2191,6 +2269,84 @@ function aplicarAjuste(){
   cerrar('mAjuste');
   _ajClave = null;
   toast(convertir ? 'Ajustado · '+cantidadConvertida+' convertido a Pétalos' : 'Stock ajustado: '+(delta>0?'+':'')+delta);
+}
+
+/* ══ AGRUPAR LA ALSTRO YA CARGADA (una sola vez) ══
+   Las compras nuevas ya entran agrupadas por gradoAlstro(). Esto es para el stock que
+   quedó desglosado por color de antes: junta cada línea en su saco (FANCY o SELECT),
+   arrastrando las próximas entradas, los pedidos activos y los códigos del CRM, igual
+   que hace una fusión normal. Lo que no se puede clasificar sin adivinar se deja tal cual. */
+function agruparAlstroStock(){
+  var stock = cargarStock();
+  var claves = Object.keys(stock).filter(function(k){ return esAlstro(stock[k].cultivo, stock[k].variedad); });
+  if(!claves.length){ toast('No hay alstroemeria en el stock'); return; }
+
+  var mover = [], sinGrado = [], totales = {};
+  claves.forEach(function(k){
+    var it = stock[k];
+    var g = gradoAlstro(it.variedad, it.proveedor||'', it.cantidad);
+    if(!g){ sinGrado.push(nombreProducto(it.variedad, it.medida)+' ('+(it.cantidad||0)+')'); return; }
+    var destino = claveProducto('ALSTRO '+g);
+    totales[destino] = (totales[destino]||0) + (it.cantidad||0);
+    if(destino!==k) mover.push({ de:k, a:destino, grado:g });
+  });
+
+  if(!mover.length){ toast('La alstro ya está agrupada por tamaño'); return; }
+
+  var resumen = Object.keys(totales).sort().map(function(kd){
+    return '  · '+kd.replace('|—','')+' = '+totales[kd];
+  }).join('\n');
+  var aviso = '¿Agrupar la alstroemeria por tamaño?\n\n'+mover.length+' líneas de color se juntan en:\n'+resumen;
+  if(sinGrado.length) aviso += '\n\nSe quedan aparte (no se puede saber el grado sin adivinar):\n  · '+sinGrado.join('\n  · ');
+  aviso += '\n\nLos pedidos activos y los códigos del CRM se redirigen solos.\nEsto no se deshace automáticamente.\n\n¿Seguro?';
+  if(!confirm(aviso)) return;
+
+  var redirigir = {};
+  mover.forEach(function(m){
+    var o = stock[m.de];
+    if(!o) return;
+    if(!stock[m.a]) stock[m.a] = { cultivo:'ALSTROEMERIA', variedad:'ALSTRO '+m.grado, medida:'—',
+                                   cantidad:0, unidad:o.unidad||'paquetes', futuras:[] };
+    var d = stock[m.a];
+    d.cantidad = (d.cantidad||0) + (o.cantidad||0);
+    d.futuras  = (d.futuras||[]).concat(o.futuras||[]);
+    delete stock[m.de];
+    redirigir[m.de] = m.a;
+  });
+  guardarStock(stock);
+
+  // Pedidos activos que apuntaban a un color pasan al saco correspondiente
+  var pedidos = (_pedidosCache||[]).slice(), pedidosMovidos = 0;
+  pedidos.forEach(function(pe){
+    if(redirigir[pe.clave]){
+      pe.clave = redirigir[pe.clave];
+      var it = stock[pe.clave];
+      if(it) pe.nombre = nombreProducto(it.variedad, it.medida);
+      pedidosMovidos++;
+    }
+  });
+  if(pedidosMovidos) guardarPedidosCambiados(pedidos);
+
+  // Códigos del CRM aprendidos: se redirigen para que el cierre siga casando
+  var mapeo = Object.assign({}, cargarMapeo()), codigosMovidos = 0;
+  Object.keys(mapeo).forEach(function(cod){
+    if(redirigir[mapeo[cod]]){ mapeo[cod] = redirigir[mapeo[cod]]; codigosMovidos++; }
+  });
+  if(codigosMovidos){
+    _mapeoCache = mapeo;
+    refMapeo.set(mapeo).catch(function(err){ console.error('refMapeo.set (agrupar alstro):', err); });
+  }
+
+  registrarMovimiento({
+    tipo:'agrupar_alstro',
+    detalle:'🌸 Alstro agrupada por tamaño: '+mover.length+' líneas de color juntadas'+
+            (pedidosMovidos?' · '+pedidosMovidos+' pedido(s) movido(s)':'')+
+            (codigosMovidos?' · '+codigosMovidos+' código(s) redirigido(s)':'')+
+            (sinGrado.length?' · '+sinGrado.length+' sin clasificar':'')
+  });
+
+  cerrar('mHistorico');
+  toast('Alstro agrupada'+(sinGrado.length?' · '+sinGrado.length+' línea(s) sin clasificar':''));
 }
 
 /* ══ HISTÓRICO ══ */
