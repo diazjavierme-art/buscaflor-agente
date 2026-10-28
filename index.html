@@ -352,8 +352,8 @@ header{
       <p class="nota">Para compras que no vienen de un Excel de AWB (ej. Verdnatura). Si la fecha es futura, se guarda como próxima entrada y no se suma al disponible de hoy.</p>
       <div class="campo">
         <label>Variedad</label>
-        <div class="sw"><input class="si" id="cpVariedad" placeholder="Buscar en tu stock o escribir nueva…" autocomplete="off" oninput="buscarVariedadCompra(this.value)" onfocus="buscarVariedadCompra(this.value)"><div class="sd" id="cpVariedadDD"></div></div>
-        <p class="nota" style="margin:4px 0 0;font-size:11px;">Si ya la tienes, elígela de la lista para que se sume ahí (así casa con tu CRM). Si es nueva, sigue escribiendo y se creará.</p>
+        <div class="sw"><input class="si" id="cpVariedad" placeholder="Buscar artículo de AmbarX (nombre o código)…" autocomplete="off" oninput="_cpCodigo=null;buscarVariedadCompra(this.value)" onfocus="buscarVariedadCompra(this.value)"><div class="sd" id="cpVariedadDD"></div></div>
+        <p class="nota" style="margin:4px 0 0;font-size:11px;">Elige el artículo de la lista — es el catálogo de AmbarX, así casa con el CRM, las etiquetas y los pedidos.</p>
       </div>
       <div style="display:flex;gap:10px;">
         <div class="campo" style="flex:1;">
@@ -649,6 +649,130 @@ function aprenderMapeo(codigo, clave){
   refMapeo.child(codigo).set(clave).catch(function(err){ console.error('refMapeo.set:', err); });
 }
 
+/* ══ CATÁLOGO AMBARX — fuente única de artículos para todas las apps ══
+   El stock se guarda por CÓDIGO de artículo de AmbarX (ej. "4" = FREEDOM 60CM/25T), el mismo
+   código que sale en el CRM, en las etiquetas de caja y en los pedidos. Así todo casa por código.
+   - buscaflor/articulos/items   → catálogo de AmbarX (código, descripción, variedad, medida…)
+   - buscaflor/equivalencias     → lo que manda la FINCA ("FREEDOM|60", "CLAVEL FANCY RED|—")
+                                   → código AmbarX. Se aprende al vincular una vez en la carga.
+   - buscaflor/mapeoCodigos      → códigos de venta que descuentan de OTRO artículo del stock
+                                   (ej. 454 SUPER SELECT sale del saco 245 SELECT). */
+var refArticulos = fbDB.ref('buscaflor/articulos/items');
+var refEquiv = fbDB.ref('buscaflor/equivalencias');
+var _articulos = {};
+var _idxCatalogo = {};   // "FREEDOM|60" -> ["4"]
+var _equivCache = {};
+// Equivalencias de partida (se pueden sobrescribir vinculando a mano en la carga)
+var EQUIV_INICIALES = {
+  'ALSTRO SELECT|—':'245', 'ALSTRO FANCY|—':'367',
+  'CLAVEL FANCY AMARILLO|—':'618', 'CLAVEL FANCY YELLOW|—':'618',
+  'CLAVEL FANCY ANTIGUA|—':'625',
+  'CLAVEL FANCY BURGUNDY|—':'582',
+  'CLAVEL FANCY CARAMEL|—':'612',
+  'CLAVEL FANCY PINK|—':'594',
+  'CLAVEL FANCY PURPLE|—':'580',
+  'CLAVEL FANCY RED|—':'581',
+  'CLAVEL FANCY WHITE|—':'584',
+  'LENTISCO|—':'915'
+};
+var MAPEO_INICIAL = { '454':'245' }; // super select sale del mismo saco que el select
+
+function esCodigoAmbar(k){ return !!k && String(k).indexOf('|')<0; }
+function articulo(codigo){ return (codigo!=null && _articulos[codigo]) || null; }
+function cultivoDeArticulo(a){
+  var d = String((a && a.descripcion)||'').toUpperCase();
+  if(/ALSTRO/.test(d)) return 'ALSTROEMERIA';
+  if(/CLAVEL/.test(d)) return 'CLAVELES';
+  if(/HORTENS/.test(d)) return 'HORTENSIAS';
+  if(/PANICULATA|GYPS/.test(d)) return 'GYPSOPHILA';
+  if(/NARDO/.test(d)) return 'NARDOS';
+  if(a && a.medida && a.tallosPaquete) return 'ROSAS';
+  return 'OTROS';
+}
+// Crea la línea de stock de un artículo AmbarX. base = datos de la línea de origen (cultivo/unidad de la finca)
+function itemDesdeArticulo(codigo, base){
+  var a = articulo(codigo) || {};
+  base = base || {};
+  var cultivo = cultivoDeArticulo(a);
+  if(cultivo==='OTROS' && base.cultivo) cultivo = String(base.cultivo).toUpperCase();
+  return {
+    codigo: String(codigo),
+    descripcion: a.descripcion || nombreProducto(base.variedad, base.medida),
+    cultivo: cultivo,
+    variedad: a.variedad || base.variedad || a.descripcion || '',
+    medida: a.medida ? String(a.medida) : '—',
+    cantidad: 0,
+    unidad: base.unidad || unidadDeCultivo(cultivo),
+    futuras: []
+  };
+}
+function construirIndiceCatalogo(){
+  var idx = {};
+  Object.keys(_articulos).forEach(function(c){
+    var k = claveProducto(_articulos[c].descripcion||'');
+    if(!k) return;
+    (idx[k] = idx[k] || []).push(c);
+  });
+  _idxCatalogo = idx;
+}
+// Nombre de finca/CRM → código AmbarX (null si no se sabe sin preguntar)
+function codigoDeNombre(variedad, medida){
+  var nk = claveProducto(nombreProducto(variedad, medida));
+  if(!nk) return null;
+  var eq = _equivCache[nk] || EQUIV_INICIALES[nk];
+  if(eq && articulo(eq)) return eq;
+  var c = _idxCatalogo[nk];
+  if(c && c.length===1) return c[0];
+  return null;
+}
+// Código de venta → código de la línea de stock de la que descuenta (normalmente el mismo)
+function codigoStock(codigo){
+  if(!codigo) return codigo;
+  var c = String(codigo);
+  var destino = _mapeoCache[c] || MAPEO_INICIAL[c];
+  return (destino && esCodigoAmbar(destino) && destino!==c) ? destino : c;
+}
+function aprenderEquivalencia(nk, codigo){
+  if(!nk || !codigo || !articulo(codigo)) return;
+  if((_equivCache[nk] || EQUIV_INICIALES[nk])===codigo) return;
+  _equivCache[nk] = codigo;
+  refEquiv.child(nk).set(codigo).catch(function(err){ console.error('refEquiv.set:', err); });
+}
+function nombreArticulo(codigo){
+  var a = articulo(codigo);
+  return a ? a.descripcion : String(codigo);
+}
+// Lista de artículos del catálogo ordenada: primero los que se parecen al texto dado
+function articulosSugeridos(texto, max){
+  var palabras = String(texto||'').toUpperCase().replace(/[^A-ZÑ0-9 ]/g,' ').split(/\s+/).filter(function(p){ return p.length>2 && !/^\d+CM$/.test(p); });
+  var puntuados = [];
+  Object.keys(_articulos).forEach(function(c){
+    var d = String(_articulos[c].descripcion||'').toUpperCase();
+    var p = 0;
+    palabras.forEach(function(w){ if(d.indexOf(w)>=0) p += w.length; });
+    var med = String(texto||'').match(/\b(\d{2,3})\b/);
+    if(med && _articulos[c].medida===+med[1]) p += 3;
+    if(p>0) puntuados.push({c:c, p:p});
+  });
+  puntuados.sort(function(a,b){ return b.p-a.p || nombreArticulo(a.c).localeCompare(nombreArticulo(b.c)); });
+  return puntuados.slice(0, max||15).map(function(x){ return x.c; });
+}
+function opcionesCatalogoHTML(texto, seleccionado){
+  var sug = articulosSugeridos(texto, 15);
+  var html = '';
+  if(sug.length){
+    html += '<optgroup label="Parecidos">';
+    sug.forEach(function(c){ html += '<option value="'+c+'"'+(c===seleccionado?' selected':'')+'>#'+c+' · '+nombreArticulo(c)+'</option>'; });
+    html += '</optgroup>';
+  }
+  html += '<optgroup label="Todo el catálogo AmbarX">';
+  Object.keys(_articulos).sort(function(a,b){ return nombreArticulo(a).localeCompare(nombreArticulo(b)); }).forEach(function(c){
+    if(sug.indexOf(c)>=0) return;
+    html += '<option value="'+c+'"'+(c===seleccionado?' selected':'')+'>#'+c+' · '+nombreArticulo(c)+'</option>';
+  });
+  return html + '</optgroup>';
+}
+
 /* ══ REGLAS DE CULTIVO (unidades Buscaflor) ══ */
 function unidadDeCultivo(cultivo){
   var c = (cultivo||'').toUpperCase();
@@ -690,7 +814,7 @@ function nombreCorto(cultivo, variedad){
     var sinPrefijo = v.replace(/^CLAVEL(ES)?\s+/i,'');
     var partes = sinPrefijo.split(/\s+/);
     var grado = '';
-    if(partes[0] && partes[0].toUpperCase()==='FANCY'){ grado='FCY'; partes.shift(); }
+    if(partes[0] && /^(FANCY|FCY)$/i.test(partes[0])){ grado='FCY'; partes.shift(); }
     else if(partes[0] && partes[0].toUpperCase()==='SELECT'){ grado='SELECT'; partes.shift(); }
     var resto = partes.join(' ');
     return (resto ? resto : v) + (grado ? ' '+grado : '');
@@ -699,7 +823,7 @@ function nombreCorto(cultivo, variedad){
     // Aquí el orden color/grado no es uniforme ("ALSTRO PINK SELECT" vs "ALSTRO FANCY
     // ASSORTED" vs "ALSTRO SELECT OR-YW") — reordenar sería arriesgado, así que solo se
     // quita el "ALSTRO" del principio y se deja el resto tal cual venga.
-    var sinAlstro = v.replace(/^ALSTRO(EMERIA)?\s+/i,'');
+    var sinAlstro = v.replace(/^ALSTRO(EMERIAS?)?\s+/i,'');
     return sinAlstro || v;
   }
   return v;
@@ -910,7 +1034,9 @@ function renderStock(){
       return ((a.variedad||'')+(a.medida||'')).localeCompare((b.variedad||'')+(b.medida||''));
     });
     if(busqueda){
-      items = items.filter(function(it){ return (it.variedad||'').toLowerCase().indexOf(busqueda)>=0; });
+      items = items.filter(function(it){
+        return ((it.variedad||'')+' '+(it.descripcion||'')+' #'+(it.codigo||'')).toLowerCase().indexOf(busqueda)>=0;
+      });
       if(!items.length) return;
     }
     html += '<div class="cultivo">';
@@ -931,7 +1057,10 @@ function renderStock(){
         + ' <span class="f-fisico" title="Físico real en almacén, antes de restar pedidos">📦'+fisico+'</span>'
         : '';
       filasHtml += '<div class="fila">';
-      filasHtml += '<span class="f-nombre">'+nombreCorto(cult, it.variedad)+medidaTxt+candado+'</span>';
+      var codTxt = esCodigoAmbar(it._k)
+        ? ' <span class="f-cod" title="Código AmbarX" style="color:var(--gris);font-size:10px;font-family:\'IBM Plex Mono\',monospace;">#'+it._k+'</span>'
+        : ' <span title="Sin código AmbarX" style="color:var(--rojo);font-size:10px;">sin código</span>';
+      filasHtml += '<span class="f-nombre">'+nombreCorto(cult, it.variedad)+medidaTxt+codTxt+candado+'</span>';
       dias.forEach(function(f,i){
         var v = fisico + sumaFuturasHasta(it, f) - comprometido;
         var cls = v<0 ? 'neg' : v===0 ? 'cero' : (i>0 && v>cRef) ? 'futuro' : '';
@@ -949,6 +1078,11 @@ function renderStock(){
       ? '<div class="vacio"><p>Sin resultados para «<b>'+busqueda+'</b>»</p></div>'
       : '<div class="vacio"><p>Sin stock disponible '+(esHoyReal?'hoy':'el '+fmtFecha(fechaBase))+'</p></div>';
   }
+  var antiguas = claves.filter(function(k){ return !esCodigoAmbar(k); }).length;
+  if(antiguas){
+    html = '<div class="alerta" style="margin-bottom:10px;"><b>'+antiguas+' línea'+(antiguas!==1?'s':'')+' del stock antiguo sin código AmbarX.</b> '+
+           'El stock ya funciona por código de AmbarX. Borra el stock antiguo desde <b>Histórico → Resetear todo el stock</b> y vuelve a cargar el inventario: cada línea se vinculará a su artículo de AmbarX.</div>' + html;
+  }
   cont.innerHTML = html;
   cont.querySelectorAll('.f-edit').forEach(function(b){
     b.addEventListener('click', function(){ abrirAjuste(b.getAttribute('data-k')); });
@@ -965,7 +1099,9 @@ function actualizarLabelFecha(){
 }
 
 /* ══ COMPRA MANUAL (proveedores sin Excel, ej. Verdnatura) ══ */
+var _cpCodigo = null;
 function abrirCompra(){
+  _cpCodigo = null;
   document.getElementById('cpVariedad').value = '';
   document.getElementById('cpMedida').value = '';
   document.getElementById('cpCultivo').value = '';
@@ -981,26 +1117,26 @@ function buscarVariedadCompra(texto){
   var q = (texto||'').toLowerCase().trim();
   var dd = document.getElementById('cpVariedadDD');
   if(!q){ dd.classList.remove('open'); return; }
-  var claves = Object.keys(stock).filter(function(k){
-    var it = stock[k];
-    return nombreProducto(it.variedad, it.medida).toLowerCase().indexOf(q)>=0;
-  }).slice(0,40);
-  if(!claves.length){
-    dd.innerHTML = '<div class="so" style="color:var(--gris);font-style:italic;">Sin coincidencias — se creará como variedad nueva</div>';
+  var codigos = Object.keys(_articulos).filter(function(c){
+    return ('#'+c+' '+nombreArticulo(c)).toLowerCase().indexOf(q)>=0 || c===q;
+  }).sort(function(a,b){ return (stock[b]?1:0)-(stock[a]?1:0) || nombreArticulo(a).localeCompare(nombreArticulo(b)); }).slice(0,40);
+  if(!codigos.length){
+    dd.innerHTML = '<div class="so" style="color:var(--gris);font-style:italic;">No está en el catálogo de AmbarX — dalo de alta allí primero</div>';
     dd.classList.add('open');
     return;
   }
-  dd.innerHTML = claves.map(function(k){
-    var it = stock[k];
-    return '<div class="so" data-k="'+k+'">'+nombreProducto(it.variedad,it.medida)+' <span class="disp-badge">'+(it.cantidad||0)+' '+(it.unidad||'')+'</span></div>';
+  dd.innerHTML = codigos.map(function(c){
+    var it = stock[c];
+    return '<div class="so" data-k="'+c+'">#'+c+' · '+nombreArticulo(c)+(it?' <span class="disp-badge">'+(it.cantidad||0)+' '+(it.unidad||'')+'</span>':'')+'</div>';
   }).join('');
   dd.classList.add('open');
   dd.querySelectorAll('.so[data-k]').forEach(function(el){
     el.addEventListener('mousedown', function(e){
       e.preventDefault();
-      var k = el.getAttribute('data-k');
-      var it = stock[k];
-      document.getElementById('cpVariedad').value = it.variedad;
+      var c = el.getAttribute('data-k');
+      var it = stock[c] || itemDesdeArticulo(c);
+      _cpCodigo = c;
+      document.getElementById('cpVariedad').value = nombreArticulo(c);
       document.getElementById('cpMedida').value = (it.medida && it.medida!=='—' && it.medida!=='-') ? it.medida : '';
       document.getElementById('cpCultivo').value = it.cultivo || '';
       document.getElementById('cpUnidad').value = it.unidad || 'paquetes';
@@ -1034,9 +1170,11 @@ function guardarCompraManual(){
   }
 
   var stock = cargarStock();
-  var k = claveProducto(nombreProducto(variedad, medida));
-  if(!stock[k]) stock[k] = {cultivo:cultivo, variedad:variedad, medida:medida, cantidad:0, unidad:unidad, futuras:[]};
+  var k = codigoStock(_cpCodigo || codigoDeNombre(variedad, medida));
+  if(!k){ toast('Elige el artículo de AmbarX en la lista desplegable'); return; }
+  if(!stock[k]) stock[k] = itemDesdeArticulo(k, {cultivo:cultivo, unidad:unidad, variedad:variedad, medida:medida});
   if(!stock[k].futuras) stock[k].futuras = [];
+  variedad = stock[k].variedad; medida = stock[k].medida;
 
   var esFutura = fecha > hoyISO();
   if(esFutura){
@@ -1573,46 +1711,54 @@ function sugerirParecida(variedadNueva, stock){
   return mejor;
 }
 
+// Cada línea de la finca se casa con un artículo de AmbarX: por la equivalencia aprendida,
+// por coincidencia exacta con el catálogo, o eligiéndolo a mano una vez (se recuerda).
+function codigoDeLineaCompra(l){
+  if(l._nk==null) l._nk = claveProducto(nombreProducto(l.variedad,l.medida));
+  if(l._codigo) return l._codigo;
+  if(l._forzarEleccion) return null;
+  var c = codigoDeNombre(l.variedad, l.medida);
+  return c ? codigoStock(c) : null;
+}
 function renderPreviewCompra(){
   var stock = cargarStock();
   var lineas = _excelPreview.lineas;
   var porCult={};
   lineas.forEach(function(l,i){ l._i=i; if(!porCult[l.cultivo])porCult[l.cultivo]=[]; porCult[l.cultivo].push(l); });
-  var opciones = Object.keys(stock).sort(function(a,b){
-    return nombreProducto(stock[a].variedad,stock[a].medida).localeCompare(nombreProducto(stock[b].variedad,stock[b].medida));
-  });
   var html='';
   if(_excelPreview.documentos && _excelPreview.documentos.length>1){
     html += '<div style="font-size:11px;color:var(--gris);margin-bottom:6px;">Documentos: '+_excelPreview.documentos.map(function(d){return d.awb;}).join(' · ')+'</div>';
   }
-  var nuevas = 0;
+  if(!Object.keys(_articulos).length){
+    html += '<div class="alerta"><b>No se ha cargado el catálogo de AmbarX.</b> Revisa la conexión y vuelve a abrir la carga.</div>';
+  }
+  var sinCodigo = 0;
   Object.keys(porCult).forEach(function(c){
     html += '<div class="prev-cult">'+c+' · '+unidadDeCultivo(c)+'</div>';
     porCult[c].forEach(function(l){
       var conv = l._tallos ? ' <span style="color:var(--gris);">('+l._tallos+' tallos)</span>' : '';
-      var clave = claveProducto(nombreProducto(l.variedad,l.medida));
-      var yaExiste = !!stock[clave];
-      if(yaExiste){
-        html += '<div class="prev-linea"><span>'+l.variedad+(l.medida!=='—'?' '+l.medida:'')+conv+'</span><span class="num">'+l.cantidad+'</span></div>';
+      var nombreFinca = l.variedad+(l.medida!=='—'?' '+l.medida:'');
+      var cod = codigoDeLineaCompra(l);
+      if(cod){
+        var nuevaEnStock = !stock[cod] ? ' <span style="color:var(--oro);font-size:10px;">nueva en stock</span>' : '';
+        var cambiar = '<a href="#" class="cambiar-art" data-idx="'+l._i+'" style="font-size:10px;color:var(--gris);margin-left:6px;">cambiar</a>';
+        var mismoNombre = claveProducto(nombreArticulo(cod))===l._nk;
+        html += '<div class="prev-linea"><span>'+nombreFinca+conv+
+                (mismoNombre ? '' : ' <span style="color:var(--gris);font-size:10.5px;">→ #'+cod+' '+nombreArticulo(cod)+'</span>')+
+                (mismoNombre ? ' <span style="color:var(--gris);font-size:10px;">#'+cod+'</span>' : '')+nuevaEnStock+cambiar+'</span><span class="num">'+l.cantidad+'</span></div>';
       } else {
-        nuevas++;
-        var sugerida = sugerirParecida(l.variedad, stock);
+        sinCodigo++;
         html += '<div class="prev-linea" style="flex-direction:column;align-items:stretch;gap:4px;border-color:var(--oro);">';
-        html += '<div style="display:flex;justify-content:space-between;"><span>🆕 '+l.variedad+(l.medida!=='—'?' '+l.medida:'')+conv+'</span><span class="num" style="color:var(--oro);">'+l.cantidad+'</span></div>';
-        if(sugerida){
-          html += '<div style="font-size:10.5px;color:#8a6a1f;">💡 Se parece a «'+nombreProducto(stock[sugerida].variedad,stock[sugerida].medida)+'» — ya seleccionada abajo, cambia si no es</div>';
-        }
+        html += '<div style="display:flex;justify-content:space-between;"><span>❓ '+nombreFinca+conv+'</span><span class="num" style="color:var(--oro);">'+l.cantidad+'</span></div>';
         html += '<select class="vincular-sel" data-idx="'+l._i+'" style="width:100%;border:1px solid var(--oro);border-radius:6px;padding:5px 7px;font-family:\'IBM Plex Sans\',sans-serif;font-size:11.5px;background:var(--papel);color:var(--tinta);">';
-        html += '<option value="">＋ Crear variedad nueva («'+l.variedad+(l.medida!=='—'?' '+l.medida:'')+'»)</option>';
-        opciones.forEach(function(k){
-          html += '<option value="'+k.replace(/"/g,'&quot;')+'"'+(k===sugerida?' selected':'')+'>Es la misma que: '+nombreProducto(stock[k].variedad,stock[k].medida)+'</option>';
-        });
+        html += '<option value="">— ¿Qué artículo de AmbarX es? —</option>';
+        html += opcionesCatalogoHTML(nombreFinca, null);
         html += '</select></div>';
       }
     });
   });
-  if(nuevas>0){
-    html = '<div class="alerta" style="border-color:var(--oro);background:rgba(199,154,62,0.08);"><b style="color:#8a6a1f;">'+nuevas+' variedad'+(nuevas!==1?'es':'')+' nueva'+(nuevas!==1?'s':'')+' («🆕»).</b> Si ya tenías algo parecido con otro nombre, vincúlalo abajo para que se sume ahí en vez de crear una duplicada.</div>' + html;
+  if(sinCodigo>0){
+    html = '<div class="alerta" style="border-color:var(--oro);background:rgba(199,154,62,0.08);"><b style="color:#8a6a1f;">'+sinCodigo+' línea'+(sinCodigo!==1?'s':'')+' de la finca sin artículo de AmbarX («❓»).</b> Elige a qué artículo corresponde cada una: se recuerda para las próximas cargas.</div>' + html;
   }
   if(_excelPreview._omitidos){
     html += '<div class="alerta" style="margin-top:8px;">Omitidos por ya estar cargados: '+_excelPreview._omitidos.join(', ')+'</div>';
@@ -1623,14 +1769,17 @@ function renderPreviewCompra(){
   document.getElementById('previewLineas').innerHTML = html;
   document.querySelectorAll('#previewLineas .vincular-sel').forEach(function(sel){
     sel.addEventListener('change', function(){
-      var idx = parseInt(this.getAttribute('data-idx'));
-      var linea = _excelPreview.lineas[idx];
-      if(this.value){
-        var it = stock[this.value];
-        linea.variedad = it.variedad;
-        linea.medida = it.medida;
-        linea.cultivo = it.cultivo; // para que se agrupe en la sección correcta también
-      }
+      var linea = _excelPreview.lineas[parseInt(this.getAttribute('data-idx'))];
+      linea._codigo = this.value ? codigoStock(this.value) : null;
+      linea._manual = !!this.value;
+      renderPreviewCompra();
+    });
+  });
+  document.querySelectorAll('#previewLineas .cambiar-art').forEach(function(a){
+    a.addEventListener('click', function(e){
+      e.preventDefault();
+      var linea = _excelPreview.lineas[parseInt(this.getAttribute('data-idx'))];
+      linea._codigo = null; linea._forzarEleccion = true;
       renderPreviewCompra();
     });
   });
@@ -1712,20 +1861,14 @@ function confirmarExcel(){
   var boton = document.getElementById('btnCargarStock');
 
   try{
-    // Aplica los vínculos elegidos (o sugeridos por defecto) en los desplegables de
-    // "variedad nueva" — se lee el estado real del desplegable ahora mismo, así que
-    // funciona igual si el usuario tocó algo como si dejó la sugerencia tal cual estaba.
-    var stockActualParaVinculos = cargarStock();
-    document.querySelectorAll('#previewLineas .vincular-sel').forEach(function(sel){
-      var idx = parseInt(sel.getAttribute('data-idx'));
-      var valor = sel.value;
-      if(valor && stockActualParaVinculos[valor] && _excelPreview.lineas[idx]){
-        var it = stockActualParaVinculos[valor];
-        _excelPreview.lineas[idx].variedad = it.variedad;
-        _excelPreview.lineas[idx].medida = it.medida;
-        _excelPreview.lineas[idx].cultivo = it.cultivo;
-      }
-    });
+    // Cada línea tiene que estar casada con un artículo de AmbarX antes de cargar
+    var pendientes = _excelPreview.lineas.filter(function(l){ return !codigoDeLineaCompra(l); });
+    if(pendientes.length){
+      toast(pendientes.length+' línea(s) sin artículo de AmbarX — elígelo en los desplegables «❓»');
+      return;
+    }
+    // Lo elegido a mano se aprende para la próxima carga de esa finca
+    _excelPreview.lineas.forEach(function(l){ if(l._manual && l._nk) aprenderEquivalencia(l._nk, l._codigo); });
 
     var existente = cargarStock();
     var meta = cargarMeta();
@@ -1760,8 +1903,9 @@ function confirmarExcel(){
     var stock = Object.assign({}, existente);
     var nuevas=0, sumadas=0, futuras=0;
     _excelPreview.lineas.forEach(function(l){
-      var k = claveProducto(nombreProducto(l.variedad,l.medida));
-      if(!stock[k]) stock[k] = {cultivo:l.cultivo, variedad:l.variedad, medida:l.medida, cantidad:0, unidad:l.unidad, futuras:[]};
+      var k = codigoDeLineaCompra(l);
+      l._clave = k;
+      if(!stock[k]) stock[k] = itemDesdeArticulo(k, l);
       if(!stock[k].futuras) stock[k].futuras = [];
       if(esFutura){
         stock[k].futuras.push({cantidad:l.cantidad, fecha:fechaCarga, origen:origen});
@@ -1785,7 +1929,7 @@ function confirmarExcel(){
       fechaCarga: fechaCarga,
       esFutura: esFutura,
       lineas: _excelPreview.lineas.map(function(l){
-        return { clave: claveProducto(nombreProducto(l.variedad,l.medida)), cantidad: l.cantidad, nombre: nombreProducto(l.variedad,l.medida), origen: origen };
+        return { clave: l._clave, cantidad: l.cantidad, nombre: nombreArticulo(l._clave), nombreFinca: nombreProducto(l.variedad,l.medida), origen: origen };
       }),
       detalle: (esFutura ? 'Próxima entrada ('+fmtFecha(fechaCarga)+'): ' : 'Compra sumada: ')+documentos.map(function(d){return d.awb;}).join(', ')+' · '+_excelPreview.lineas.length+' líneas'
     });
@@ -1904,18 +2048,24 @@ function leerCierreArchivo(e){
 // el stock). Solo se recurre al texto la primera vez que se ve ese código.
 function casarConStock(desc, stock, codigo){
   if(codigo){
+    // El stock va por código de AmbarX: casa directo, o por la línea de la que descuenta (454 → 245)
+    var cs = codigoStock(codigo);
+    if(stock[cs]) return cs;
+    if(stock[codigo]) return String(codigo);
     var clavePorCodigo = cargarMapeo()[codigo];
     if(clavePorCodigo && stock[clavePorCodigo]) return clavePorCodigo;
   }
   if(!desc) return null;
   var d = desc.toUpperCase().trim();
+  var porNombre = codigoDeNombre(desc, '—') || (_idxCatalogo[claveProducto(desc)]||[])[0];
+  if(porNombre && stock[codigoStock(porNombre)]) return codigoStock(porNombre);
   var k = claveProducto(desc);
   if(stock[k]) return k;
   // Alstro: el CRM vende "fancy", "select" o "super select" — los dos últimos, mismo saco.
   if(d.indexOf('ALSTRO')>=0){
     var gVenta = gradoAlstro(d, '', 0);
     if(gVenta){
-      var kAlstro = claveProducto('ALSTRO '+gVenta);
+      var kAlstro = codigoDeNombre('ALSTRO '+gVenta, '—') || claveProducto('ALSTRO '+gVenta);
       if(stock[kAlstro]) return kAlstro;
     }
   }
@@ -2021,7 +2171,7 @@ function renderCierrePreview(){
       html += '<select class="vincular-sel" data-idx="'+i+'" style="width:100%;border:1px solid var(--rojo);border-radius:6px;padding:5px 7px;font-family:\'IBM Plex Sans\',sans-serif;font-size:11.5px;background:var(--papel);color:var(--tinta);">';
       html += '<option value="">— vincular a variedad del stock —</option>';
       opciones.forEach(function(k){
-        html += '<option value="'+k.replace(/"/g,'&quot;')+'">'+nombreProducto(stock[k].variedad,stock[k].medida)+'</option>';
+        html += '<option value="'+k.replace(/"/g,'&quot;')+'">'+(esCodigoAmbar(k)?'#'+k+' · '+nombreArticulo(k):nombreProducto(stock[k].variedad,stock[k].medida))+'</option>';
       });
       html += '</select></div>';
     }
@@ -2252,8 +2402,10 @@ function aplicarAjuste(){
   var cantidadConvertida = convertir ? Math.abs(delta) : 0;
   var clavePetalos = null;
   if(convertir){
-    clavePetalos = claveProducto('PÉTALOS');
-    if(!stock[clavePetalos]) stock[clavePetalos] = {cultivo:'PÉTALOS', variedad:'PÉTALOS', medida:'—', cantidad:0, unidad:'paquetes', futuras:[]};
+    clavePetalos = articulo('290') ? '290' : claveProducto('PÉTALOS');
+    if(!stock[clavePetalos]) stock[clavePetalos] = articulo('290')
+      ? Object.assign(itemDesdeArticulo('290'), {cultivo:'PÉTALOS', unidad:'paquetes'})
+      : {cultivo:'PÉTALOS', variedad:'PÉTALOS', medida:'—', cantidad:0, unidad:'paquetes', futuras:[]};
     stock[clavePetalos].cantidad = (stock[clavePetalos].cantidad||0) + cantidadConvertida;
     aprenderMapeo('290', clavePetalos); // para que el Cierre del día lo reconozca solo por el código
   }
@@ -2286,7 +2438,7 @@ function agruparAlstroStock(){
     var it = stock[k];
     var g = gradoAlstro(it.variedad, it.proveedor||'', it.cantidad);
     if(!g){ sinGrado.push(nombreProducto(it.variedad, it.medida)+' ('+(it.cantidad||0)+')'); return; }
-    var destino = claveProducto('ALSTRO '+g);
+    var destino = codigoDeNombre('ALSTRO '+g, '—') || claveProducto('ALSTRO '+g);
     totales[destino] = (totales[destino]||0) + (it.cantidad||0);
     if(destino!==k) mover.push({ de:k, a:destino, grado:g });
   });
@@ -2305,8 +2457,9 @@ function agruparAlstroStock(){
   mover.forEach(function(m){
     var o = stock[m.de];
     if(!o) return;
-    if(!stock[m.a]) stock[m.a] = { cultivo:'ALSTROEMERIA', variedad:'ALSTRO '+m.grado, medida:'—',
-                                   cantidad:0, unidad:o.unidad||'paquetes', futuras:[] };
+    if(!stock[m.a]) stock[m.a] = esCodigoAmbar(m.a)
+      ? itemDesdeArticulo(m.a, {cultivo:'ALSTROEMERIA', unidad:o.unidad||'paquetes'})
+      : { cultivo:'ALSTROEMERIA', variedad:'ALSTRO '+m.grado, medida:'—', cantidad:0, unidad:o.unidad||'paquetes', futuras:[] };
     var d = stock[m.a];
     d.cantidad = (d.cantidad||0) + (o.cantidad||0);
     d.futuras  = (d.futuras||[]).concat(o.futuras||[]);
@@ -2648,6 +2801,14 @@ refLog.on('value', function(snap){
 });
 refMapeo.on('value', function(snap){
   _mapeoCache = snap.val() || {};
+});
+refArticulos.on('value', function(snap){
+  _articulos = snap.val() || {};
+  construirIndiceCatalogo();
+  if(_stockListo) renderStock();
+});
+refEquiv.on('value', function(snap){
+  _equivCache = snap.val() || {};
 });
 refPedidos.on('value', function(snap){
   var v = snap.val();
