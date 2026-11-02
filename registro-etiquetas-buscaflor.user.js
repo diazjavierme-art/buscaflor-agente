@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Registro de cajas (etiquetas Querry -> Firebase)
 // @namespace    buscaflor
-// @version      0.1.0
+// @version      0.2.0
 // @description  Registra en Firebase cada caja impresa en la app de etiquetas (cliente, nº de caja, artículos y cantidades). FASE 1: solo registra, no descuenta stock.
 // @match        *://*/ImpresionEtiquetasRosasBuscaflor/*
 // @run-at       document-start
@@ -17,6 +17,8 @@
   const DB = 'https://stock-buscaflor-default-rtdb.europe-west1.firebasedatabase.app';
   const RAIZ = 'buscaflor/etiquetas';          // documentos/, eventos/
   const PUESTO = 'almacen';                     // identifica el PC que imprime
+  const API_KEY = 'AIzaSyD0UwaxdqoAgei-pqr1abceXVj5jTzYw2o'; // clave pública del proyecto Firebase (no es secreta)
+  const LS_AUTH = 'bf_etiquetas_auth';           // sesión del puesto (solo el token de refresco, nunca la contraseña)
   const LS = 'bf_etiquetas_v1';                 // estado local (sobrevive a recargas)
 
   // ---------------- Utilidades ----------------
@@ -190,12 +192,60 @@
   let ok = 0, err = 0, enviando = false;
   const guardarCola = () => { try { localStorage.setItem(LS + '_cola', JSON.stringify(cola)); } catch (e) {} };
 
+  // ---------------- Sesión (Firebase Auth por REST) ----------------
+  let sesion = null; try { sesion = JSON.parse(localStorage.getItem(LS_AUTH) || 'null'); } catch (e) {}
+  let idToken = null, idExp = 0, errSesion = '';
+  async function token() {
+    if (!sesion || !sesion.rt) return null;
+    if (idToken && Date.now() < idExp - 60000) return idToken;
+    const r = await fetchOrig('https://securetoken.googleapis.com/v1/token?key=' + API_KEY, {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(sesion.rt) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { errSesion = (j.error && j.error.message) || ('HTTP ' + r.status); if (r.status === 400) { sesion = null; localStorage.removeItem(LS_AUTH); } return null; }
+    errSesion = ''; idToken = j.id_token; idExp = Date.now() + (+j.expires_in || 3600) * 1000;
+    if (j.refresh_token && j.refresh_token !== sesion.rt) { sesion.rt = j.refresh_token; localStorage.setItem(LS_AUTH, JSON.stringify(sesion)); }
+    return idToken;
+  }
+  async function entrar(email, pass) {
+    const r = await fetchOrig('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + API_KEY, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass, returnSecureToken: true }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((j.error && j.error.message) || ('HTTP ' + r.status));
+    sesion = { rt: j.refreshToken, email: j.email }; localStorage.setItem(LS_AUTH, JSON.stringify(sesion));
+    idToken = j.idToken; idExp = Date.now() + (+j.expiresIn || 3600) * 1000; errSesion = '';
+  }
+  function formularioSesion() {
+    if (document.getElementById('bf-login')) return;
+    const f = document.createElement('div'); f.id = 'bf-login';
+    f.style.cssText = 'position:fixed;left:8px;bottom:36px;z-index:100000;background:#fff;color:#222;border:1px solid #999;border-radius:6px;padding:10px;font:13px Arial,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3);width:240px';
+    f.innerHTML = '<b>Registro de cajas · iniciar sesión</b><br><br>' +
+      '<input id="bf-em" type="email" placeholder="email" style="width:100%;box-sizing:border-box;margin-bottom:6px">' +
+      '<input id="bf-pw" type="password" placeholder="contraseña" style="width:100%;box-sizing:border-box;margin-bottom:6px">' +
+      '<div id="bf-msg" style="color:#c0392b;min-height:16px"></div>' +
+      '<button id="bf-ok">Entrar</button> <button id="bf-no">Cerrar</button>' +
+      (sesion ? ' <button id="bf-out" style="float:right">Salir</button>' : '');
+    document.body.appendChild(f);
+    const em = f.querySelector('#bf-em'); if (sesion) em.value = sesion.email || '';
+    f.querySelector('#bf-no').onclick = () => f.remove();
+    const out = f.querySelector('#bf-out'); if (out) out.onclick = () => { sesion = null; idToken = null; localStorage.removeItem(LS_AUTH); f.remove(); pintar(); };
+    f.querySelector('#bf-ok').onclick = async () => {
+      const msg = f.querySelector('#bf-msg'); msg.textContent = 'Entrando…';
+      try { await entrar(em.value.trim(), f.querySelector('#bf-pw').value); f.remove(); vaciarCola(); }
+      catch (e) { msg.textContent = /INVALID|PASSWORD|EMAIL/.test(e.message) ? 'Email o contraseña incorrectos' : 'Error: ' + e.message; }
+      pintar();
+    };
+    (sesion ? f.querySelector('#bf-pw') : em).focus();
+  }
+
   async function vaciarCola() {
     if (enviando) return; enviando = true;
     while (cola.length) {
       const w = cola[0];
       try {
-        const r = await fetchOrig(`${DB}/${w.ruta}.json`, { method: w.metodo, body: JSON.stringify(w.datos), headers: { 'Content-Type': 'application/json' } });
+        let tk = null; try { tk = await token(); } catch (e) { errSesion = String(e); }
+        const r = await fetchOrig(`${DB}/${w.ruta}.json` + (tk ? '?auth=' + encodeURIComponent(tk) : ''), { method: w.metodo, body: JSON.stringify(w.datos), headers: { 'Content-Type': 'application/json' } });
         if (!r.ok) throw new Error('HTTP ' + r.status);
         cola.shift(); ok++; guardarCola();
       } catch (e) { err++; console.warn('[bf-etiquetas] envío fallido, se reintentará', e); break; }
@@ -236,14 +286,17 @@
     if (!document.body) return;
     if (!badge) {
       badge = document.createElement('div');
-      badge.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999;font:12px/1.3 Arial,sans-serif;padding:4px 8px;border-radius:4px;color:#fff;opacity:.85;pointer-events:none';
+      badge.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999;font:12px/1.3 Arial,sans-serif;padding:4px 8px;border-radius:4px;color:#fff;opacity:.85;cursor:pointer';
+      badge.title = 'Pulsa para iniciar o cerrar sesión';
+      badge.onclick = formularioSesion;
       document.body.appendChild(badge);
     }
     const S = motor.estado();
     const doc = S.docAbierto && S.docs[S.docAbierto];
     const n = doc ? Object.keys(doc.cajas).length : 0;
-    badge.style.background = cola.length ? '#c0392b' : '#2e7d32';
-    badge.textContent = `Registro cajas: ${doc ? n + ' caja(s) en doc. abierto' : 'sin documento abierto'} · ${cola.length ? cola.length + ' pendiente(s) de enviar' : 'Firebase OK'}`;
+    badge.style.background = cola.length ? '#c0392b' : (sesion ? '#2e7d32' : '#e67e22');
+    badge.textContent = `Registro cajas: ${doc ? n + ' caja(s) en doc. abierto' : 'sin documento abierto'} · ${cola.length ? cola.length + ' pendiente(s) de enviar' : 'Firebase OK'}` +
+      (sesion ? '' : ' · SIN SESIÓN (pulsa aquí)') + (errSesion ? ' · ' + errSesion : '');
   }
   document.addEventListener('DOMContentLoaded', () => { pintar(); vaciarCola(); });
 })();

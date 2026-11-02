@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <style>
 :root{
   --navy:#1F344C; --navy-dark:#152435; --navy-suave:#EEF1F4; --papel:#FFFFFF; --fondo:#F7F8F9;
@@ -69,6 +70,27 @@ td:first-child{font-family:'IBM Plex Sans',sans-serif;}
 .foto-prev{max-width:100%;max-height:220px;border-radius:6px;margin-top:6px;display:block;}
 .cargando{display:none;text-align:center;padding:14px;color:var(--navy);font-weight:600;}
 .cargando.activo{display:block;}
+/* ── Pantalla almacén ── */
+body.pantalla{max-width:none;}
+.pa-top{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px;}
+.pa-ultima{background:var(--navy);color:#fff;border-radius:8px;padding:10px 14px;font-size:15px;flex:1 1 400px;}
+.pa-ultima b{font-size:17px;}
+.pa-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;}
+.pa-card{background:var(--papel);border:2px solid var(--filo);border-radius:10px;padding:12px 14px;}
+.pa-card.completo{border-color:var(--verde);opacity:.75;}
+.pa-card h2{font-size:21px;color:var(--navy);margin-bottom:2px;}
+.pa-card .sub{font-size:13px;}
+.pa-lin{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 0;border-top:1px solid var(--filo);font-size:17px;}
+.pa-lin .n{font-family:'IBM Plex Mono',monospace;font-weight:600;white-space:nowrap;}
+.pa-lin.hecha{color:var(--gris);}
+.pa-lin.hecha > span:first-child{text-decoration:line-through;}
+.pa-lin.hecha .n{color:var(--verde);}
+.pa-lin.parcial .n{color:var(--oro);}
+.pa-lin.fuera{color:var(--rojo);font-size:14px;}
+.pa-lin .nt{display:block;font-size:12px;color:var(--gris);text-decoration:none;}
+@keyframes flash{0%{background:#fff3c4;}100%{background:transparent;}}
+.pa-lin.flash{animation:flash 4s ease-out;}
+.pa-card.flash{animation:flash 4s ease-out;}
 details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
 </style>
 </head>
@@ -78,12 +100,14 @@ details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
   <a href="./">Ir al stock →</a>
 </header>
 <div class="tabs">
-  <div class="tab activa" data-tab="abiertos" onclick="verTab('abiertos')">Pedidos abiertos</div>
+  <div class="tab activa" data-tab="pantalla" onclick="verTab('pantalla')">🖥 Pantalla almacén</div>
+  <div class="tab" data-tab="abiertos" onclick="verTab('abiertos')">Pedidos abiertos</div>
   <div class="tab" data-tab="nuevo" onclick="verTab('nuevo')">＋ Nuevo pedido</div>
   <div class="tab" data-tab="cerrados" onclick="verTab('cerrados')">Cerrados</div>
 </div>
 <main>
-  <section id="tab-abiertos"><div id="listaAbiertos"><div class="vacio">Conectando…</div></div></section>
+  <section id="tab-pantalla"><div id="pantalla"><div class="vacio">Conectando…</div></div></section>
+  <section id="tab-abiertos" style="display:none;"><div id="listaAbiertos"><div class="vacio">Conectando…</div></div></section>
   <section id="tab-cerrados" style="display:none;"><div id="listaCerrados"></div></section>
 
   <section id="tab-nuevo" style="display:none;">
@@ -129,7 +153,7 @@ details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
 </main>
 <div class="toast" id="toast"></div>
 
-<script>
+<script type="text/plain" id="bfApp">
 'use strict';
 var firebaseConfig = {
   apiKey: "AIzaSyD0UwaxdqoAgei-pqr1abceXVj5jTzYw2o",
@@ -140,7 +164,7 @@ var firebaseConfig = {
   messagingSenderId: "724662381940",
   appId: "1:724662381940:web:b72b12168bb6dada4f9021"
 };
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 var db = firebase.database();
 var refPedidos   = db.ref('buscaflor/pedidosClientes');   // pedidos de clientes (uno abierto por cliente)
 var refArticulos = db.ref('buscaflor/articulos/items');
@@ -201,12 +225,16 @@ function calcularPedido(p){
     });
     if(d.estado && d.estado!=='abierto') cierres.push(d.estado+(d.alerta?' ⚠':''));
   });
-  var lineas = lineasArray(p.lineas).map(function(l){
-    var s = servido[l.codigo]||0;
-    return { codigo:l.codigo, cantidad:+l.cantidad||0, servido:s, pendiente:Math.max(0,(+l.cantidad||0)-s), pedir:!!l.pedir, nota:l.nota||'' };
-  });
-  var enPedido = {}; lineas.forEach(function(l){ enPedido[l.codigo]=true; });
-  var fuera = Object.keys(servido).filter(function(c){ return !enPedido[c]; }).map(function(c){ return {codigo:c, servido:servido[c]}; });
+  // Lo servido se reparte por líneas: primero el artículo exacto, después sus alternativas
+  // ("SWEETNESS 60 / MANDALA 60" vale con cualquiera de las dos).
+  var resto = Object.assign({}, servido);
+  var base = lineasArray(p.lineas);
+  var lineas = base.map(function(l){ return { codigo:l.codigo, alternativas:lineasArray(l.alternativas).map(String), cantidad:+l.cantidad||0, servido:0, pedir:!!l.pedir, nota:l.nota||'' }; });
+  lineas.forEach(function(l){ var t=Math.min(resto[l.codigo]||0, l.cantidad); l.servido+=t; resto[l.codigo]=(resto[l.codigo]||0)-t; });
+  lineas.forEach(function(l){ l.alternativas.forEach(function(a){ var t=Math.min(resto[a]||0, l.cantidad-l.servido); if(t>0){ l.servido+=t; resto[a]-=t; } }); });
+  // lo que sobra de un artículo del pedido cuenta como servido de más en su línea
+  lineas.forEach(function(l){ if(resto[l.codigo]>0){ l.servido+=resto[l.codigo]; resto[l.codigo]=0; } l.pendiente=Math.max(0,l.cantidad-l.servido); });
+  var fuera = Object.keys(resto).filter(function(c){ return resto[c]>0; }).map(function(c){ return {codigo:c, servido:resto[c]}; });
   var totP = lineas.reduce(function(s,l){return s+l.cantidad;},0), totS = lineas.reduce(function(s,l){return s+Math.min(l.servido,l.cantidad);},0);
   return { docs:docs, lineas:lineas, fuera:fuera, cajas:cajas, cierres:cierres, avance: totP? totS/totP : 0, completo: lineas.length>0 && lineas.every(function(l){return l.pendiente===0;}) };
 }
@@ -227,7 +255,8 @@ function stockDisponible(codigo, excluirId){
 /* ══ LISTADOS ══ */
 function verTab(t){
   document.querySelectorAll('.tab').forEach(function(x){ x.classList.toggle('activa', x.getAttribute('data-tab')===t); });
-  ['abiertos','nuevo','cerrados'].forEach(function(s){ document.getElementById('tab-'+s).style.display = s===t?'':'none'; });
+  document.body.classList.toggle('pantalla', t==='pantalla');
+  ['pantalla','abiertos','nuevo','cerrados'].forEach(function(s){ document.getElementById('tab-'+s).style.display = s===t?'':'none'; });
   if(t==='nuevo'){ var k=leerApiKey(); document.getElementById('inApiKey').value = k?'••••••••':''; }
   pintar();
 }
@@ -237,6 +266,8 @@ function pintar(){
   var ab = ids.filter(function(id){return _pedidos[id].estado==='abierto';}).sort(function(a,b){return (_pedidos[b].creado||'').localeCompare(_pedidos[a].creado||'');});
   var ce = ids.filter(function(id){return _pedidos[id].estado!=='abierto';}).sort(function(a,b){return (_pedidos[b].cerrado||'').localeCompare(_pedidos[a].cerrado||'');}).slice(0,40);
   document.getElementById('listaAbiertos').innerHTML = ab.length ? ab.map(tarjeta).join('') : '<div class="vacio">No hay pedidos abiertos.<br><br><button class="btn primario" onclick="verTab(\'nuevo\')">＋ Nuevo pedido</button></div>';
+  pintarPantalla(ab);
+  setTimeout(procesarCierres, 0);
   document.getElementById('listaCerrados').innerHTML = ce.length ? ce.map(tarjeta).join('') : '<div class="vacio">Sin pedidos cerrados todavía.</div>';
 }
 function tarjeta(id){
@@ -250,7 +281,7 @@ function tarjeta(id){
   h+='<div class="barra"><div style="width:'+Math.round(c.avance*100)+'%"></div></div>';
   h+='<table><tr><th>Artículo</th><th>Pedido</th><th>Servido</th><th>Falta</th></tr>';
   c.lineas.forEach(function(l){
-    h+='<tr><td>'+esc(nombreArt(l.codigo))+' <span class="cod">#'+esc(l.codigo)+'</span>'+(l.pedir&&l.pendiente>0?'<span class="tag pedir">PEDIR</span>':'')+(l.nota?'<div class="sub">'+esc(l.nota)+'</div>':'')+'</td>'+
+    h+='<tr><td>'+esc(nombreArt(l.codigo))+' <span class="cod">#'+esc(l.codigo)+'</span>'+(l.alternativas.length?'<div class="sub">o '+l.alternativas.map(function(a){return esc(nombreArt(a))+' #'+esc(a);}).join(' o ')+'</div>':'')+(l.pedir&&l.pendiente>0?'<span class="tag pedir">PEDIR</span>':'')+(l.nota?'<div class="sub">'+esc(l.nota)+'</div>':'')+'</td>'+
        '<td>'+l.cantidad+'</td><td class="'+(l.servido>l.cantidad?'exceso':(l.servido?'ok':''))+'">'+l.servido+'</td>'+
        '<td class="'+(l.pendiente?'pend':'ok')+'">'+(l.pendiente||'✓')+'</td></tr>';
   });
@@ -266,7 +297,7 @@ function tarjeta(id){
   if(abierto && c.cierres.length) h+='<div class="alerta ok">Ya hay albarán/factura en AmbarX para estas cajas. Si está todo, ciérralo.</div>';
   if(abierto){
     h+='<div class="fila-btn"><button class="btn peq" onclick="editarPedido(\''+id+'\')">✎ Editar</button>'+
-       '<button class="btn peq primario" onclick="cerrarPedido(\''+id+'\')">✓ Cerrar pedido</button>'+
+       '<button class="btn peq primario" onclick="terminarPedido(\''+id+'\')">✓ Terminado</button>'+
        '<button class="btn peq peligro" onclick="cancelarPedido(\''+id+'\')">Cancelar</button></div>';
   } else {
     h+='<div class="fila-btn"><button class="btn peq" onclick="reabrirPedido(\''+id+'\')">Reabrir</button></div>';
@@ -274,7 +305,105 @@ function tarjeta(id){
   return h+'</div>';
 }
 
+/* ══ CIERRE AUTOMÁTICO ══
+   Cuando en la app de etiquetas se cierra el albarán/factura de las cajas de un pedido abierto,
+   el pedido se cierra solo y lo que faltaba pasa a un pedido nuevo del mismo cliente
+   (entrega: el día siguiente; se puede editar). El id del pedido nuevo es fijo (id + "_R"), así
+   que aunque haya varias pantallas abiertas a la vez solo se crea uno. */
+function diaSiguiente(iso){ var d=new Date((iso||fechaISO()).slice(0,10)+'T12:00:00'); d.setDate(d.getDate()+1); return fechaISO(d); }
+function procesarCierres(){
+  if(!_listos.pedidos || !_listos.etiq || !_listos.articulos) return;
+  Object.keys(_pedidos).forEach(function(id){
+    var p=_pedidos[id]; if(!p || p.estado!=='abierto') return;
+    var c=calcularPedido(p);
+    // ¿algún documento de cajas de este pedido ya cerrado en AmbarX?
+    var cierre=null;
+    c.docs.forEach(function(d){
+      var doc=_etiq[d]; if(!doc || !doc.estado || doc.estado==='abierto') return;
+      Object.keys(doc.cierres||{}).forEach(function(tipo){ var t=doc.cierres[tipo]; if(t && (!cierre || t>cierre.t)) cierre={t:t, tipo:tipo, doc:d}; });
+    });
+    if(!cierre || cierre.t < (p.creado||'')) return;
+    var falta=c.lineas.filter(function(l){ return l.pendiente>0; });
+    var nuevoId=id+'_R';
+    var upd={}; 
+    upd[id+'/estado']='cerrado'; upd[id+'/cerrado']=cierre.t; upd[id+'/cerradoPor']=cierre.tipo; upd[id+'/docsVinculados']=objDocs(c.docs);
+    if(falta.length && !_pedidos[nuevoId]){
+      var porCod={}; lineasArray(p.lineas).forEach(function(l){ porCod[l.codigo]=l; });
+      upd[id+'/pasaA']=nuevoId;
+      upd[nuevoId]={ id:nuevoId, cliente:p.cliente, creado:cierre.t, actualizado:ahoraISO(), estado:'abierto',
+        fechaEntrega:diaSiguiente(cierre.t), origen:'pendiente', vieneDe:id,
+        nota: p.vieneDe ? (p.nota||'') : 'Pendiente '+(cierre.tipo==='factura'?'de la factura':'del albarán')+' del '+fmtFecha(cierre.t)+(p.nota?' · '+p.nota:''),
+        lineas: falta.map(function(l){ var o=porCod[l.codigo]||{}; return { codigo:l.codigo, descripcion:nombreArt(l.codigo), cantidad:l.pendiente, unidad:unidadDe(l.codigo), alternativas:l.alternativas, nota:o.nota||'', pedir:!!o.pedir }; }) };
+    }
+    refPedidos.update(upd);
+    toast((p.cliente.nombre||'Pedido')+': cerrado con el '+cierre.tipo+(falta.length?' · '+falta.length+' línea(s) pasan a un pedido nuevo':''));
+  });
+}
+
+/* ══ PANTALLA ALMACÉN ══
+   Los pedidos abiertos en grande; cada caja impresa en la app de etiquetas tacha lo servido
+   al momento. Lo que acaba de cambiar parpadea en amarillo. */
+var _servPrevio = {};   // "pedido|codigo" -> servido en el último repintado
+function ultimaCaja(){
+  var mejor=null;
+  Object.keys(_etiq).forEach(function(id){
+    var d=_etiq[id]; if(!d) return;
+    var cajas=d.cajas||{};
+    Object.keys(cajas).forEach(function(n){
+      var c=cajas[n]; if(!c||!c.ultima) return;
+      if(!mejor || c.ultima>mejor.c.ultima) mejor={d:d, n:n, c:c};
+    });
+  });
+  return mejor;
+}
+function pintarPantalla(ids){
+  var el=document.getElementById('pantalla'); if(!el) return;
+  var u=ultimaCaja(), h='<div class="pa-top">';
+  if(u){
+    h+='<div class="pa-ultima">Última caja: <b>'+esc(u.d.cliente&&u.d.cliente.nombre)+' · caja '+esc(u.n)+'</b> · '+esc(u.c.ultima.slice(11,16))+'<br>'+
+       lineasArray(u.c.lineas).map(function(l){ return esc(l.cantidad+' '+l.descripcion); }).join(' · ')+(u.c.origen&&u.c.origen!=='nueva'?' <i>('+esc(u.c.origen)+')</i>':'')+'</div>';
+  } else h+='<div class="pa-ultima">Aún no se ha impreso ninguna caja.</div>';
+  h+='<div class="sub">'+ids.length+' pedido'+(ids.length!==1?'s':'')+' abierto'+(ids.length!==1?'s':'')+'</div></div>';
+  if(!ids.length){ el.innerHTML=h+'<div class="vacio">No hay pedidos abiertos.</div>'; return; }
+  var datos=ids.map(function(id){ return {id:id, p:_pedidos[id], c:calcularPedido(_pedidos[id])}; });
+  // primero los que faltan, luego los completos; dentro, por fecha de entrega
+  datos.sort(function(a,b){ return (a.c.completo-b.c.completo) || (a.p.fechaEntrega||'').localeCompare(b.p.fechaEntrega||''); });
+  var nuevoPrevio={};
+  h+='<div class="pa-grid">'+datos.map(function(x){
+    var cambio=false;
+    var filas=x.c.lineas.map(function(l){
+      var k=x.id+'|'+l.codigo, antes=_servPrevio[k]; nuevoPrevio[k]=l.servido;
+      var flash = antes!=null && l.servido>antes; if(flash) cambio=true;
+      var cls = l.pendiente===0 ? 'hecha' : (l.servido>0 ? 'parcial' : '');
+      var nombre = nombreArt(l.codigo)+(l.alternativas.length?' / '+l.alternativas.map(nombreArt).join(' / '):'');
+      var num = l.pendiente===0 ? '✓ '+l.servido : 'faltan '+l.pendiente+(l.servido?' <span class="sub">de '+l.cantidad+'</span>':'');
+      return '<div class="pa-lin '+cls+(flash?' flash':'')+'"><span>'+esc(nombre)+' <span class="cod">#'+esc(l.codigo)+'</span>'+(l.nota?'<span class="nt">'+esc(l.nota)+'</span>':'')+'</span><span class="n">'+num+' <span class="sub">'+unidadDe(l.codigo)+'</span></span></div>';
+    }).join('');
+    filas+=x.c.fuera.map(function(f){ return '<div class="pa-lin fuera"><span>+ '+esc(nombreArt(f.codigo))+' (no estaba en el pedido)</span><span class="n">'+f.servido+'</span></div>'; }).join('');
+    return '<div class="pa-card'+(x.c.completo?' completo':'')+(cambio?' flash':'')+'"><h2>'+esc(x.p.cliente.nombre)+(x.c.completo?' ✓':'')+'</h2>'+
+      (x.p.vieneDe?'<div class="sub" style="color:#8a6a1f;">'+esc(x.p.nota||'Pendiente de un pedido anterior')+'</div>':'')+
+      '<div class="sub">Entrega '+fmtFecha(x.p.fechaEntrega)+' · '+x.c.cajas+' caja'+(x.c.cajas!==1?'s':'')+' · '+Math.round(x.c.avance*100)+'%'+(x.c.cierres.length?' · <span class="tag cerr">'+esc(x.c.cierres.join(' + '))+'</span>':'')+'</div>'+
+      '<div class="barra"><div style="width:'+Math.round(x.c.avance*100)+'%"></div></div>'+filas+
+      '<div class="fila-btn" style="margin:10px 0 0;"><button class="btn peq" onclick="terminarPedido(\''+x.id+'\')">✓ Terminado</button></div></div>';
+  }).join('')+'</div>';
+  _servPrevio=nuevoPrevio;
+  el.innerHTML=h;
+}
+
 /* ══ ACCIONES SOBRE PEDIDOS ══ */
+// "Terminado": se da el pedido por acabado aunque falten cosas que no se van a servir.
+// Lo que faltaba queda apuntado en el pedido (noServido) y NO pasa a otro pedido.
+function terminarPedido(id){
+  var p=_pedidos[id]; if(!p) return;
+  var c=calcularPedido(p);
+  var falta=c.lineas.filter(function(l){ return l.pendiente>0; });
+  var msg='¿Dar por terminado el pedido de '+(p.cliente.nombre||'')+'?';
+  if(falta.length) msg+='\n\nNo se van a servir:\n'+falta.map(function(l){ return '· '+l.pendiente+' '+unidadDe(l.codigo)+' '+nombreArt(l.codigo); }).join('\n')+'\n\nEsto no pasa a ningún pedido nuevo.';
+  if(!confirm(msg)) return;
+  refPedidos.child(id).update({ estado:'terminado', cerrado:ahoraISO(), cerradoPor:'terminado a mano', docsVinculados:objDocs(c.docs),
+    noServido: falta.map(function(l){ return {codigo:l.codigo, descripcion:nombreArt(l.codigo), cantidad:l.pendiente}; }) });
+  toast('Pedido terminado'+(falta.length?' · '+falta.length+' línea(s) sin servir':''));
+}
 function cerrarPedido(id){
   var p=_pedidos[id], c=calcularPedido(p);
   var falta = c.lineas.filter(function(l){return l.pendiente>0;});
@@ -347,7 +476,7 @@ function promptSistema(){
   '- ALSTROEMERIA: por PAQUETES y se vende por GRADO, no por color: FANCY (367), SELECT (245), SUPER SELECT (454). El color pedido va en "nota".\n'+
   '- NARDOS: por PAQUETES de 10 tallos (el número del pedido son paquetes).\n'+
   '- Resto: por la unidad habitual (paquetes/mazos).\n\n'+
-  'NOTACIÓN DE LAS NOTAS: comillas (") o "id." repiten la palabra de la línea de arriba (ej. "2 \\" rojo" debajo de "6 clav. blanco" = 2 clavel rojo). "2+7" = 9 (suma). "N > (M)": N es lo PEDIDO y M (en círculo, a la derecha) es lo ya servido: usa N como cantidad y pon "servido M" en nota. Importes sueltos tipo "14€" van en nota. La fecha (ej. "28/x") es la fecha del pedido/entrega; un número de 9 cifras es un teléfono.\n\n'+
+  'NOTACIÓN DE LAS NOTAS: comillas (") o "id." repiten la palabra de la línea de arriba (ej. "2 \\" rojo" debajo de "6 clav. blanco" = 2 clavel rojo). "2+7" = 9 (suma). "N > (M)": N es lo PEDIDO y M (en círculo, a la derecha) es lo ya servido: usa N como cantidad y pon "servido M" en nota. Importes sueltos tipo "14€" van en nota. "A / B" en una línea (ej. "1 sweetness 60 / mandala 60") es UNA línea que vale con cualquiera: codigo = la primera, "alternativas" = [códigos de las otras]. La fecha (ej. "28/x") es la fecha del pedido/entrega; un número de 9 cifras es un teléfono.\n\n'+
   'GRADO O MEDIDA QUE FALTA: si el artículo exacto depende de un dato que no está (ej. clavel FANCY o SELECT, nardos grandes/medianos/pequeños/super, medida de una rosa), NO adivines: pon "codigo": null, "duda": "qué falta", y en "opciones" los códigos posibles, poniendo primero los que hay en stock. Si solo hay uno posible en stock, ponlo como codigo y menciónalo en duda.\n'+
   'Si una variedad no existe en el catálogo, codigo null y explica en duda.\n\n'+
   'STOCK DISPONIBLE AHORA (codigo:cantidad): '+st+'\n\n'+
@@ -355,7 +484,7 @@ function promptSistema(){
   'CLIENTES AMBARX (codigo|nombre (denominación) · población):\n'+cli+'\n\n'+
   'CLIENTE: busca el cliente por nombre/denominación/población. Si no está claro o no aparece, "cliente":{"codigo":null,"nombre":"<lo escrito>","candidatos":["cod1","cod2"]}.\n\n'+
   'Responde SOLO con este JSON, sin texto adicional:\n'+
-  '{"cliente":{"codigo":"123 o null","nombre":"...","candidatos":[]},"fecha":"YYYY-MM-DD o vacío","telefono":"o vacío","nota":"comentario general o vacío","lineas":[{"texto":"lo que pone en la nota","codigo":"4 o null","cantidad":2,"opciones":["584","246"],"duda":"o vacío","nota":"o vacío"}]}';
+  '{"cliente":{"codigo":"123 o null","nombre":"...","candidatos":[]},"fecha":"YYYY-MM-DD o vacío","telefono":"o vacío","nota":"comentario general o vacío","lineas":[{"texto":"lo que pone en la nota","codigo":"4 o null","cantidad":2,"alternativas":[],"opciones":["584","246"],"duda":"o vacío","nota":"o vacío"}]}';
 }
 function interpretar(){
   var texto=document.getElementById('inTexto').value.trim();
@@ -394,7 +523,7 @@ function abrirRevision(j, textoOriginal){
     origen: _foto?'foto':'texto', textoOriginal: textoOriginal||'',
     lineas: (j.lineas||[]).map(function(l){
       var cod = l.codigo && art(l.codigo) ? String(l.codigo) : null;
-      return { texto:l.texto||'', codigo:cod, cantidad:+l.cantidad||0, opciones:(l.opciones||[]).map(String).filter(art), duda:l.duda||'', nota:l.nota||'' };
+      return { texto:l.texto||'', codigo:cod, cantidad:+l.cantidad||0, alternativas:(l.alternativas||[]).map(String).filter(art), opciones:(l.opciones||[]).map(String).filter(art), duda:l.duda||'', nota:l.nota||'' };
     })
   };
   pintarRevision();
@@ -402,7 +531,7 @@ function abrirRevision(j, textoOriginal){
 function editarPedido(id){
   var p=_pedidos[id];
   _rev = { id:id, cliente:Object.assign({},p.cliente), candidatos:[], fecha:p.fechaEntrega||fechaISO(), nota:p.nota||'', origen:p.origen, textoOriginal:p.textoOriginal||'',
-    lineas: lineasArray(p.lineas).map(function(l){ return {texto:'', codigo:l.codigo, cantidad:l.cantidad, opciones:[], duda:'', nota:l.nota||'', pedir:!!l.pedir}; }) };
+    lineas: lineasArray(p.lineas).map(function(l){ return {texto:'', codigo:l.codigo, cantidad:l.cantidad, alternativas:lineasArray(l.alternativas).map(String), opciones:[], duda:'', nota:l.nota||'', pedir:!!l.pedir}; }) };
   verTab('nuevo'); pintarRevision();
 }
 function volverPaso1(){ document.getElementById('paso2').style.display='none'; document.getElementById('paso1').style.display=''; }
@@ -428,6 +557,7 @@ function pintarRevision(){
        '<span class="sub">'+(l.codigo?unidadDe(l.codigo):'')+'</span>'+
        '<div class="sw"><input autocomplete="off" value="'+esc(l.codigo?('#'+l.codigo+' · '+nombreArt(l.codigo)):'')+'" placeholder="Buscar artículo…" oninput="buscarArticulo(this,'+i+')" onfocus="this.select();buscarArticulo(this,'+i+')"><div class="dd"></div></div>'+
        '<button class="btn peq peligro" onclick="_rev.lineas.splice('+i+',1);pintarRevision()">✕</button></div>';
+    if(l.alternativas && l.alternativas.length) h+='<div class="sub" style="margin-top:4px;">También vale: '+l.alternativas.map(function(a){return '#'+esc(a)+' '+esc(nombreArt(a));}).join(' · ')+' <a href="#" onclick="_rev.lineas['+i+'].alternativas=[];pintarRevision();return false;">quitar</a></div>';
     if(l.duda) h+='<div class="sub" style="color:#8a6a1f;margin-top:4px;">'+esc(l.duda)+'</div>';
     if(l.opciones.length){
       var ops=l.opciones.slice().sort(function(a,b){ return ((_stock[b]&&_stock[b].cantidad)||0)-((_stock[a]&&_stock[a].cantidad)||0); });
@@ -474,7 +604,8 @@ function guardarPedido(){
   // Junta líneas repetidas del mismo artículo
   var porCod={};
   lineas.forEach(function(l){
-    if(!porCod[l.codigo]) porCod[l.codigo]={codigo:l.codigo, descripcion:nombreArt(l.codigo), cantidad:0, unidad:unidadDe(l.codigo), nota:''};
+    if(!porCod[l.codigo]) porCod[l.codigo]={codigo:l.codigo, descripcion:nombreArt(l.codigo), cantidad:0, unidad:unidadDe(l.codigo), nota:'', alternativas:[]};
+    (l.alternativas||[]).forEach(function(a){ if(porCod[l.codigo].alternativas.indexOf(a)<0) porCod[l.codigo].alternativas.push(a); });
     porCod[l.codigo].cantidad+=l.cantidad;
     if(l.nota) porCod[l.codigo].nota = porCod[l.codigo].nota ? porCod[l.codigo].nota+' · '+l.nota : l.nota;
   });
@@ -508,6 +639,61 @@ escuchar(refArticulos,'articulos',function(v){_articulos=v;});
 escuchar(refClientes,'clientes',function(v){_clientes=v;});
 escuchar(refStock,'stock',function(v){_stock=v;});
 escuchar(refEtiq,'etiq',function(v){_etiq=v;});
+document.body.classList.add('pantalla');
 </script>
+<div id="bfLogin" style="display:none;position:fixed;inset:0;z-index:99999;background:#f4f4f4;align-items:center;justify-content:center;font-family:Arial,sans-serif">
+  <form id="bfLoginForm" style="background:#fff;border:1px solid #ccc;border-radius:8px;padding:24px;width:min(320px,90vw)">
+    <div style="font-size:18px;font-weight:bold;margin-bottom:4px">Buscaflor</div>
+    <div style="color:#666;font-size:13px;margin-bottom:16px">Inicia sesión para entrar</div>
+    <input id="bfEmail" type="email" autocomplete="username" placeholder="email" required style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;font-size:15px">
+    <input id="bfPass" type="password" autocomplete="current-password" placeholder="contraseña" required style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;font-size:15px">
+    <div id="bfLoginMsg" style="color:#c0392b;font-size:13px;min-height:18px;margin-bottom:8px"></div>
+    <button type="submit" style="width:100%;padding:10px;font-size:15px;background:#222;color:#fff;border:0;border-radius:4px;cursor:pointer">Entrar</button>
+  </form>
+</div>
+<button id="bfLogout" type="button" title="Cerrar sesión" style="display:none;position:fixed;right:8px;bottom:8px;z-index:9999;font:11px Arial,sans-serif;padding:3px 8px;background:#fff;border:1px solid #bbb;border-radius:4px;color:#555;cursor:pointer;opacity:.8"></button>
+<script>
+/* ══ ACCESO — solo usuarios con sesión (Firebase Auth email/contraseña) ══
+   La app no arranca hasta que hay sesión; la sesión se recuerda en este navegador. */
+(function(){
+  var cfg = {
+    apiKey: "AIzaSyD0UwaxdqoAgei-pqr1abceXVj5jTzYw2o",
+    authDomain: "stock-buscaflor.firebaseapp.com",
+    databaseURL: "https://stock-buscaflor-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "stock-buscaflor",
+    storageBucket: "stock-buscaflor.firebasestorage.app",
+    messagingSenderId: "724662381940",
+    appId: "1:724662381940:web:b72b12168bb6dada4f9021"
+  };
+  if (!firebase.apps.length) firebase.initializeApp(cfg);
+  var arrancada = false, caja = document.getElementById('bfLogin'), salir = document.getElementById('bfLogout');
+  function arrancar(){
+    if (arrancada) return; arrancada = true;
+    var s = document.createElement('script');
+    s.text = document.getElementById('bfApp').textContent;
+    document.body.appendChild(s);
+  }
+  firebase.auth().onAuthStateChanged(function(u){
+    if (u) { caja.style.display = 'none'; salir.textContent = 'Salir (' + u.email + ')'; salir.style.display = 'block'; arrancar(); }
+    else if (arrancada) { location.reload(); }
+    else { caja.style.display = 'flex'; salir.style.display = 'none'; document.getElementById('bfEmail').focus(); }
+  });
+  salir.onclick = function(){ if (confirm('¿Cerrar sesión en este navegador?')) firebase.auth().signOut(); };
+  document.getElementById('bfLoginForm').onsubmit = function(e){
+    e.preventDefault();
+    var m = document.getElementById('bfLoginMsg'); m.textContent = 'Entrando…';
+    firebase.auth().signInWithEmailAndPassword(document.getElementById('bfEmail').value.trim(), document.getElementById('bfPass').value)
+      .then(function(){ m.textContent = ''; })
+      .catch(function(err){
+        var c = err && err.code || '';
+        m.textContent = /invalid|wrong-password|user-not-found/.test(c) ? 'Email o contraseña incorrectos'
+          : c === 'auth/too-many-requests' ? 'Demasiados intentos; espera un poco'
+          : c === 'auth/operation-not-allowed' ? 'El acceso por email no está activado en Firebase'
+          : 'Error: ' + (err.message || c);
+      });
+  };
+})();
+</script>
+
 </body>
 </html>

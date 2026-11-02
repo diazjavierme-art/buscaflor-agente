@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <style>
 /* ══ BUSCAFLOR STOCK · estilo marca (navy/blanco) ══ */
 :root{
@@ -566,11 +567,11 @@ header{
 
 <div class="toast" id="toast"></div>
 
-<script>
+<script type="text/plain" id="bfApp">
 'use strict';
 
 /* ══ FIREBASE — stock compartido en tiempo real ══
-   Cualquiera con el link ve el mismo stock, sin login. La API Key de Claude (para leer
+   Stock compartido en tiempo real; solo entra quien tiene usuario (ver bloque ACCESO al final). La API Key de Claude (para leer
    PDFs) sigue guardándose solo en el navegador de cada uno — no hace falta compartirla. */
 var firebaseConfig = {
   apiKey: "AIzaSyD0UwaxdqoAgei-pqr1abceXVj5jTzYw2o",
@@ -581,7 +582,7 @@ var firebaseConfig = {
   messagingSenderId: "724662381940",
   appId: "1:724662381940:web:b72b12168bb6dada4f9021"
 };
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 var fbDB = firebase.database();
 var refStock = fbDB.ref('buscaflor/stock');
 var refLog   = fbDB.ref('buscaflor/log');
@@ -926,7 +927,41 @@ function pedidosActivosDe(clave){
   return (_pedidosCache||[]).filter(function(p){ return p.clave===clave && p.estado==='activo'; });
 }
 function sumaPedidosActivos(clave){
-  return pedidosActivosDe(clave).reduce(function(s,p){ return s+(p.cantidad||0); }, 0);
+  return pedidosActivosDe(clave).reduce(function(s,p){ return s+(p.cantidad||0); }, 0) + (_reservaPedidosClientes[clave]||0);
+}
+
+/* ══ PEDIDOS DE CLIENTES (app de pedidos) + CAJAS IMPRESAS ══
+   El stock FÍSICO solo lo descuenta el cierre con el informe de ventas de AmbarX (las etiquetas
+   se pueden cambiar luego en el albarán/factura). Las cajas impresas sirven para saber qué
+   falta de cada pedido, y eso que falta se reserva aquí, igual que las reservas
+   de siempre: no toca el físico, pero baja el disponible. Mismo cálculo que la app de pedidos. */
+var refPedidosClientes = fbDB.ref('buscaflor/pedidosClientes');
+var refEtiqDocs = fbDB.ref('buscaflor/etiquetas/documentos');
+var _pedidosClientes = {}, _etiqDocs = {}, _reservaPedidosClientes = {};
+function _lista(x){ return Array.isArray(x) ? x.filter(Boolean) : (x ? Object.values(x).filter(Boolean) : []); }
+function recalcularReservaPedidos(){
+  var r = {};
+  Object.keys(_pedidosClientes).forEach(function(id){
+    var p = _pedidosClientes[id]; if(!p || p.estado!=='abierto' || !p.cliente) return;
+    var contado = !p.cliente.codigo || /CONTADO/i.test(p.cliente.nombre||'');
+    var servido = {};
+    Object.keys(_etiqDocs).forEach(function(did){
+      var d = _etiqDocs[did]; if(!d || !d.cliente) return;
+      var vinc = p.docsVinculados && p.docsVinculados[did];
+      var auto = !contado && String(d.cliente.codigo)===String(p.cliente.codigo) && (d.abierto||'') >= (p.creado||'');
+      if(!vinc && !auto) return;
+      _lista(d.cajas).forEach(function(c){ _lista(c.lineas).forEach(function(l){ servido[l.codigo]=(servido[l.codigo]||0)+(+l.cantidad||0); }); });
+    });
+    _lista(p.lineas).forEach(function(l){
+      var q = +l.cantidad||0, s0 = Math.min(servido[l.codigo]||0, q); servido[l.codigo]=(servido[l.codigo]||0)-s0;
+      var s = s0;
+      _lista(l.alternativas).forEach(function(a){ var t=Math.min(servido[a]||0, q-s); if(t>0){ s+=t; servido[a]-=t; } });
+      var falta = Math.max(0, q-s); if(!falta) return;
+      var k = codigoStock(l.codigo);
+      r[k] = (r[k]||0) + falta;
+    });
+  });
+  _reservaPedidosClientes = r;
 }
 
 /* ══ CIERRE — acumulado por día, para poder cerrar varias veces sin restar de más ══
@@ -2815,6 +2850,8 @@ refPedidos.on('value', function(snap){
   _pedidosCache = Array.isArray(v) ? v : (v ? Object.values(v) : []);
   renderStock(); // el disponible depende de los pedidos activos — repinta al cambiar
 });
+refPedidosClientes.on('value', function(snap){ _pedidosClientes = snap.val()||{}; recalcularReservaPedidos(); if(_stockListo) renderStock(); });
+refEtiqDocs.on('value', function(snap){ _etiqDocs = snap.val()||{}; recalcularReservaPedidos(); if(_stockListo) renderStock(); });
 refCierresDia.on('value', function(snap){
   _cierresDiaCache = snap.val() || {};
 });
@@ -2824,5 +2861,59 @@ refStock.on('value', function(snap){
   renderStock();
 });
 </script>
+<div id="bfLogin" style="display:none;position:fixed;inset:0;z-index:99999;background:#f4f4f4;align-items:center;justify-content:center;font-family:Arial,sans-serif">
+  <form id="bfLoginForm" style="background:#fff;border:1px solid #ccc;border-radius:8px;padding:24px;width:min(320px,90vw)">
+    <div style="font-size:18px;font-weight:bold;margin-bottom:4px">Buscaflor</div>
+    <div style="color:#666;font-size:13px;margin-bottom:16px">Inicia sesión para entrar</div>
+    <input id="bfEmail" type="email" autocomplete="username" placeholder="email" required style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;font-size:15px">
+    <input id="bfPass" type="password" autocomplete="current-password" placeholder="contraseña" required style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;font-size:15px">
+    <div id="bfLoginMsg" style="color:#c0392b;font-size:13px;min-height:18px;margin-bottom:8px"></div>
+    <button type="submit" style="width:100%;padding:10px;font-size:15px;background:#222;color:#fff;border:0;border-radius:4px;cursor:pointer">Entrar</button>
+  </form>
+</div>
+<button id="bfLogout" type="button" title="Cerrar sesión" style="display:none;position:fixed;right:8px;bottom:8px;z-index:9999;font:11px Arial,sans-serif;padding:3px 8px;background:#fff;border:1px solid #bbb;border-radius:4px;color:#555;cursor:pointer;opacity:.8"></button>
+<script>
+/* ══ ACCESO — solo usuarios con sesión (Firebase Auth email/contraseña) ══
+   La app no arranca hasta que hay sesión; la sesión se recuerda en este navegador. */
+(function(){
+  var cfg = {
+    apiKey: "AIzaSyD0UwaxdqoAgei-pqr1abceXVj5jTzYw2o",
+    authDomain: "stock-buscaflor.firebaseapp.com",
+    databaseURL: "https://stock-buscaflor-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "stock-buscaflor",
+    storageBucket: "stock-buscaflor.firebasestorage.app",
+    messagingSenderId: "724662381940",
+    appId: "1:724662381940:web:b72b12168bb6dada4f9021"
+  };
+  if (!firebase.apps.length) firebase.initializeApp(cfg);
+  var arrancada = false, caja = document.getElementById('bfLogin'), salir = document.getElementById('bfLogout');
+  function arrancar(){
+    if (arrancada) return; arrancada = true;
+    var s = document.createElement('script');
+    s.text = document.getElementById('bfApp').textContent;
+    document.body.appendChild(s);
+  }
+  firebase.auth().onAuthStateChanged(function(u){
+    if (u) { caja.style.display = 'none'; salir.textContent = 'Salir (' + u.email + ')'; salir.style.display = 'block'; arrancar(); }
+    else if (arrancada) { location.reload(); }
+    else { caja.style.display = 'flex'; salir.style.display = 'none'; document.getElementById('bfEmail').focus(); }
+  });
+  salir.onclick = function(){ if (confirm('¿Cerrar sesión en este navegador?')) firebase.auth().signOut(); };
+  document.getElementById('bfLoginForm').onsubmit = function(e){
+    e.preventDefault();
+    var m = document.getElementById('bfLoginMsg'); m.textContent = 'Entrando…';
+    firebase.auth().signInWithEmailAndPassword(document.getElementById('bfEmail').value.trim(), document.getElementById('bfPass').value)
+      .then(function(){ m.textContent = ''; })
+      .catch(function(err){
+        var c = err && err.code || '';
+        m.textContent = /invalid|wrong-password|user-not-found/.test(c) ? 'Email o contraseña incorrectos'
+          : c === 'auth/too-many-requests' ? 'Demasiados intentos; espera un poco'
+          : c === 'auth/operation-not-allowed' ? 'El acceso por email no está activado en Firebase'
+          : 'Error: ' + (err.message || c);
+      });
+  };
+})();
+</script>
+
 </body>
 </html>
