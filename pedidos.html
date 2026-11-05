@@ -207,7 +207,9 @@ function cultivoDe(c){
 }
 // Unidad en la que AmbarX vende ese artículo (la misma que sale en la etiqueta de la caja)
 function unidadDe(c){ return cultivoDe(c)==='CLAVEL' ? 'tallos' : 'paq.'; }
-function esContado(cli){ return !cli || !cli.codigo || /CONTADO/i.test(cli.nombre||''); }
+// Solo el cliente genérico "VENTA CONTADO" (muchos compradores distintos con el mismo código) o un cliente sin
+// código se vinculan a mano. Los contado con nombre (SAN JOSE, KIOSKO, CONCHI…) son un único cliente: se asignan solos.
+function esContado(cli){ return !cli || !cli.codigo || /^\s*VENTA\s+CONTADO\s*$/i.test(cli.nombre||''); }
 function lineasArray(x){ return Array.isArray(x) ? x.filter(Boolean) : (x ? Object.values(x).filter(Boolean) : []); }
 
 /* ══ CÁLCULO: servido / pendiente a partir de las cajas impresas ══
