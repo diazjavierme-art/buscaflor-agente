@@ -91,6 +91,9 @@ body.pantalla{max-width:none;}
 @keyframes flash{0%{background:#fff3c4;}100%{background:transparent;}}
 .pa-lin.flash{animation:flash 4s ease-out;}
 .pa-card.flash{animation:flash 4s ease-out;}
+.dia-cab{display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 8px;padding-bottom:4px;border-bottom:2px solid var(--navy);}
+.dia-cab b{font-size:15px;color:var(--navy);text-transform:capitalize;}
+.pa-prox{font-size:13px;color:var(--navy);cursor:pointer;text-decoration:underline;}
 details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
 </style>
 </head>
@@ -101,13 +104,15 @@ details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
 </header>
 <div class="tabs">
   <div class="tab activa" data-tab="pantalla" onclick="verTab('pantalla')">🖥 Pantalla almacén</div>
-  <div class="tab" data-tab="abiertos" onclick="verTab('abiertos')">Pedidos abiertos</div>
+  <div class="tab" data-tab="abiertos" onclick="verTab('abiertos')">Para hoy</div>
+  <div class="tab" data-tab="futuros" onclick="verTab('futuros')">Próximos <span id="nFuturos" class="tag ab" style="display:none;"></span></div>
   <div class="tab" data-tab="nuevo" onclick="verTab('nuevo')">＋ Nuevo pedido</div>
   <div class="tab" data-tab="cerrados" onclick="verTab('cerrados')">Cerrados</div>
 </div>
 <main>
   <section id="tab-pantalla"><div id="pantalla"><div class="vacio">Conectando…</div></div></section>
   <section id="tab-abiertos" style="display:none;"><div id="listaAbiertos"><div class="vacio">Conectando…</div></div></section>
+  <section id="tab-futuros" style="display:none;"><div id="listaFuturos"></div></section>
   <section id="tab-cerrados" style="display:none;"><div id="listaCerrados"></div></section>
 
   <section id="tab-nuevo" style="display:none;">
@@ -201,15 +206,33 @@ function lineasArray(x){ return Array.isArray(x) ? x.filter(Boolean) : (x ? Obje
    crea el pedido (y hasta que se cierra) cuentan para él. Para clientes "contado" (sin ficha
    propia) las cajas se vinculan a mano. Se toma el estado FINAL de cada caja (modificada,
    repetida…), igual que hace AmbarX. */
+// Si un cliente tiene varios pedidos (hoy y días siguientes), cada documento de cajas cuenta
+// solo para uno: el de fecha de entrega más próxima entre los que estaban vigentes al imprimir.
+function pedidoValeParaDoc(p, d){
+  if(!p || !p.cliente || p.estado==='cancelado') return false;
+  if(String(d.cliente.codigo)!==String(p.cliente.codigo)) return false;
+  if((d.abierto||'') < (p.creado||'')) return false;
+  if(p.estado!=='abierto' && p.cerrado && (d.abierto||'') > p.cerrado) return false;
+  return true;
+}
+function duenoDoc(docId){
+  var d=_etiq[docId]; if(!d || !d.cliente) return null;
+  var mejor=null;
+  Object.keys(_pedidos).forEach(function(id){
+    var p=_pedidos[id]; if(esContado(p&&p.cliente) || !pedidoValeParaDoc(p,d)) return;
+    if(!mejor){ mejor=id; return; }
+    var m=_pedidos[mejor], fa=p.fechaEntrega||'', fb=m.fechaEntrega||'';
+    if(fa<fb || (fa===fb && (p.creado||'')<(m.creado||''))) mejor=id;
+  });
+  return mejor;
+}
 function docsDelPedido(p){
   var ids = {};
   Object.keys(p.docsVinculados||{}).forEach(function(id){ if(_etiq[id]) ids[id]=true; });
   if(!esContado(p.cliente)){
     Object.keys(_etiq).forEach(function(id){
-      var d=_etiq[id]; if(!d || !d.cliente) return;
-      if(String(d.cliente.codigo)!==String(p.cliente.codigo)) return;
-      if((d.abierto||'') < (p.creado||'')) return;
-      if(p.estado!=='abierto' && p.cerrado && (d.abierto||'') > p.cerrado) return;
+      var d=_etiq[id]; if(!d || !d.cliente || !pedidoValeParaDoc(p,d)) return;
+      if(_pedidos[duenoDoc(id)]!==p) return;
       ids[id]=true;
     });
   }
@@ -256,17 +279,22 @@ function stockDisponible(codigo, excluirId){
 function verTab(t){
   document.querySelectorAll('.tab').forEach(function(x){ x.classList.toggle('activa', x.getAttribute('data-tab')===t); });
   document.body.classList.toggle('pantalla', t==='pantalla');
-  ['pantalla','abiertos','nuevo','cerrados'].forEach(function(s){ document.getElementById('tab-'+s).style.display = s===t?'':'none'; });
+  ['pantalla','abiertos','futuros','nuevo','cerrados'].forEach(function(s){ document.getElementById('tab-'+s).style.display = s===t?'':'none'; });
   if(t==='nuevo'){ var k=leerApiKey(); document.getElementById('inApiKey').value = k?'••••••••':''; }
   pintar();
 }
 function pintar(){
   if(!_listos.pedidos || !_listos.articulos) return;
   var ids = Object.keys(_pedidos).filter(function(id){return _pedidos[id];});
-  var ab = ids.filter(function(id){return _pedidos[id].estado==='abierto';}).sort(function(a,b){return (_pedidos[b].creado||'').localeCompare(_pedidos[a].creado||'');});
+  var hoy = fechaISO();
+  var todos = ids.filter(function(id){return _pedidos[id].estado==='abierto';});
+  var ab = todos.filter(function(id){return (_pedidos[id].fechaEntrega||hoy) <= hoy;}).sort(function(a,b){return (_pedidos[b].creado||'').localeCompare(_pedidos[a].creado||'');});
+  var fu = todos.filter(function(id){return (_pedidos[id].fechaEntrega||hoy) > hoy;});
+  _diaPintado = hoy;
   var ce = ids.filter(function(id){return _pedidos[id].estado!=='abierto';}).sort(function(a,b){return (_pedidos[b].cerrado||'').localeCompare(_pedidos[a].cerrado||'');}).slice(0,40);
-  document.getElementById('listaAbiertos').innerHTML = ab.length ? ab.map(tarjeta).join('') : '<div class="vacio">No hay pedidos abiertos.<br><br><button class="btn primario" onclick="verTab(\'nuevo\')">＋ Nuevo pedido</button></div>';
-  pintarPantalla(ab);
+  document.getElementById('listaAbiertos').innerHTML = ab.length ? ab.map(tarjeta).join('') : '<div class="vacio">No hay pedidos para hoy.<br><br><button class="btn primario" onclick="verTab(\'nuevo\')">＋ Nuevo pedido</button></div>';
+  pintarPantalla(ab, fu);
+  pintarFuturos(fu);
   setTimeout(procesarCierres, 0);
   document.getElementById('listaCerrados').innerHTML = ce.length ? ce.map(tarjeta).join('') : '<div class="vacio">Sin pedidos cerrados todavía.</div>';
 }
@@ -356,15 +384,41 @@ function ultimaCaja(){
   });
   return mejor;
 }
-function pintarPantalla(ids){
+var _diaPintado='';
+// Si la pantalla se queda encendida de un día para otro, se repinta al cambiar el día.
+setInterval(function(){ if(_diaPintado && fechaISO()!==_diaPintado) pintar(); }, 60000);
+
+function pintarFuturos(fu){
+  var badge=document.getElementById('nFuturos');
+  badge.textContent=fu.length; badge.style.display=fu.length?'':'none';
+  var el=document.getElementById('listaFuturos');
+  if(!fu.length){ el.innerHTML='<div class="vacio">No hay pedidos para los próximos días.<br><br><button class="btn primario" onclick="verTab(\'nuevo\')">＋ Nuevo pedido</button></div>'; return; }
+  var porDia={};
+  fu.forEach(function(id){ var f=_pedidos[id].fechaEntrega; (porDia[f]=porDia[f]||[]).push(id); });
+  el.innerHTML=Object.keys(porDia).sort().map(function(f){
+    var ids=porDia[f].sort(function(a,b){ return (_pedidos[a].cliente.nombre||'').localeCompare(_pedidos[b].cliente.nombre||''); });
+    var tot={};
+    ids.forEach(function(id){ calcularPedido(_pedidos[id]).lineas.forEach(function(l){ tot[l.codigo]=(tot[l.codigo]||0)+l.pendiente; }); });
+    var cods=Object.keys(tot).filter(function(c){return tot[c]>0;}).sort(function(a,b){ return nombreArt(a).localeCompare(nombreArt(b)); });
+    var tabla='<details class="card"><summary><b>Total del día por artículo</b> · '+cods.length+' artículo'+(cods.length!==1?'s':'')+'</summary>'+
+      '<table><tr><th>Artículo</th><th>Total</th><th>Stock libre</th></tr>'+cods.map(function(c){
+        var disp=stockDisponible(c);
+        return '<tr><td>'+esc(nombreArt(c))+' <span class="cod">#'+esc(c)+'</span></td><td>'+tot[c]+' <span class="sub">'+unidadDe(c)+'</span></td><td class="'+(disp<0?'exceso':'')+'">'+disp+'</td></tr>';
+      }).join('')+'</table><div class="nota">Stock libre = stock actual menos todo lo reservado por pedidos abiertos (hoy y próximos). En rojo, lo que hay que comprar.</div></details>';
+    return '<div class="dia-cab"><b>'+fmtFecha(f)+'</b><span class="sub">'+ids.length+' pedido'+(ids.length!==1?'s':'')+'</span></div>'+tabla+ids.map(tarjeta).join('');
+  }).join('');
+}
+
+function pintarPantalla(ids, fu){
   var el=document.getElementById('pantalla'); if(!el) return;
   var u=ultimaCaja(), h='<div class="pa-top">';
   if(u){
     h+='<div class="pa-ultima">Última caja: <b>'+esc(u.d.cliente&&u.d.cliente.nombre)+' · caja '+esc(u.n)+'</b> · '+esc(u.c.ultima.slice(11,16))+'<br>'+
        lineasArray(u.c.lineas).map(function(l){ return esc(l.cantidad+' '+l.descripcion); }).join(' · ')+(u.c.origen&&u.c.origen!=='nueva'?' <i>('+esc(u.c.origen)+')</i>':'')+'</div>';
   } else h+='<div class="pa-ultima">Aún no se ha impreso ninguna caja.</div>';
-  h+='<div class="sub">'+ids.length+' pedido'+(ids.length!==1?'s':'')+' abierto'+(ids.length!==1?'s':'')+'</div></div>';
-  if(!ids.length){ el.innerHTML=h+'<div class="vacio">No hay pedidos abiertos.</div>'; return; }
+  h+='<div class="sub">'+ids.length+' pedido'+(ids.length!==1?'s':'')+' para hoy'+
+     (fu&&fu.length?'<br><span class="pa-prox" onclick="verTab(\'futuros\')">+ '+fu.length+' para próximos días →</span>':'')+'</div></div>';
+  if(!ids.length){ el.innerHTML=h+'<div class="vacio">No hay pedidos para hoy.</div>'; return; }
   var datos=ids.map(function(id){ return {id:id, p:_pedidos[id], c:calcularPedido(_pedidos[id])}; });
   // primero los que faltan, luego los completos; dentro, por fecha de entrega
   datos.sort(function(a,b){ return (a.c.completo-b.c.completo) || (a.p.fechaEntrega||'').localeCompare(b.p.fechaEntrega||''); });
@@ -415,13 +469,13 @@ function objDocs(arr){ var o={}; arr.forEach(function(d){o[d]=true;}); return o;
 function cancelarPedido(id){ if(!confirm('¿Cancelar este pedido? Deja de reservar stock.')) return; refPedidos.child(id).update({estado:'cancelado', cerrado:ahoraISO()}); toast('Pedido cancelado'); }
 function reabrirPedido(id){
   var p=_pedidos[id];
-  var otro = pedidoAbiertoDe(p.cliente, id);
-  if(otro){ toast('Ese cliente ya tiene otro pedido abierto'); return; }
+  var otro = pedidoAbiertoDe(p.cliente, id, p.fechaEntrega);
+  if(otro){ toast('Ese cliente ya tiene otro pedido abierto para ese día'); return; }
   refPedidos.child(id).update({estado:'abierto', cerrado:null}); toast('Pedido reabierto');
 }
-function pedidoAbiertoDe(cli, excluir){
+function pedidoAbiertoDe(cli, excluir, fecha){
   if(esContado(cli)) return null;
-  return Object.keys(_pedidos).find(function(id){ var p=_pedidos[id]; return p && id!==excluir && p.estado==='abierto' && String(p.cliente.codigo)===String(cli.codigo); }) || null;
+  return Object.keys(_pedidos).find(function(id){ var p=_pedidos[id]; return p && id!==excluir && p.estado==='abierto' && String(p.cliente.codigo)===String(cli.codigo) && (!fecha || (p.fechaEntrega||'')===fecha); }) || null;
 }
 function vincularCajas(id){
   var p=_pedidos[id];
@@ -611,10 +665,10 @@ function guardarPedido(){
   });
   var finales=Object.keys(porCod).map(function(c){ var l=porCod[c]; var disp=(_stock[c]?+_stock[c].cantidad||0:0)-(pend[c]||0); l.pedir = disp < l.cantidad; return l; });
 
-  // Regla: un solo pedido abierto por cliente
-  var otro = r.id ? null : pedidoAbiertoDe(r.cliente, null);
+  // Regla: un solo pedido abierto por cliente y fecha de entrega
+  var otro = r.id ? null : pedidoAbiertoDe(r.cliente, null, r.fecha);
   if(otro){
-    if(!confirm(r.cliente.nombre+' ya tiene un pedido abierto.\n\n¿Añadir estas líneas a ese pedido?\n(Cancelar = no guardar)')) return;
+    if(!confirm(r.cliente.nombre+' ya tiene un pedido abierto para el '+fmtFecha(r.fecha)+'.\n\n¿Añadir estas líneas a ese pedido?\n(Cancelar = no guardar)')) return;
     var p=_pedidos[otro], ex={};
     lineasArray(p.lineas).forEach(function(l){ ex[l.codigo]=Object.assign({},l); });
     finales.forEach(function(l){ if(ex[l.codigo]){ ex[l.codigo].cantidad+=l.cantidad; ex[l.codigo].pedir=ex[l.codigo].pedir||l.pedir; if(l.nota) ex[l.codigo].nota=(ex[l.codigo].nota?ex[l.codigo].nota+' · ':'')+l.nota; } else ex[l.codigo]=l; });
@@ -628,7 +682,7 @@ function guardarPedido(){
   function fin(){
     toast('Pedido guardado'); _rev=null; _foto=null;
     document.getElementById('inTexto').value=''; document.getElementById('inFoto').value=''; document.getElementById('fotoPrev').style.display='none';
-    volverPaso1(); verTab('abiertos');
+    volverPaso1(); verTab(r.fecha>fechaISO() ? 'futuros' : 'abiertos');
   }
 }
 
