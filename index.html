@@ -304,6 +304,9 @@ header{
       <button class="subir-zona" id="dzExcel" onclick="document.getElementById('inputExcel').click()">📊 Seleccionar o soltar archivo Excel</button>
       <input type="file" id="inputVerdnatura" accept=".pdf,image/*" multiple style="display:none;" onchange="leerVerdnatura(event)">
       <button class="subir-zona" id="dzVerdnatura" style="border-color:var(--navy);background:var(--navy-suave);color:var(--navy);" onclick="document.getElementById('inputVerdnatura').click()">🌹 Seleccionar o soltar albaranes Verdnatura (varios a la vez)</button>
+      <input type="file" id="inputCatalogo" accept=".xlsx,.xls" style="display:none;" onchange="leerCatalogo(event)">
+      <button class="subir-zona" style="border-style:dashed;" onclick="document.getElementById('inputCatalogo').click()">📋 Actualizar catálogo AmbarX (Informe de artículos)</button>
+      <div id="resCatalogo"></div>
       <div class="cargando" id="cargandoExcel">Leyendo el documento…</div>
       <div id="previewExcel" style="display:none;">
         <div class="campo" style="margin-top:2px;">
@@ -706,6 +709,60 @@ function itemDesdeArticulo(codigo, base){
     unidad: base.unidad || unidadDeCultivo(cultivo),
     futuras: []
   };
+}
+/* ── Actualizar catálogo desde el "INFORME DE ARTÍCULOS" de AmbarX (columnas Artículo · Descripción · Familia) ──
+   Solo AÑADE artículos nuevos y corrige descripciones cambiadas. No borra nada: los pedidos y el stock antiguos
+   pueden seguir usando códigos que ya no salgan en el informe. */
+function datosArticuloDesdeDescripcion(desc){
+  var d = String(desc||'').trim().replace(/\s+/g,' ');
+  var m = d.match(/^(.*?)\s*(\d+)\s*T\s*\/\s*(\d{2,3})\s*CM\s*$/i);           // "PINK OHARA 25T/50CM"
+  if(m) return { variedad:m[1].trim(), medida:m[3], tallosPaquete:+m[2] };
+  m = d.match(/^(.*?)\s*(\d{2,3})\s*CM\s*(?:\/\s*(\d+)\s*T(?:ALLOS)?)?\s*$/i); // "FREEDOM 60CM/25T", "WHITE OHARA 70CM"
+  if(m) return { variedad:m[1].trim(), medida:m[2], tallosPaquete: m[3] ? +m[3] : null };
+  return { variedad:d, medida:null, tallosPaquete:null };
+}
+function _escCat(x){ return String(x==null?'':x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function leerCatalogo(ev){
+  var f = ev.target.files && ev.target.files[0]; ev.target.value=''; if(!f) return;
+  var el = document.getElementById('resCatalogo');
+  el.innerHTML = '<div class="nota">Leyendo catálogo…</div>';
+  var rd = new FileReader();
+  rd.onload = function(e){
+    try{
+      var wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+      var filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
+      var cab = (filas[0]||[]).map(function(x){ return String(x).trim().toUpperCase(); });
+      var iC = cab.findIndex(function(x){ return /^ART[IÍ]CULO$/.test(x); }), iD = cab.indexOf('DESCRIPCIÓN'); if(iD<0) iD = cab.indexOf('DESCRIPCION');
+      var iF = cab.indexOf('FAMILIA');
+      if(iC<0 || iD<0){ el.innerHTML='<div class="alerta">No parece el Informe de artículos de AmbarX (faltan las columnas Artículo y Descripción).</div>'; return; }
+      var cambios = {}, nuevos = [], renombrados = [], vistos = {};
+      filas.slice(1).forEach(function(r){
+        var cod = String(r[iC]==null?'':r[iC]).trim(), desc = String(r[iD]||'').trim().replace(/\s+/g,' ');
+        if(!cod || !desc || /[.#$\/\[\]]/.test(cod)) return;
+        vistos[cod] = true;
+        var fam = iF>=0 ? String(r[iF]||'').trim() : '';
+        var ant = _articulos[cod];
+        if(!ant){
+          var dd = datosArticuloDesdeDescripcion(desc);
+          cambios[cod] = { codigo:cod, descripcion:desc, variedad:dd.variedad, medida:dd.medida, tallosPaquete:dd.tallosPaquete, familia:fam||null };
+          nuevos.push(cod+' '+desc);
+        } else if(ant.descripcion !== desc){
+          var d2 = datosArticuloDesdeDescripcion(desc);
+          cambios[cod+'/descripcion'] = desc; cambios[cod+'/variedad'] = d2.variedad; cambios[cod+'/medida'] = d2.medida; cambios[cod+'/tallosPaquete'] = d2.tallosPaquete;
+          renombrados.push(cod+' '+ant.descripcion+' → '+desc);
+        }
+      });
+      var faltan = Object.keys(_articulos).filter(function(c){ return !vistos[c]; }).length;
+      var resumen = '<b>'+Object.keys(vistos).length+'</b> artículos en el informe · <b>'+nuevos.length+'</b> nuevos · <b>'+renombrados.length+'</b> con descripción cambiada'+(faltan?' · '+faltan+' del catálogo no salen en el informe (se dejan)':'');
+      var lista = nuevos.concat(renombrados).slice(0,40).map(function(x){ return '<div class="nota" style="margin:2px 0;">'+_escCat(x)+'</div>'; }).join('');
+      if(!nuevos.length && !renombrados.length){ el.innerHTML='<div class="alerta ok">Catálogo al día. '+resumen+'</div>'; return; }
+      refArticulos.update(cambios).then(function(){
+        el.innerHTML='<div class="alerta ok">Catálogo actualizado. '+resumen+lista+'</div>';
+        toast('Catálogo AmbarX actualizado');
+      }).catch(function(err){ el.innerHTML='<div class="alerta">⚠ No se guardó: '+_escCat(err.message)+'</div>'; });
+    }catch(err){ el.innerHTML='<div class="alerta">⚠ No se pudo leer el archivo: '+_escCat(err.message)+'</div>'; }
+  };
+  rd.readAsArrayBuffer(f);
 }
 function construirIndiceCatalogo(){
   var idx = {};
