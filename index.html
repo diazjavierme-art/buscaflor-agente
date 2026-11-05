@@ -939,16 +939,32 @@ var refPedidosClientes = fbDB.ref('buscaflor/pedidosClientes');
 var refEtiqDocs = fbDB.ref('buscaflor/etiquetas/documentos');
 var _pedidosClientes = {}, _etiqDocs = {}, _reservaPedidosClientes = {};
 function _lista(x){ return Array.isArray(x) ? x.filter(Boolean) : (x ? Object.values(x).filter(Boolean) : []); }
+// Igual que en pedidos.html: solo el genérico "VENTA CONTADO" (o sin código) se vincula a mano, y cada documento
+// de cajas cuenta para un único pedido del cliente: el de fecha de entrega más próxima vigente al imprimir.
+function _esContadoPC(cli){ return !cli || !cli.codigo || /^\s*VENTA\s+CONTADO\s*$/i.test(cli.nombre||''); }
+function _duenoDocPC(d){
+  var mejor=null;
+  Object.keys(_pedidosClientes).forEach(function(id){
+    var p=_pedidosClientes[id]; if(!p || !p.cliente || p.estado==='cancelado' || _esContadoPC(p.cliente)) return;
+    if(String(d.cliente.codigo)!==String(p.cliente.codigo)) return;
+    if((d.abierto||'') < (p.creado||'')) return;
+    if(p.estado!=='abierto' && p.cerrado && (d.abierto||'') > p.cerrado) return;
+    if(!mejor){ mejor=id; return; }
+    var m=_pedidosClientes[mejor], fa=p.fechaEntrega||'', fb=m.fechaEntrega||'';
+    if(fa<fb || (fa===fb && (p.creado||'')<(m.creado||''))) mejor=id;
+  });
+  return mejor;
+}
 function recalcularReservaPedidos(){
   var r = {};
   Object.keys(_pedidosClientes).forEach(function(id){
     var p = _pedidosClientes[id]; if(!p || p.estado!=='abierto' || !p.cliente) return;
-    var contado = !p.cliente.codigo || /CONTADO/i.test(p.cliente.nombre||'');
+    var contado = _esContadoPC(p.cliente);
     var servido = {};
     Object.keys(_etiqDocs).forEach(function(did){
       var d = _etiqDocs[did]; if(!d || !d.cliente) return;
       var vinc = p.docsVinculados && p.docsVinculados[did];
-      var auto = !contado && String(d.cliente.codigo)===String(p.cliente.codigo) && (d.abierto||'') >= (p.creado||'');
+      var auto = !contado && String(d.cliente.codigo)===String(p.cliente.codigo) && (d.abierto||'') >= (p.creado||'') && _duenoDocPC(d)===id;
       if(!vinc && !auto) return;
       _lista(d.cajas).forEach(function(c){ _lista(c.lineas).forEach(function(l){ servido[l.codigo]=(servido[l.codigo]||0)+(+l.cantidad||0); }); });
     });
