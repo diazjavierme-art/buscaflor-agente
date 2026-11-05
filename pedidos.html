@@ -128,6 +128,15 @@ details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
         <button class="btn primario" id="btnInterpretar" onclick="interpretar()">Interpretar pedido</button>
       </div>
       <div class="cargando" id="cargando">Leyendo el pedido…</div>
+      <details id="detLote"><summary><b>Cargar varios pedidos de una vez</b></summary>
+        <p class="nota">Pega el bloque que te pasa Claude: cada pedido empieza por «Cliente:» y cada línea lleva el código del artículo entre paréntesis, como (#584). Se carga tal cual, sin interpretar.</p>
+        <textarea id="inLote" placeholder="Cliente: FRANCISCO MANUEL EGEA (#1)&#10;Fecha de entrega: 06/11/2026&#10;11 paq FREEDOM 60 (#4)&#10;1500 tallos CLAVEL FCY MIXTO (#346) - 3 cajas&#10;&#10;Cliente: …" oninput="_lote=null;document.getElementById('btnLote').disabled=true;"></textarea>
+        <div class="fila-btn">
+          <button class="btn" onclick="comprobarLote()">Comprobar</button>
+          <button class="btn primario" id="btnLote" onclick="cargarLote()" disabled>Cargar pedidos</button>
+        </div>
+        <div id="loteRes"></div>
+      </details>
       <details><summary>API key de Claude</summary>
         <p class="nota">Es la misma que usa la app de stock para leer albaranes (se guarda solo en este navegador).</p>
         <div class="fila-btn"><input type="password" id="inApiKey" placeholder="sk-ant-…"><button class="btn peq" onclick="guardarApiKey()">Guardar</button></div>
@@ -684,6 +693,87 @@ function guardarPedido(){
     document.getElementById('inTexto').value=''; document.getElementById('inFoto').value=''; document.getElementById('fotoPrev').style.display='none';
     volverPaso1(); verTab(r.fecha>fechaISO() ? 'futuros' : 'abiertos');
   }
+}
+
+/* ══ CARGA DE VARIOS PEDIDOS (bloque con códigos, sin IA) ══ */
+var _lote=null;
+function fechaDeTexto(t){
+  var m=String(t||'').match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/); if(!m) return '';
+  var a=+m[3]; if(a<100) a+=2000; return a+'-'+pad(+m[2])+'-'+pad(+m[1]);
+}
+function leerLote(texto){
+  var pedidos=[], act=null;
+  String(texto||'').split(/\r?\n/).forEach(function(raw, n){
+    var t=raw.replace(/^[\s`*•\-]+(?=\S)/,'').trim(); if(!t || /^```/.test(t)) return;
+    var mc=t.match(/^cliente\s*:\s*(.*)$/i);
+    if(mc){
+      var cod=(mc[1].match(/\(#\s*(\d+)\)/)||[])[1]||null;
+      act={cliente:{codigo:cod, nombre:mc[1].replace(/\(#\s*\d+\)/,'').trim()}, fecha:'', nota:'', lineas:[], errores:[]};
+      pedidos.push(act); return;
+    }
+    if(!act) return;
+    var mf=t.match(/^fecha(?: de entrega)?\s*:\s*(.*)$/i);
+    if(mf){ act.fecha=fechaDeTexto(mf[1]); if(!act.fecha) act.errores.push('Fecha no válida: '+mf[1]); return; }
+    var mn=t.match(/^nota\s*:\s*(.*)$/i);
+    if(mn){ act.nota=mn[1].trim(); return; }
+    var ml=t.match(/^(\d+(?:[.,]\d+)?)\s+.*?\(#\s*(\d+)\)\s*(?:[-–—]\s*(.*))?$/);
+    if(ml){ act.lineas.push({codigo:ml[2], cantidad:+ml[1].replace(',','.'), nota:(ml[3]||'').trim(), alternativas:[]}); return; }
+    if(/^\d/.test(t)) act.errores.push('Línea sin código (#…): «'+t+'»');
+  });
+  pedidos.forEach(function(p){
+    if(!p.cliente.codigo) p.errores.push('Cliente sin código (#…)');
+    else if(_clientes[p.cliente.codigo]) p.cliente.nombre=_clientes[p.cliente.codigo].nombre||p.cliente.nombre;
+    else p.errores.push('El cliente #'+p.cliente.codigo+' no está en AmbarX');
+    if(!p.fecha) p.fecha=diaSiguiente(fechaISO());
+    if(!p.lineas.length) p.errores.push('Sin líneas');
+    p.lineas.forEach(function(l){ if(!art(l.codigo)) p.errores.push('Artículo #'+l.codigo+' no existe'); });
+    p.existente=pedidoAbiertoDe(p.cliente, null, p.fecha);
+  });
+  return pedidos;
+}
+function comprobarLote(){
+  var ps=leerLote(document.getElementById('inLote').value), el=document.getElementById('loteRes');
+  if(!ps.length){ el.innerHTML='<div class="alerta">No encuentro ningún «Cliente:» en el texto.</div>'; _lote=null; document.getElementById('btnLote').disabled=true; return; }
+  var malos=ps.filter(function(p){return p.errores.length;}).length;
+  el.innerHTML=ps.map(function(p){
+    return '<div class="alerta'+(p.errores.length?'':' ok')+'"><b>'+esc(p.cliente.nombre)+'</b> <span class="cod">#'+esc(p.cliente.codigo)+'</span> · entrega '+fmtFecha(p.fecha)+' · '+p.lineas.length+' línea'+(p.lineas.length!==1?'s':'')+
+      (p.existente?'<div class="sub">Ya tiene pedido abierto ese día: las líneas se sumarán a ese pedido.</div>':'')+
+      p.errores.map(function(e){return '<div>⚠ '+esc(e)+'</div>';}).join('')+
+      '<div class="sub">'+p.lineas.map(function(l){return esc(l.cantidad+' '+nombreArt(l.codigo));}).join(' · ')+'</div></div>';
+  }).join('')+(malos?'<div class="nota">Corrige los avisos ⚠ y vuelve a comprobar. Los pedidos con avisos no se cargan.</div>':'');
+  _lote=ps; document.getElementById('btnLote').disabled = ps.length===malos;
+  document.getElementById('btnLote').textContent='Cargar '+(ps.length-malos)+' pedido'+(ps.length-malos!==1?'s':'');
+}
+function cargarLote(){
+  if(!_lote) return;
+  var buenos=_lote.filter(function(p){return !p.errores.length;}); if(!buenos.length) return;
+  var ahora=ahoraISO(), sello=ahora.replace(/[-:T]/g,''), promesas=[];
+  buenos.forEach(function(r, i){
+    var pend=pendientesAbiertos(null), porCod={};
+    r.lineas.forEach(function(l){
+      if(!porCod[l.codigo]) porCod[l.codigo]={codigo:l.codigo, descripcion:nombreArt(l.codigo), cantidad:0, unidad:unidadDe(l.codigo), nota:'', alternativas:[]};
+      porCod[l.codigo].cantidad+=l.cantidad;
+      if(l.nota) porCod[l.codigo].nota = porCod[l.codigo].nota ? porCod[l.codigo].nota+' · '+l.nota : l.nota;
+    });
+    var finales=Object.keys(porCod).map(function(c){ var l=porCod[c]; var disp=(_stock[c]?+_stock[c].cantidad||0:0)-(pend[c]||0); l.pedir = disp < l.cantidad; return l; });
+    var otro=pedidoAbiertoDe(r.cliente, null, r.fecha);
+    if(otro){
+      var p=_pedidos[otro], ex={};
+      lineasArray(p.lineas).forEach(function(l){ ex[l.codigo]=Object.assign({},l); });
+      finales.forEach(function(l){ if(ex[l.codigo]){ ex[l.codigo].cantidad+=l.cantidad; ex[l.codigo].pedir=ex[l.codigo].pedir||l.pedir; if(l.nota) ex[l.codigo].nota=(ex[l.codigo].nota?ex[l.codigo].nota+' · ':'')+l.nota; } else ex[l.codigo]=l; });
+      promesas.push(refPedidos.child(otro).update({lineas:Object.values(ex), actualizado:ahora, nota:[p.nota,r.nota].filter(Boolean).join(' · ')}));
+    } else {
+      var id='P'+sello+'_'+r.cliente.codigo+'_'+i;
+      promesas.push(refPedidos.child(id).set({ id:id, cliente:r.cliente, fechaEntrega:r.fecha, nota:r.nota, lineas:finales, origen:'lote', textoOriginal:'', creado:ahora, actualizado:ahora, estado:'abierto' }));
+    }
+  });
+  Promise.all(promesas).then(function(){
+    toast(buenos.length+' pedido'+(buenos.length!==1?'s':'')+' cargado'+(buenos.length!==1?'s':''));
+    var quedan=_lote.length-buenos.length;
+    document.getElementById('inLote').value=''; document.getElementById('loteRes').innerHTML = quedan?'<div class="alerta">'+quedan+' pedido(s) con avisos no se han cargado.</div>':'';
+    _lote=null; document.getElementById('btnLote').disabled=true;
+    verTab(buenos.some(function(p){return p.fecha>fechaISO();}) ? 'futuros' : 'abiertos');
+  }).catch(function(e){ toast('⚠ No se guardó: '+e.message); });
 }
 
 /* ══ DATOS EN VIVO ══ */
