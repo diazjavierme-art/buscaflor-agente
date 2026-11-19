@@ -1325,8 +1325,9 @@ function lineasStockClientes(){
   var D=datosStock(''), out=[];
   D.ord.forEach(function(i){
     if(FAMILIAS[i][0]==='Material y otros') return;
-    var cs=D.G[i].filter(function(c){ return fisico(c)>0; }); if(!cs.length) return;
-    out.push({fam:FAMILIAS[i][0], u:FAMILIAS[i][1], tot:cs.reduce(function(s,c){return s+fisico(c);},0), cs:cs});
+    // Para clientes solo cuenta lo DISPONIBLE (stock menos lo reservado por pedidos)
+    var cs=D.G[i].filter(function(c){ return fisico(c)-(D.pend[c]||0)>0; }); if(!cs.length) return;
+    out.push({fam:FAMILIAS[i][0], u:FAMILIAS[i][1], tot:cs.reduce(function(s,c){return s+fisico(c)-(D.pend[c]||0);},0), cs:cs, disp:function(c){ return fisico(c)-(D.pend[c]||0); }});
   });
   return out;
 }
@@ -1334,15 +1335,15 @@ function compartirStock(){
   var F=lineasStockClientes(); if(!F.length){ toast('No hay stock que enviar'); return; }
   var doc=nuevoPdf(); if(!doc) return;
   var now=hayStockAmb()&&_stockAmb.leido ? new Date(_stockAmb.leido) : new Date();
-  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.text('Stock Rosas de Buscaflor',15,18);
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.text('Stock disponible · Rosas de Buscaflor',15,18);
   doc.setFont('helvetica','normal'); doc.setFontSize(10);
   doc.text('Stock a '+now.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})+' · '+now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}),15,24);
   var body=[];
   F.forEach(function(f){
     body.push([{content:f.fam.toUpperCase(),styles:{fontStyle:'bold'}},'',{content:nf(f.tot)+' '+f.u,styles:{fontStyle:'bold',halign:'right'}}]);
-    f.cs.forEach(function(c){ body.push(['   '+descStock(c),{content:proveedoresDe(c).join(', '),styles:{fontSize:8.5,textColor:60}},{content:nf(fisico(c)),styles:{halign:'right'}}]); });
+    f.cs.forEach(function(c){ body.push(['   '+descStock(c),{content:proveedoresDe(c).join(', '),styles:{fontSize:8.5,textColor:60}},{content:nf(f.disp(c)),styles:{halign:'right'}}]); });
   });
-  tabla(doc,{startY:29, head:[['Artículo','Proveedores',{content:'Cantidad',styles:{halign:'right'}}]], body:body,
+  tabla(doc,{startY:29, head:[['Artículo','Proveedores',{content:'Disponible',styles:{halign:'right'}}]], body:body,
     styles:Object.assign({},TABLA.styles,{fontSize:10,lineColor:180,lineWidth:{bottom:0.1}}),
     columnStyles:{0:{cellWidth:72},1:{cellWidth:83},2:{cellWidth:25,halign:'right'}}});
   piePaginas(doc);
@@ -1350,8 +1351,8 @@ function compartirStock(){
 }
 function copiarStockTexto(){
   var F=lineasStockClientes(); if(!F.length){ toast('No hay stock'); return; }
-  var t='*Stock Rosas de Buscaflor* ('+(fechaStockTxt()||fmtFechaLarga(fechaISO()))+')\n'+F.map(function(f){
-    return '\n*'+f.fam+'*\n'+f.cs.map(function(c){ return '· '+descStock(c)+': '+nf(fisico(c)); }).join('\n');
+  var t='*Stock disponible Rosas de Buscaflor* ('+(fechaStockTxt()||fmtFechaLarga(fechaISO()))+')\n'+F.map(function(f){
+    return '\n*'+f.fam+'*\n'+f.cs.map(function(c){ return '· '+descStock(c)+': '+nf(f.disp(c)); }).join('\n');
   }).join('\n');
   copiar(t).then(function(ok){ toast(ok?'Stock copiado: pégalo en WhatsApp':'No se pudo copiar'); });
 }
