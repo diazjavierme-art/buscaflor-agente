@@ -8,6 +8,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
 :root{
   --navy:#1F344C; --navy-dark:#152435; --navy-suave:#EEF1F4; --papel:#FFFFFF; --fondo:#F7F8F9;
@@ -18,8 +21,9 @@ body{font-family:'IBM Plex Sans',sans-serif;background:var(--fondo);color:var(--
 header{background:var(--papel);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--navy);}
 header h1{font-size:17px;color:var(--navy);font-weight:600;}
 header a{font-size:12px;color:var(--navy);}
-.tabs{display:flex;background:var(--papel);border-bottom:1px solid var(--filo);}
-.tab{flex:1;padding:11px 6px;text-align:center;font-weight:600;font-size:13px;color:var(--gris);border-bottom:3px solid transparent;cursor:pointer;}
+.tabs{display:flex;background:var(--papel);border-bottom:1px solid var(--filo);overflow-x:auto;scrollbar-width:none;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab{flex:1 0 auto;padding:11px 10px;text-align:center;font-weight:600;font-size:13px;color:var(--gris);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;}
 .tab.activa{color:var(--navy);border-bottom-color:var(--navy);}
 main{padding:14px;}
 .btn{padding:10px 12px;font-family:inherit;font-size:13px;font-weight:600;border:1px solid var(--navy);border-radius:6px;cursor:pointer;background:var(--papel);color:var(--navy);}
@@ -95,6 +99,26 @@ body.pantalla{max-width:none;}
 .dia-cab b{font-size:15px;color:var(--navy);text-transform:capitalize;}
 .pa-prox{font-size:13px;color:var(--navy);cursor:pointer;text-decoration:underline;}
 details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
+/* ── Stock, vuelos, ajustes ── */
+.chip{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:10px;white-space:nowrap;}
+.chip.ok{background:rgba(47,125,92,.12);color:var(--verde);} .chip.bad{background:rgba(192,70,58,.12);color:var(--rojo);}
+.chip.warn{background:rgba(199,154,62,.16);color:#8a6a1f;} .chip.n{background:var(--navy-suave);color:var(--navy);}
+.kpis{display:flex;gap:8px;overflow-x:auto;margin:8px 0 10px;}
+.kpi{flex:0 0 auto;background:var(--papel);border:1px solid var(--filo);border-radius:8px;padding:7px 11px;text-decoration:none;color:var(--tinta);font-size:11.5px;}
+.kpi b{display:block;font-size:16px;color:var(--navy);font-family:'IBM Plex Mono',monospace;}
+.fam{background:var(--papel);border:1px solid var(--filo);border-radius:8px;margin-bottom:10px;overflow:hidden;}
+.fam .fh{display:flex;justify-content:space-between;padding:8px 11px;background:var(--navy-suave);font-size:13px;color:var(--navy);}
+.sk{display:flex;justify-content:space-between;gap:10px;padding:7px 11px;border-top:1px solid var(--filo);font-size:13px;}
+.sk .n{font-family:'IBM Plex Mono',monospace;font-weight:600;white-space:nowrap;text-align:right;}
+.sk .n small{display:block;font-weight:400;font-size:10.5px;color:var(--gris);}
+.neg{color:var(--rojo);}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;}
+.toolbar .btn{flex:1 1 auto;}
+.prev-txt{white-space:pre-wrap;font-size:12px;background:var(--fondo);border:1px solid var(--filo);border-radius:6px;padding:8px;margin:8px 0;max-height:220px;overflow:auto;}
+.bar2{height:8px;background:var(--navy-suave);border-radius:4px;overflow:hidden;min-width:60px;}
+.bar2 i{display:block;height:100%;background:var(--verde);} .bar2 i.over{background:var(--rojo);}
+.izq td,.izq th{text-align:left;font-family:inherit;}
+.izq td:last-child{text-align:right;}
 </style>
 </head>
 <body>
@@ -108,12 +132,80 @@ details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
   <div class="tab" data-tab="futuros" onclick="verTab('futuros')">Próximos <span id="nFuturos" class="tag ab" style="display:none;"></span></div>
   <div class="tab" data-tab="nuevo" onclick="verTab('nuevo')">＋ Nuevo pedido</div>
   <div class="tab" data-tab="cerrados" onclick="verTab('cerrados')">Cerrados</div>
+  <div class="tab" data-tab="stock" onclick="verTab('stock')">Stock</div>
+  <div class="tab" data-tab="vuelos" onclick="verTab('vuelos')">Vuelos <span id="nVuelos" class="tag pedir" style="display:none;"></span></div>
+  <div class="tab" data-tab="sv" onclick="verTab('sv')">SV 2027</div>
+  <div class="tab" data-tab="ajustes" onclick="verTab('ajustes')">Ajustes</div>
 </div>
 <main>
   <section id="tab-pantalla"><div id="pantalla"><div class="vacio">Conectando…</div></div></section>
-  <section id="tab-abiertos" style="display:none;"><div id="listaAbiertos"><div class="vacio">Conectando…</div></div></section>
+  <section id="tab-abiertos" style="display:none;">
+    <div class="toolbar">
+      <button class="btn peq" onclick="pdfPreparacion(fechaISO())">PDF de preparación de hoy</button>
+      <button class="btn peq" onclick="exportarAmbarx(false)">Excel para AmbarX (no exportados)</button>
+      <button class="btn peq" onclick="exportarAmbarx(true)">Exportar todos</button>
+    </div>
+    <div id="listaAbiertos"><div class="vacio">Conectando…</div></div>
+  </section>
   <section id="tab-futuros" style="display:none;"><div id="listaFuturos"></div></section>
   <section id="tab-cerrados" style="display:none;"><div id="listaCerrados"></div></section>
+
+  <section id="tab-stock" style="display:none;">
+    <div class="alerta oro" id="stOrigen">Cargando el stock de AmbarX…</div>
+    <div class="kpis" id="stKpi"></div>
+    <input id="stQ" type="search" placeholder="Buscar: freedom 60, clavel, 904…" oninput="pintarStock()">
+    <div class="fila-btn">
+      <button class="btn primario" onclick="compartirStock()">Enviar stock en PDF (WhatsApp…)</button>
+      <button class="btn" onclick="copiarStockTexto()">Copiar como texto</button>
+    </div>
+    <div id="stTabla"></div>
+    <p class="nota" style="text-align:center;">Stock del almacén según el informe de AmbarX. «Libre» = stock menos lo que falta por servir de los pedidos abiertos. Si algo no cuadra, corrígelo en AmbarX y se verá aquí en el siguiente cruce.</p>
+  </section>
+
+  <section id="tab-vuelos" style="display:none;">
+    <div id="vuAvisos"></div>
+    <label>Mostrar</label>
+    <select id="vuF" onchange="pintarVuelos()"><option value="abiertos">Vuelos con algo pendiente</option><option value="todos">Todos los vuelos</option></select>
+    <div id="vuLista" style="margin-top:10px;"></div>
+    <p class="nota">Cada vuelo con sus facturas de fincas, el estado del inventario y si está grabado en AmbarX. Lo actualizan solas las tareas del servidor.</p>
+  </section>
+
+  <section id="tab-sv" style="display:none;">
+    <p class="nota">Previsión de compra de San Valentín 2027 = lo vendido en San Valentín 2026. La flor se asigna por orden de llegada del pedido: lo que pasa de la previsión queda «en espera». Para marcar un pedido como de San Valentín, actívalo al revisarlo.</p>
+    <div id="svTabla"></div>
+  </section>
+
+  <section id="tab-ajustes" style="display:none;">
+    <div class="card">
+      <b>Emails de clientes</b>
+      <p class="nota">Cada cliente queda vinculado a su email por su código de AmbarX. Se usa en las confirmaciones y listados.</p>
+      <div class="sw">
+        <input id="ajCli" autocomplete="off" placeholder="Busca cliente por nombre, código o pueblo" oninput="buscarClienteAj(this.value)" onfocus="buscarClienteAj(this.value)">
+        <div class="dd" id="ddAjCli"></div>
+      </div>
+      <div id="ajSel" style="display:none;">
+        <label id="ajNombre"></label>
+        <div class="fila-btn"><input id="ajEmail" type="email" placeholder="cliente@correo.com"><input id="ajTel" placeholder="Teléfono (WhatsApp)"><button class="btn peq primario" onclick="guardarContactoAj()">Guardar</button></div>
+      </div>
+      <details><summary>Pegar muchos a la vez</summary>
+        <p class="nota">Una línea por cliente: código y email, separados por punto y coma, coma o tabulador (sirve copiar dos columnas de Excel).</p>
+        <textarea id="ajBulk" placeholder="1;flores.egea@correo.com&#10;1001;pedidos@floristeria.es"></textarea>
+        <div class="fila-btn"><button class="btn peq" onclick="guardarEmailsBulk()">Guardar lista</button></div>
+      </details>
+      <div id="ajTabla" style="max-height:340px;overflow:auto;margin-top:8px;"></div>
+    </div>
+    <div class="card">
+      <b>Firma de los mensajes</b>
+      <textarea id="ajFirma" style="min-height:70px;margin-top:8px;"></textarea>
+      <div class="fila-btn"><button class="btn peq" onclick="guardarFirma()">Guardar firma</button></div>
+    </div>
+    <div class="card">
+      <b>Precios de San Valentín 2027</b>
+      <p class="nota">Si un artículo no tiene precio, la confirmación dice «según tarifa».</p>
+      <div id="ajPrecios"></div>
+      <div class="fila-btn"><button class="btn peq primario" onclick="guardarPrecios()">Guardar precios</button></div>
+    </div>
+  </section>
 
   <section id="tab-nuevo" style="display:none;">
     <div id="paso1">
@@ -153,6 +245,7 @@ details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
       <div class="sub" id="revClienteInfo"></div>
       <label>Fecha de entrega</label>
       <input type="date" id="revFecha">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--tinta);"><input type="checkbox" id="revSV" style="width:auto;"> Pedido de San Valentín 2027 (flor por orden de llegada)</label>
       <label>Líneas</label>
       <div id="revLineas"></div>
       <div class="fila-btn"><button class="btn peq" onclick="anadirLinea()">＋ Añadir línea</button></div>
@@ -185,8 +278,13 @@ var refArticulos = db.ref('buscaflor/articulos/items');
 var refClientes  = db.ref('buscaflor/clientes/items');
 var refStock     = db.ref('buscaflor/stock');
 var refEtiq      = db.ref('buscaflor/etiquetas/documentos'); // cajas impresas (script del almacén)
+var refStockAmb  = db.ref('buscaflor/stockAmbarx');   // informe de stocks de AmbarX (lo escribe la tarea del servidor)
+var refVuelos    = db.ref('buscaflor/vuelos');        // vuelos con facturas y estado en AmbarX (tarea del servidor)
+var refContactos = db.ref('buscaflor/contactos');     // email y teléfono por código de cliente AmbarX
+var refConfig    = db.ref('buscaflor/configPedidos'); // firma y campaña de San Valentín
 
 var _pedidos = {}, _articulos = {}, _clientes = {}, _stock = {}, _etiq = {};
+var _stockAmb = null, _vuelos = {}, _contactos = {}, _config = {};
 var _listos = {};
 var CLAVE_API = 'bf_ak';
 var MODELO = 'claude-sonnet-4-6';
@@ -276,22 +374,31 @@ function calcularPedido(p){
 function pendientesAbiertos(excluirId){
   var r={};
   Object.keys(_pedidos).forEach(function(id){
-    var p=_pedidos[id]; if(!p || p.estado!=='abierto' || id===excluirId) return;
+    var p=_pedidos[id]; if(!p || p.estado!=='abierto' || id===excluirId || !reservaStock(p)) return;
     calcularPedido(p).lineas.forEach(function(l){ r[l.codigo]=(r[l.codigo]||0)+l.pendiente; });
   });
   return r;
 }
+// Stock físico: el del informe de AmbarX si ya está cargado; si no, el de la app de stock.
+function hayStockAmb(){ return !!(_stockAmb && _stockAmb.items); }
+function fisico(c){
+  if(hayStockAmb()){ var it=_stockAmb.items[c]; return it ? (+it.q||0) : 0; }
+  var s=_stock[c]; return s ? (+s.cantidad||0) : 0;
+}
+function codigosConStock(){
+  return hayStockAmb() ? Object.keys(_stockAmb.items) : Object.keys(_stock);
+}
 function stockDisponible(codigo, excluirId){
-  var it=_stock[codigo]; var fis = it ? (+it.cantidad||0) : 0;
-  return fis - (pendientesAbiertos(excluirId)[codigo]||0);
+  return fisico(codigo) - (pendientesAbiertos(excluirId)[codigo]||0);
 }
 
 /* ══ LISTADOS ══ */
 function verTab(t){
   document.querySelectorAll('.tab').forEach(function(x){ x.classList.toggle('activa', x.getAttribute('data-tab')===t); });
   document.body.classList.toggle('pantalla', t==='pantalla');
-  ['pantalla','abiertos','futuros','nuevo','cerrados'].forEach(function(s){ document.getElementById('tab-'+s).style.display = s===t?'':'none'; });
+  ['pantalla','abiertos','futuros','nuevo','cerrados','stock','vuelos','sv','ajustes'].forEach(function(s){ document.getElementById('tab-'+s).style.display = s===t?'':'none'; });
   if(t==='nuevo'){ var k=leerApiKey(); document.getElementById('inApiKey').value = k?'••••••••':''; }
+  _tab=t;
   pintar();
 }
 function pintar(){
@@ -308,6 +415,7 @@ function pintar(){
   pintarFuturos(fu);
   setTimeout(procesarCierres, 0);
   document.getElementById('listaCerrados').innerHTML = ce.length ? ce.map(tarjeta).join('') : '<div class="vacio">Sin pedidos cerrados todavía.</div>';
+  pintarExtras();
 }
 function tarjeta(id){
   var p=_pedidos[id], c=calcularPedido(p), abierto=p.estado==='abierto';
@@ -315,12 +423,15 @@ function tarjeta(id){
     (p.cliente.codigo?' <span class="cod">#'+esc(p.cliente.codigo)+'</span>':'')+
     '<div class="sub">Entrega '+fmtFecha(p.fechaEntrega)+' · '+c.cajas+' caja'+(c.cajas!==1?'s':'')+' impresa'+(c.cajas!==1?'s':'')+
     (c.cierres.length?' · <span class="tag cerr">'+esc(c.cierres.join(' + '))+'</span>':'')+
-    (abierto?'':' · <span class="tag ab">'+esc(p.estado)+'</span>')+'</div></div>'+
+    (abierto?'':' · <span class="tag ab">'+esc(p.estado)+'</span>')+
+    (esSV(p)?' · <span class="chip warn">San Valentín</span>':'')+
+    (p.confirmacion?' · <span class="chip ok">Confirmado ('+esc(p.confirmacion.via)+')</span>':'')+
+    (p.exportado?' · <span class="chip n">En AmbarX</span>':'')+'</div></div>'+
     '<div class="sub" style="text-align:right;">'+Math.round(c.avance*100)+'%</div></div>';
   h+='<div class="barra"><div style="width:'+Math.round(c.avance*100)+'%"></div></div>';
   h+='<table><tr><th>Artículo</th><th>Pedido</th><th>Servido</th><th>Falta</th></tr>';
   c.lineas.forEach(function(l){
-    h+='<tr><td>'+esc(nombreArt(l.codigo))+' <span class="cod">#'+esc(l.codigo)+'</span>'+(l.alternativas.length?'<div class="sub">o '+l.alternativas.map(function(a){return esc(nombreArt(a))+' #'+esc(a);}).join(' o ')+'</div>':'')+(l.pedir&&l.pendiente>0?'<span class="tag pedir">PEDIR</span>':'')+(l.nota?'<div class="sub">'+esc(l.nota)+'</div>':'')+'</td>'+
+    h+='<tr><td>'+esc(nombreArt(l.codigo))+' <span class="cod">#'+esc(l.codigo)+'</span>'+(l.alternativas.length?'<div class="sub">o '+l.alternativas.map(function(a){return esc(nombreArt(a))+' #'+esc(a);}).join(' o ')+'</div>':'')+(l.pedir&&l.pendiente>0?'<span class="tag pedir">PEDIR</span>':'')+chipSV(p,l.codigo)+(l.nota?'<div class="sub">'+esc(l.nota)+'</div>':'')+'</td>'+
        '<td>'+l.cantidad+'</td><td class="'+(l.servido>l.cantidad?'exceso':(l.servido?'ok':''))+'">'+l.servido+'</td>'+
        '<td class="'+(l.pendiente?'pend':'ok')+'">'+(l.pendiente||'✓')+'</td></tr>';
   });
@@ -340,6 +451,11 @@ function tarjeta(id){
        '<button class="btn peq peligro" onclick="cancelarPedido(\''+id+'\')">Cancelar</button></div>';
   } else {
     h+='<div class="fila-btn"><button class="btn peq" onclick="reabrirPedido(\''+id+'\')">Reabrir</button></div>';
+  }
+  if(p.estado!=='cancelado'){
+    h+='<div class="fila-btn"><button class="btn peq" onclick="abrirConfirmar(\''+id+'\')">✉ Confirmar al cliente</button>'+
+       (p.cliente.codigo?'<button class="btn peq" onclick="listadoCliente(\''+esc(p.cliente.codigo)+'\')">📄 Pedidos de este cliente</button>':'')+'</div>'+
+       '<div id="conf-'+id+'"></div>';
   }
   return h+'</div>';
 }
@@ -416,7 +532,7 @@ function pintarFuturos(fu){
         var disp=stockDisponible(c);
         return '<tr><td>'+esc(nombreArt(c))+' <span class="cod">#'+esc(c)+'</span></td><td>'+tot[c]+' <span class="sub">'+unidadDe(c)+'</span></td><td class="'+(disp<0?'exceso':'')+'">'+disp+'</td></tr>';
       }).join('')+'</table><div class="nota">Stock libre = stock actual menos todo lo reservado por pedidos abiertos (hoy y próximos). En rojo, lo que hay que comprar.</div></details>';
-    return '<div class="dia-cab"><b>'+fmtFecha(f)+'</b><span class="sub">'+ids.length+' pedido'+(ids.length!==1?'s':'')+'</span></div>'+tabla+ids.map(tarjeta).join('');
+    return '<div class="dia-cab"><b>'+fmtFecha(f)+'</b><span class="sub">'+ids.length+' pedido'+(ids.length!==1?'s':'')+' · <a href="#" onclick="pdfPreparacion(\''+f+'\');return false;">PDF de preparación</a></span></div>'+tabla+ids.map(tarjeta).join('');
   }).join('');
 }
 
@@ -533,7 +649,7 @@ function guardarApiKey(){ var v=document.getElementById('inApiKey').value.trim()
 function promptSistema(){
   var cat = Object.keys(_articulos).map(function(c){ return c+'|'+_articulos[c].descripcion; }).join('\n');
   var cli = Object.keys(_clientes).map(function(c){ var x=_clientes[c]; return c+'|'+x.nombre+(x.denominacion&&x.denominacion!==x.nombre?' ('+x.denominacion+')':'')+(x.poblacion?' · '+x.poblacion:''); }).join('\n');
-  var st = Object.keys(_stock).filter(function(c){return (+_stock[c].cantidad||0)>0;}).map(function(c){ return c+':'+_stock[c].cantidad; }).join(', ') || '(vacío)';
+  var st = codigosConStock().filter(function(c){return fisico(c)>0;}).map(function(c){ return c+':'+fisico(c); }).join(', ') || '(vacío)';
   return 'Eres el asistente de pedidos de Buscaflor, mayorista de flor cortada en Sevilla. Pasas notas de pedido de clientes (manuscritas, abreviadas, dictadas) a líneas con el CÓDIGO de artículo de AmbarX.\n\n'+
   'REGLAS DE UNIDADES (la cantidad SIEMPRE en la unidad de venta de AmbarX):\n'+
   '- CLAVEL: se vende por TALLOS. En los pedidos el número son RAMOS de 20 tallos → cantidad = ramos × 20. "clav. blanco" = clavel blanco.\n'+
@@ -595,7 +711,7 @@ function abrirRevision(j, textoOriginal){
 }
 function editarPedido(id){
   var p=_pedidos[id];
-  _rev = { id:id, cliente:Object.assign({},p.cliente), candidatos:[], fecha:p.fechaEntrega||fechaISO(), nota:p.nota||'', origen:p.origen, textoOriginal:p.textoOriginal||'',
+  _rev = { id:id, cliente:Object.assign({},p.cliente), candidatos:[], fecha:p.fechaEntrega||fechaISO(), nota:p.nota||'', origen:p.origen, textoOriginal:p.textoOriginal||'', campana:p.campana||'',
     lineas: lineasArray(p.lineas).map(function(l){ return {texto:'', codigo:l.codigo, cantidad:l.cantidad, alternativas:lineasArray(l.alternativas).map(String), opciones:[], duda:'', nota:l.nota||'', pedir:!!l.pedir}; }) };
   verTab('nuevo'); pintarRevision();
 }
@@ -606,6 +722,7 @@ function pintarRevision(){
   document.getElementById('revCliente').value = r.cliente.nombre||'';
   document.getElementById('revFecha').value = r.fecha;
   document.getElementById('revNota').value = r.nota;
+  document.getElementById('revSV').checked = r.campana==='SV27';
   var info='';
   if(r.cliente.codigo) info='Cliente AmbarX #'+r.cliente.codigo+(esContado(r.cliente)?' · contado: las cajas se vinculan a mano':'');
   else info='<span class="exceso">No encuentro este cliente en AmbarX.</span> Búscalo arriba'+(r.candidatos.length?' — ¿es '+r.candidatos.map(function(c){return '<a href="#" onclick="elegirCliente(\''+c+'\');return false;">'+esc(_clientes[c].nombre)+'</a>';}).join(' o ')+'?':'')+' o guárdalo sin ficha (se tratará como contado).';
@@ -614,7 +731,7 @@ function pintarRevision(){
   document.getElementById('avisosRev').innerHTML = dudas ? '<div class="alerta oro"><b>'+dudas+' línea'+(dudas!==1?'s':'')+' con duda.</b> Elige el artículo en cada una (las opciones con stock salen primero).</div>' : '<div class="alerta ok">Todas las líneas tienen artículo de AmbarX. Revisa cantidades y guarda.</div>';
   var pend = pendientesAbiertos(r.id);
   document.getElementById('revLineas').innerHTML = r.lineas.map(function(l,i){
-    var disp = l.codigo ? ((_stock[l.codigo]?+_stock[l.codigo].cantidad||0:0) - (pend[l.codigo]||0)) : null;
+    var disp = l.codigo ? (fisico(l.codigo) - (pend[l.codigo]||0)) : null;
     var sinStock = l.codigo && disp < l.cantidad;
     var h='<div class="linea'+(l.codigo?'':' duda')+'">';
     if(l.texto) h+='<div class="orig">«'+esc(l.texto)+'»</div>';
@@ -625,8 +742,8 @@ function pintarRevision(){
     if(l.alternativas && l.alternativas.length) h+='<div class="sub" style="margin-top:4px;">También vale: '+l.alternativas.map(function(a){return '#'+esc(a)+' '+esc(nombreArt(a));}).join(' · ')+' <a href="#" onclick="_rev.lineas['+i+'].alternativas=[];pintarRevision();return false;">quitar</a></div>';
     if(l.duda) h+='<div class="sub" style="color:#8a6a1f;margin-top:4px;">'+esc(l.duda)+'</div>';
     if(l.opciones.length){
-      var ops=l.opciones.slice().sort(function(a,b){ return ((_stock[b]&&_stock[b].cantidad)||0)-((_stock[a]&&_stock[a].cantidad)||0); });
-      h+='<div class="opciones">'+ops.map(function(c){ var s=_stock[c]?(+_stock[c].cantidad||0)-(pend[c]||0):0; return '<button class="'+(c===l.codigo?'sel':'')+'" onclick="_rev.lineas['+i+'].codigo=\''+c+'\';pintarRevision()">#'+c+' '+esc(nombreArt(c))+' · stock '+s+'</button>'; }).join('')+'</div>';
+      var ops=l.opciones.slice().sort(function(a,b){ return fisico(b)-fisico(a); });
+      h+='<div class="opciones">'+ops.map(function(c){ var s=fisico(c)-(pend[c]||0); return '<button class="'+(c===l.codigo?'sel':'')+'" onclick="_rev.lineas['+i+'].codigo=\''+c+'\';pintarRevision()">#'+c+' '+esc(nombreArt(c))+' · stock '+s+'</button>'; }).join('')+'</div>';
     }
     if(l.codigo){
       h+='<div class="sub" style="margin-top:4px;">Disponible: '+disp+' '+unidadDe(l.codigo)+(sinStock?' <span class="tag pedir">PEDIR</span> no llega con el stock actual':'')+'</div>';
@@ -638,8 +755,8 @@ function pintarRevision(){
 function buscarArticulo(inp, i){
   var q=inp.value.toLowerCase().replace(/^#\S+\s*·\s*/,'').trim(); var dd=inp.nextElementSibling;
   var res=Object.keys(_articulos).filter(function(c){ return !q || ('#'+c+' '+_articulos[c].descripcion).toLowerCase().indexOf(q)>=0 || c===q; })
-    .sort(function(a,b){ return ((_stock[b]&&_stock[b].cantidad)||0)-((_stock[a]&&_stock[a].cantidad)||0) || nombreArt(a).localeCompare(nombreArt(b)); }).slice(0,40);
-  dd.innerHTML=res.map(function(c){ return '<div data-c="'+c+'">#'+c+' · '+esc(nombreArt(c))+(_stock[c]?' <span class="sub">stock '+(_stock[c].cantidad||0)+'</span>':'')+'</div>'; }).join('')||'<div>Sin resultados</div>';
+    .sort(function(a,b){ return fisico(b)-fisico(a) || nombreArt(a).localeCompare(nombreArt(b)); }).slice(0,40);
+  dd.innerHTML=res.map(function(c){ return '<div data-c="'+c+'">#'+c+' · '+esc(nombreArt(c))+(fisico(c)?' <span class="sub">stock '+fisico(c)+'</span>':'')+'</div>'; }).join('')||'<div>Sin resultados</div>';
   dd.classList.add('open');
   dd.querySelectorAll('div[data-c]').forEach(function(el){ el.addEventListener('mousedown',function(e){ e.preventDefault(); _rev.lineas[i].codigo=el.getAttribute('data-c'); _rev.lineas[i].duda=''; pintarRevision(); }); });
   inp.onblur=function(){ setTimeout(function(){dd.classList.remove('open');},150); };
@@ -660,6 +777,7 @@ function guardarPedido(){
   var r=_rev;
   r.fecha=document.getElementById('revFecha').value||fechaISO();
   r.nota=document.getElementById('revNota').value.trim();
+  r.campana=document.getElementById('revSV').checked?'SV27':'';
   if(!r.cliente.nombre){ toast('Falta el cliente'); return; }
   var lineas=r.lineas.filter(function(l){return l.cantidad>0;});
   if(!lineas.length){ toast('El pedido no tiene líneas'); return; }
@@ -674,7 +792,7 @@ function guardarPedido(){
     porCod[l.codigo].cantidad+=l.cantidad;
     if(l.nota) porCod[l.codigo].nota = porCod[l.codigo].nota ? porCod[l.codigo].nota+' · '+l.nota : l.nota;
   });
-  var finales=Object.keys(porCod).map(function(c){ var l=porCod[c]; var disp=(_stock[c]?+_stock[c].cantidad||0:0)-(pend[c]||0); l.pedir = disp < l.cantidad; return l; });
+  var finales=Object.keys(porCod).map(function(c){ var l=porCod[c]; var disp=fisico(c)-(pend[c]||0); l.pedir = disp < l.cantidad; return l; });
 
   // Regla: un solo pedido abierto por cliente y fecha de entrega
   var otro = r.id ? null : pedidoAbiertoDe(r.cliente, null, r.fecha);
@@ -687,7 +805,7 @@ function guardarPedido(){
     return;
   }
   var id = r.id || ('P'+ahoraISO().replace(/[-:T]/g,'')+'_'+(r.cliente.codigo||'X'));
-  var datos = { id:id, cliente:r.cliente, fechaEntrega:r.fecha, nota:r.nota, lineas:finales, origen:r.origen||'texto', textoOriginal:r.textoOriginal||'', actualizado:ahoraISO() };
+  var datos = { id:id, cliente:r.cliente, fechaEntrega:r.fecha, nota:r.nota, lineas:finales, origen:r.origen||'texto', textoOriginal:r.textoOriginal||'', campana:r.campana||'', actualizado:ahoraISO() };
   if(!r.id){ datos.creado=ahoraISO(); datos.estado='abierto'; }
   refPedidos.child(id).update(datos).then(fin).catch(function(e){ toast('⚠ No se guardó: '+e.message); });
   function fin(){
@@ -757,7 +875,7 @@ function cargarLote(){
       porCod[l.codigo].cantidad+=l.cantidad;
       if(l.nota) porCod[l.codigo].nota = porCod[l.codigo].nota ? porCod[l.codigo].nota+' · '+l.nota : l.nota;
     });
-    var finales=Object.keys(porCod).map(function(c){ var l=porCod[c]; var disp=(_stock[c]?+_stock[c].cantidad||0:0)-(pend[c]||0); l.pedir = disp < l.cantidad; return l; });
+    var finales=Object.keys(porCod).map(function(c){ var l=porCod[c]; var disp=fisico(c)-(pend[c]||0); l.pedir = disp < l.cantidad; return l; });
     var otro=pedidoAbiertoDe(r.cliente, null, r.fecha);
     if(otro){
       var p=_pedidos[otro], ex={};
@@ -778,6 +896,435 @@ function cargarLote(){
   }).catch(function(e){ toast('⚠ No se guardó: '+e.message); });
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   AÑADIDOS 19-11-2026 (traídos de la app de claude.ai):
+   stock de AmbarX, vuelos, confirmación al cliente, listados en PDF,
+   hoja de preparación, Excel para AmbarX, San Valentín 2027 y ajustes.
+   ══════════════════════════════════════════════════════════════════════ */
+var _tab = 'pantalla';
+function nf(n){ return Number(n||0).toLocaleString('es-ES',{maximumFractionDigits:2}); }
+function eur(n){ return Number(n).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
+function usd(n){ return n==null||n==='' ? '' : Number(n).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' $'; }
+function fmtFechaLarga(iso){
+  if(!iso) return 'por confirmar';
+  var d=new Date(iso.slice(0,10)+'T12:00:00');
+  return ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][d.getDay()]+' '+d.getDate()+' de '+
+    ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][d.getMonth()];
+}
+function ddmmyyyy(iso){ var d=new Date(iso); return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear(); }
+function firma(){ return (_config && _config.firma) || 'Un saludo,\nRosas de Buscaflor'; }
+function nombreCliCod(c){ return (_clientes[c] && _clientes[c].nombre) || ('#'+c); }
+function slug(s){ return String(s||'').replace(/[^A-Za-z0-9ÁÉÍÓÚÑáéíóúñ]+/g,'_').slice(0,40); }
+
+/* Zona de reparto por código de cliente (mismas reglas que el análisis de facturas) */
+var ZONA_CH=['1','79','88','181','283','93','229','285'], ZONA_FU=['187','160','215','165','161','148','238','119','82'];
+function zona(c){ c=String(c||''); if(ZONA_FU.indexOf(c)>=0) return 'Fuera'; if(ZONA_CH.indexOf(c)>=0 || (c.length===4 && c.indexOf('10')===0)) return 'Chipiona'; return 'Sevilla'; }
+
+/* ── San Valentín 2027: catálogo de campaña, previsión y asignación por orden de llegada ── */
+function esSV(p){ return !!(p && p.campana==='SV27'); }
+function campana(){ return (_config && _config.campana) || {}; }
+function campItems(){ return lineasArray(campana().items); }
+function campItem(c){ return campItems().find(function(i){ return String(i.c)===String(c); }) || null; }
+function precioSV(c){ var i=campItem(c); return i && i.p!=null && i.p!=='' ? +i.p : null; }
+function asignarSV(){
+  var usado={}, res={}, grupos=campana().grupos||{};
+  Object.keys(_pedidos).map(function(id){ return _pedidos[id]; })
+    .filter(function(p){ return p && esSV(p) && p.estado!=='cancelado'; })
+    .sort(function(a,b){ return String(a.creado||'').localeCompare(String(b.creado||'')); })
+    .forEach(function(p){
+      res[p.id]={};
+      lineasArray(p.lineas).forEach(function(l){
+        var it=campItem(l.codigo), g=it && grupos[it.g];
+        if(!g){ res[p.id][l.codigo]={st:'libre'}; return; }
+        var antes=usado[it.g]||0, q=+l.cantidad||0; usado[it.g]=antes+q;
+        res[p.id][l.codigo] = antes+q<=g.prev ? {st:'ok'} : (antes<g.prev ? {st:'parcial', ok:g.prev-antes} : {st:'espera'});
+      });
+    });
+  return {res:res, usado:usado};
+}
+function chipSV(p, c){
+  if(!esSV(p)) return '';
+  var a=(asignarSV().res[p.id]||{})[c]; if(!a) return '';
+  if(a.st==='libre') return ' <span class="chip n">fuera de previsión</span>';
+  if(a.st==='ok') return ' <span class="chip ok">asegurado</span>';
+  if(a.st==='parcial') return ' <span class="chip warn">'+nf(a.ok)+' aseguradas</span>';
+  return ' <span class="chip bad">en espera</span>';
+}
+// Los pedidos de San Valentín solo reservan stock en su última semana
+function reservaStock(p){
+  if(!esSV(p)) return true;
+  var lim=new Date(); lim.setDate(lim.getDate()+7);
+  return (p.fechaEntrega||'') <= fechaISO(lim);
+}
+
+/* ── Contactos de clientes (email y teléfono por código AmbarX) ── */
+function contacto(c){ return (c!=null && _contactos[c]) || {}; }
+function emailCli(c){ return contacto(c).email || ''; }
+function telCli(c){ return contacto(c).tel || ''; }
+function listaEmails(s){
+  var a=String(s||'').split(/[;,\s]+/).map(function(x){return x.trim().toLowerCase();}).filter(Boolean);
+  return a.length && a.every(function(x){ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x); }) ? a : [];
+}
+function movilWA(tel){
+  var m=String(tel||'').replace(/[^\d+]/g,' ').split(/\s+/).map(function(x){return x.replace(/^\+?34/,'');}).find(function(x){ return /^[67]\d{8}$/.test(x); });
+  return m ? '34'+m : '';
+}
+function guardarContacto(c, datos){
+  var upd=Object.assign({}, datos, {actualizado:ahoraISO()});
+  return refContactos.child(sanitizarClave(c)).update(upd);
+}
+function sanitizarClave(s){ return String(s).replace(/[.#$\[\]\/]/g,'_').trim(); }
+
+/* ── Compartir (menú del móvil) o descargar ── */
+function copiar(t){
+  if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(function(){return true;},function(){return false;});
+  return Promise.resolve(false);
+}
+function descargarBlob(blob, nombre){
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=nombre;
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+function compartirPdf(doc, nombre, titulo, texto){
+  var blob=new Blob([doc.output('arraybuffer')],{type:'application/pdf'});
+  try{
+    var file=new File([blob], nombre, {type:'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      return navigator.share({files:[file], title:titulo, text:texto||''}).then(function(){return 'compartido';}, function(e){ return e && e.name==='AbortError' ? 'cancelado' : (descargarBlob(blob,nombre),'descargado'); });
+    }
+  }catch(e){}
+  descargarBlob(blob, nombre); return Promise.resolve('descargado');
+}
+function nuevoPdf(){
+  if(!window.jspdf || !window.jspdf.jsPDF){ toast('No se ha cargado el generador de PDF. Recarga la página.'); return null; }
+  var doc=new window.jspdf.jsPDF({unit:'mm',format:'a4'}); doc.setTextColor(0); return doc;
+}
+function piePaginas(doc){
+  var n=doc.getNumberOfPages(); for(var i=1;i<=n;i++){ doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.text('Página '+i+' de '+n, 195, 290, {align:'right'}); }
+}
+// Tablas sin rellenos ni color (para no gastar tinta)
+var TABLA = { theme:'plain', styles:{font:'helvetica',fontSize:9.5,textColor:0,cellPadding:1.5}, headStyles:{fontStyle:'bold',textColor:0,fillColor:false,lineWidth:{bottom:0.3},lineColor:0} };
+function tabla(doc, opts){ doc.autoTable(Object.assign({margin:{left:15,right:15}}, TABLA, opts)); return doc.lastAutoTable.finalY; }
+
+/* ── Confirmación al cliente ── */
+function lineasTexto(p){
+  var a=esSV(p) ? (asignarSV().res[p.id]||{}) : {};
+  return lineasArray(p.lineas).map(function(l){
+    var pr=esSV(p)?precioSV(l.codigo):null, x=a[l.codigo];
+    return '- '+nombreArt(l.codigo)+': '+nf(l.cantidad)+' '+unidadDe(l.codigo)+(pr!=null?' a '+eur(pr):'')+
+      (x&&x.st==='espera'?' (en lista de espera)':(x&&x.st==='parcial'?' ('+nf(x.ok)+' aseguradas, resto en espera)':''))+(l.nota?' · '+l.nota:'');
+  }).join('\n');
+}
+function textoConfirmacion(p){
+  var a=esSV(p) ? (asignarSV().res[p.id]||{}) : {};
+  var espera=Object.keys(a).some(function(k){ return a[k].st==='espera'||a[k].st==='parcial'; });
+  var sinPrecio=esSV(p) && lineasArray(p.lineas).some(function(l){ return precioSV(l.codigo)==null; });
+  return 'Hola,\n\nTe confirmamos tu pedido'+(esSV(p)?' de San Valentín':'')+' (ref. '+p.id+'):\n\n'+lineasTexto(p)+
+    '\n\nEntrega: '+fmtFechaLarga(p.fechaEntrega)+(p.nota?'\nNotas: '+p.nota:'')+'\n'+
+    (sinPrecio?'\nLos artículos sin precio van según la tarifa de campaña.':'')+
+    (espera?'\nLo marcado en lista de espera se sirve según llegue la flor; te avisamos si no podemos cubrirlo.':'')+
+    '\n\nSi algo no está bien, contéstanos a este mensaje.\n\n'+firma();
+}
+function abrirConfirmar(id){
+  var p=_pedidos[id], el=document.getElementById('conf-'+id); if(!p||!el) return;
+  if(el.innerHTML){ el.innerHTML=''; return; }
+  var c=p.cliente.codigo, em=emailCli(c), wa=movilWA(telCli(c));
+  el.innerHTML='<div class="alerta oro" style="margin-top:6px;">'+
+    (p.confirmacion?'<div class="ok" style="margin-bottom:6px;">Ya confirmado por '+esc(p.confirmacion.via)+(p.confirmacion.a?' a '+esc(p.confirmacion.a):'')+' el '+esc(String(p.confirmacion.fecha).replace('T',' ').slice(0,16))+'.</div>':'')+
+    '<label style="margin-top:0;">Email del cliente</label><input id="cfEm-'+id+'" type="email" value="'+esc(em)+'" placeholder="cliente@correo.com">'+
+    '<div class="prev-txt">'+esc(textoConfirmacion(p))+'</div>'+
+    '<div class="fila-btn"><button class="btn peq primario" onclick="confirmarEmail(\''+id+'\')">Enviar por email</button>'+
+    '<button class="btn peq" onclick="confirmarWhatsApp(\''+id+'\')">WhatsApp'+(wa?' ('+wa.slice(2)+')':'')+'</button>'+
+    '<button class="btn peq" onclick="confirmarCopiar(\''+id+'\')">Copiar texto</button></div>'+
+    '<div class="nota">El email se abre en tu app de correo (Gmail…) con el destinatario y el texto puestos: solo tienes que pulsar Enviar.</div></div>';
+}
+function marcarConfirmado(id, via, a){ refPedidos.child(id).update({confirmacion:{via:via, fecha:ahoraISO(), a:a||''}}); }
+function confirmarEmail(id){
+  var p=_pedidos[id], to=(document.getElementById('cfEm-'+id).value||'').trim();
+  var lst=listaEmails(to); if(!lst.length){ toast('Escribe un email válido (varios, separados por punto y coma)'); return; }
+  if(p.cliente.codigo && to!==emailCli(p.cliente.codigo)) guardarContacto(p.cliente.codigo, {email:to});
+  var asunto='Confirmación de pedido'+(esSV(p)?' San Valentín':'')+' · '+(p.cliente.nombre||'')+' · '+p.id;
+  location.href='mailto:'+lst.join(',')+'?subject='+encodeURIComponent(asunto)+'&body='+encodeURIComponent(textoConfirmacion(p));
+  marcarConfirmado(id,'email',lst.join('; '));
+}
+function confirmarWhatsApp(id){
+  var p=_pedidos[id], t=textoConfirmacion(p), wa=movilWA(telCli(p.cliente.codigo));
+  if(!wa && navigator.share){ navigator.share({text:t}).then(function(){ marcarConfirmado(id,'WhatsApp'); }, function(){}); return; }
+  window.open('https://wa.me/'+(wa||'')+'?text='+encodeURIComponent(t), '_blank');
+  marcarConfirmado(id,'WhatsApp', wa);
+}
+function confirmarCopiar(id){
+  copiar(textoConfirmacion(_pedidos[id])).then(function(ok){ toast(ok?'Texto copiado: pégalo donde quieras':'No se pudo copiar: selecciónalo a mano'); if(ok) marcarConfirmado(id,'texto copiado'); });
+}
+
+/* ── Listado en PDF de los pedidos de un cliente ── */
+function listadoCliente(c){
+  var desde=new Date(); desde.setDate(desde.getDate()-7); desde=fechaISO(desde);
+  var ps=Object.keys(_pedidos).map(function(id){return _pedidos[id];}).filter(function(p){
+    return p && p.cliente && String(p.cliente.codigo)===String(c) && p.estado!=='cancelado' && (p.estado==='abierto' || (p.fechaEntrega||'')>=desde);
+  }).sort(function(a,b){ return (a.fechaEntrega||'').localeCompare(b.fechaEntrega||'') || (a.creado||'').localeCompare(b.creado||''); });
+  if(!ps.length){ toast('Este cliente no tiene pedidos abiertos ni recientes'); return; }
+  var doc=nuevoPdf(); if(!doc) return;
+  var y=18, tot={}, importe=0, hayEspera=false, sinPrecio=false;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.text('Rosas de Buscaflor · Pedidos', 15, y); y+=7;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text('Cliente: '+nombreCliCod(c)+' (código '+c+')', 15, y); y+=5;
+  doc.text('Fecha del listado: '+ddmmyyyy(new Date())+' · '+ps.length+' pedido'+(ps.length===1?'':'s'), 15, y); y+=4;
+  doc.setLineWidth(0.3); doc.line(15,y,195,y); y+=6;
+  var asig=asignarSV().res;
+  ps.forEach(function(p){
+    if(y>255){ doc.addPage(); y=18; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('Pedido '+p.id+' · entrega '+fmtFechaLarga(p.fechaEntrega), 15, y); y+=4;
+    if(p.nota){ doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.text(doc.splitTextToSize('Notas: '+p.nota,180),15,y+1); y+=4; }
+    var cp=calcularPedido(p), a=asig[p.id]||{};
+    var body=cp.lineas.map(function(l){
+      var u=unidadDe(l.codigo), d=nombreArt(l.codigo), pr=esSV(p)?precioSV(l.codigo):null;
+      tot[d]=tot[d]||{q:0,u:u}; tot[d].q+=l.cantidad; if(pr!=null) importe+=pr*l.cantidad; else if(esSV(p)) sinPrecio=true;
+      var x=a[l.codigo], st = x&&x.st==='espera' ? 'En espera' : (x&&x.st==='parcial' ? nf(x.ok)+' aseguradas' : (l.pendiente===0 ? 'Servido' : (l.servido ? 'Servido '+nf(l.servido) : 'Pedido')));
+      if(x && (x.st==='espera'||x.st==='parcial')) hayEspera=true;
+      return [d, nf(l.cantidad)+' '+u, pr!=null?eur(pr):(esSV(p)?'Tarifa':''), st];
+    });
+    y=tabla(doc,{startY:y+1, head:[['Artículo',{content:'Cantidad',styles:{halign:'right'}},{content:'Precio',styles:{halign:'right'}},'Estado']], body:body, columnStyles:{1:{halign:'right'},2:{halign:'right'}}})+7;
+  });
+  if(y>240){ doc.addPage(); y=18; }
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('Total', 15, y); y+=1;
+  y=tabla(doc,{startY:y+1, head:[['Artículo',{content:'Cantidad',styles:{halign:'right'}}]], body:Object.keys(tot).map(function(k){ return [k, nf(tot[k].q)+' '+tot[k].u]; }), columnStyles:{1:{halign:'right'}}})+6;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  [importe?'Importe de las líneas con precio: '+eur(importe)+' sin IVA.':'', sinPrecio?'Las líneas sin precio van según la tarifa de campaña.':'', hayEspera?'Lo marcado en espera se sirve según llegue la flor; te avisamos si no podemos cubrirlo.':'']
+    .filter(Boolean).forEach(function(t){ doc.text(doc.splitTextToSize(t,180),15,y); y+=5; });
+  piePaginas(doc);
+  var em=emailCli(c), texto='Hola,\n\nTe adjuntamos el listado de tus pedidos con nosotros, con el día de entrega de cada uno.\n\nSi algo no está bien, contéstanos a este mensaje.\n\n'+firma();
+  (em ? copiar(em) : Promise.resolve(false)).then(function(ok){
+    if(ok) toast('Email del cliente copiado ('+em+'): pégalo como destinatario');
+    compartirPdf(doc, 'Pedidos_'+slug(nombreCliCod(c))+'.pdf', 'Pedidos '+nombreCliCod(c), texto);
+  });
+}
+
+/* ── Hoja de preparación de un día (por zona y cliente, con casilla; solo lo que falta por servir) ── */
+function pdfPreparacion(fecha){
+  var hoy=fechaISO();
+  var ps=Object.keys(_pedidos).map(function(id){return _pedidos[id];}).filter(function(p){
+    if(!p || p.estado!=='abierto') return false;
+    var f=p.fechaEntrega||hoy; return fecha===hoy ? f<=hoy : f===fecha;
+  }).map(function(p){ return {p:p, c:calcularPedido(p), z:zona(p.cliente.codigo)}; }).filter(function(x){ return x.c.lineas.some(function(l){return l.pendiente>0;}); });
+  if(!ps.length){ toast('No hay nada pendiente de preparar para '+fmtFechaLarga(fecha)); return; }
+  var Z=['Chipiona','Fuera','Sevilla'];
+  ps.sort(function(a,b){ return Z.indexOf(a.z)-Z.indexOf(b.z) || String(a.p.cliente.nombre||'').localeCompare(String(b.p.cliente.nombre||'')); });
+  var doc=nuevoPdf(); if(!doc) return;
+  var y=18, tot={}, z0='';
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.text('Preparación · '+fmtFechaLarga(fecha), 15, y); y+=6;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.text(ps.length+' pedido'+(ps.length===1?'':'s')+' · impreso '+ahoraISO().replace('T',' ').slice(0,16), 15, y); y+=4;
+  doc.setLineWidth(0.3); doc.line(15,y,195,y); y+=6;
+  ps.forEach(function(x){
+    if(y>250){ doc.addPage(); y=18; }
+    if(x.z!==z0){ z0=x.z; doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.text(z0.toUpperCase(),15,y); y+=6; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text(String(x.p.cliente.nombre||'')+(x.p.cliente.codigo?' (#'+x.p.cliente.codigo+')':''), 15, y);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.text(x.p.id+(esSV(x.p)?' · San Valentín':''), 195, y, {align:'right'}); y+=4;
+    if(x.p.nota){ doc.text(doc.splitTextToSize('Notas: '+x.p.nota,180),15,y); y+=4; }
+    var body=x.c.lineas.filter(function(l){return l.pendiente>0;}).map(function(l){
+      var d=nombreArt(l.codigo), u=unidadDe(l.codigo); tot[d]=tot[d]||{q:0,u:u}; tot[d].q+=l.pendiente;
+      return ['[   ]', d+(l.nota?' · '+l.nota:''), nf(l.pendiente)+' '+u];
+    });
+    y=tabla(doc,{startY:y, body:body, styles:Object.assign({},TABLA.styles,{fontSize:10}), columnStyles:{0:{cellWidth:12},2:{halign:'right',cellWidth:35}}})+2;
+    doc.setDrawColor(160); doc.setLineWidth(0.1); doc.line(15,y,195,y); doc.setDrawColor(0); y+=6;
+  });
+  doc.addPage(); y=18; doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('Total a preparar · '+fmtFechaLarga(fecha), 15, y); y+=3;
+  tabla(doc,{startY:y+2, head:[['Artículo',{content:'Cantidad',styles:{halign:'right'}},{content:'Stock',styles:{halign:'right'}}]],
+    body:Object.keys(tot).sort().map(function(k){
+      var c=Object.keys(_articulos).find(function(cc){ return nombreArt(cc)===k; });
+      return [k, nf(tot[k].q)+' '+tot[k].u, c!=null?nf(fisico(c)):''];
+    }), columnStyles:{1:{halign:'right'},2:{halign:'right'}}});
+  piePaginas(doc);
+  compartirPdf(doc, 'Preparacion_'+fecha+'.pdf', 'Preparación '+fecha);
+}
+
+/* ── Excel para AmbarX (plantilla «Excel con plantilla», TIPO PV = pedido de venta) ── */
+function exportarAmbarx(todos){
+  if(typeof XLSX==='undefined'){ toast('No se ha cargado el generador de Excel. Recarga la página.'); return; }
+  var ps=Object.keys(_pedidos).map(function(id){return _pedidos[id];}).filter(function(p){
+    return p && p.estado==='abierto' && p.cliente && p.cliente.codigo && (todos || !p.exportado);
+  }).sort(function(a,b){ return String(a.creado||'').localeCompare(String(b.creado||'')); });
+  if(!ps.length){ toast(todos?'No hay pedidos abiertos con cliente de AmbarX':'No hay pedidos pendientes de pasar a AmbarX'); return; }
+  var rows=[['DOC','TIPO','SERIE','FECHA','CLIENTE','PROVEEDOR','REFERENCIA','FECHA_REFERENCIA','ALMACEN','OBSERVACIONES','ARTICULO','DESCRIPCION','CANTIDAD','PRECIO','DTO1','DTO2','DTO3','IVA%','LOTE','CADUCIDAD']];
+  ps.forEach(function(p){
+    var f=new Date((p.creado||ahoraISO()).slice(0,10)+'T12:00:00');
+    lineasArray(p.lineas).forEach(function(l){
+      var pr=esSV(p)?precioSV(l.codigo):null;
+      rows.push([p.id,'PV','',f,String(p.cliente.codigo),'','','','',(esSV(p)?'San Valentín · ':'')+'Entrega '+fmtFecha(p.fechaEntrega)+(p.nota?' · '+p.nota:''),String(l.codigo),nombreArt(l.codigo),+l.cantidad||0,pr==null?'':pr,'','','','','','']);
+    });
+  });
+  var ws=XLSX.utils.aoa_to_sheet(rows);
+  // FECHA como fecha real de Excel (número de serie, sin hora) con formato dd/mm/yyyy en todas las filas
+  for(var r=2;r<=rows.length;r++){
+    var d=rows[r-1][3], serie=Math.round((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())-Date.UTC(1899,11,30))/864e5);
+    ws['D'+r]={t:'n', v:serie, z:'dd/mm/yyyy'};
+  }
+  var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Documentos');
+  var nombre='AMBARX_PEDIDOS_'+ahoraISO().replace(/[-:]/g,'').replace('T','_').slice(0,13)+'.xlsx';
+  XLSX.writeFile(wb, nombre);
+  var marca=ahoraISO(), upd={}; ps.forEach(function(p){ upd[p.id+'/exportado']=marca; }); refPedidos.update(upd);
+  toast(ps.length+' pedido'+(ps.length===1?'':'s')+' en '+nombre+'. En AmbarX: Utilidades → Importación de documentos → Excel con plantilla');
+}
+
+/* ── STOCK (informe de AmbarX) ── */
+var FAMILIAS=[['Rosas','paquetes',/CM\/25T|CM\/25TALLOS|25 ?TALLOS|\/10T/],['Clavel','tallos',/CLAVEL/],['Alstroemeria','paquetes',/ALSTRO/],['Paniculata','paquetes',/PANICULATA/],
+  ['Eucalipto','mazos',/EUCALIPTO/],['Hortensia','tallos',/HORTENSIA/],['Verde','mazos',/HELECHO|LENTISCO|TUYA|ESPARRAGUERA|RUSCUS|PITTOSPORUM/],
+  ['Otras flores','uds',/^(?!.*(TARRINA|BOLSA|CUBO|PALET|CAJA|PAPEL|CINTA|PETALOS|CELOFAN|BLONDA|ESPONJA))/],['Material y otros','uds',/.*/]];
+function descStock(c){ var it=hayStockAmb() && _stockAmb.items[c]; return (it && it.d) || nombreArt(c); }
+function famDe(c){ var d=String(descStock(c)).toUpperCase(); for(var i=0;i<FAMILIAS.length;i++) if(FAMILIAS[i][2].test(d)) return i; return FAMILIAS.length-1; }
+function datosStock(q){
+  var pend=pendientesAbiertos(null);
+  var cs=codigosConStock().filter(function(c){ return Math.round(fisico(c))!==0; });
+  if(q) cs=cs.filter(function(c){ return (c+' '+descStock(c)).toLowerCase().indexOf(q)>=0; });
+  cs.sort(function(a,b){ return descStock(a).localeCompare(descStock(b)); });
+  var G={}; cs.forEach(function(c){ var i=famDe(c); (G[i]=G[i]||[]).push(c); });
+  return {G:G, ord:Object.keys(G).map(Number).sort(function(a,b){return a-b;}), pend:pend};
+}
+function fechaStockTxt(){
+  if(!hayStockAmb() || !_stockAmb.leido) return '';
+  return new Date(_stockAmb.leido).toLocaleString('es-ES',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
+}
+function pintarStock(){
+  var q=(document.getElementById('stQ').value||'').toLowerCase().trim(), D=datosStock(q);
+  var o=document.getElementById('stOrigen');
+  if(hayStockAmb()){ o.className='alerta ok'; o.textContent='Stock de AmbarX del '+fechaStockTxt()+' ('+(_stockAmb.registros||Object.keys(_stockAmb.items).length)+' artículos). Se actualiza de lunes a sábado a las 6:30 y a las 19:30.'; }
+  else { o.className='alerta oro'; o.textContent='Todavía no ha llegado el stock de AmbarX: se muestra el de la app de stock.'; }
+  document.getElementById('stKpi').innerHTML=D.ord.map(function(i){ var t=D.G[i].reduce(function(s,c){return s+fisico(c);},0); return '<a class="kpi" href="#fam-'+i+'">'+FAMILIAS[i][0]+'<b>'+nf(t)+'</b>'+FAMILIAS[i][1]+'</a>'; }).join('');
+  document.getElementById('stTabla').innerHTML = D.ord.length ? D.ord.map(function(i){
+    var t=D.G[i].reduce(function(s,c){return s+fisico(c);},0);
+    return '<div class="fam" id="fam-'+i+'"><div class="fh"><b>'+FAMILIAS[i][0]+'</b><span>'+nf(t)+' '+FAMILIAS[i][1]+'</span></div>'+D.G[i].map(function(c){
+      var f=fisico(c), ap=D.pend[c]||0, lib=f-ap;
+      return '<div class="sk"><span>'+esc(descStock(c))+' <span class="cod">#'+esc(c)+'</span></span><span class="n'+(f<0?' neg':'')+'">'+nf(f)+(ap?'<small class="'+(lib<0?'neg':'')+'">libre '+nf(lib)+'</small>':'')+'</span></div>';
+    }).join('')+'</div>';
+  }).join('') : '<div class="vacio">No hay stock'+(q?' de «'+esc(q)+'»':'')+'.</div>';
+}
+function lineasStockClientes(){
+  var D=datosStock(''), out=[];
+  D.ord.forEach(function(i){
+    if(FAMILIAS[i][0]==='Material y otros') return;
+    var cs=D.G[i].filter(function(c){ return fisico(c)>0; }); if(!cs.length) return;
+    out.push({fam:FAMILIAS[i][0], u:FAMILIAS[i][1], tot:cs.reduce(function(s,c){return s+fisico(c);},0), cs:cs});
+  });
+  return out;
+}
+function compartirStock(){
+  var F=lineasStockClientes(); if(!F.length){ toast('No hay stock que enviar'); return; }
+  var doc=nuevoPdf(); if(!doc) return;
+  var now=hayStockAmb()&&_stockAmb.leido ? new Date(_stockAmb.leido) : new Date();
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.text('Stock Rosas de Buscaflor',15,18);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text('Stock a '+now.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})+' · '+now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}),15,24);
+  var body=[];
+  F.forEach(function(f){
+    body.push([{content:f.fam.toUpperCase(),styles:{fontStyle:'bold'}},{content:nf(f.tot)+' '+f.u,styles:{fontStyle:'bold',halign:'right'}}]);
+    f.cs.forEach(function(c){ body.push(['   '+descStock(c),{content:nf(fisico(c)),styles:{halign:'right'}}]); });
+  });
+  tabla(doc,{startY:29, head:[['Artículo',{content:'Cantidad',styles:{halign:'right'}}]], body:body, styles:Object.assign({},TABLA.styles,{fontSize:10,lineColor:180,lineWidth:{bottom:0.1}})});
+  piePaginas(doc);
+  compartirPdf(doc,'Stock_Buscaflor_'+fechaISO(now)+'.pdf','Stock Buscaflor').then(function(r){ if(r==='descargado') toast('PDF descargado: ábrelo y compártelo por WhatsApp'); });
+}
+function copiarStockTexto(){
+  var F=lineasStockClientes(); if(!F.length){ toast('No hay stock'); return; }
+  var t='*Stock Rosas de Buscaflor* ('+(fechaStockTxt()||fmtFechaLarga(fechaISO()))+')\n'+F.map(function(f){
+    return '\n*'+f.fam+'*\n'+f.cs.map(function(c){ return '· '+descStock(c)+': '+nf(fisico(c)); }).join('\n');
+  }).join('\n');
+  copiar(t).then(function(ok){ toast(ok?'Stock copiado: pégalo en WhatsApp':'No se pudo copiar'); });
+}
+
+/* ── VUELOS ── */
+var AMBV={completo:['ok','AmbarX completo'],incompleto:['bad','AmbarX incompleto'],bloqueado:['bad','AmbarX bloqueado'],pendiente:['warn','Sin subir a AmbarX'],anterior:['n','No va a AmbarX (antes del 19-11)']};
+function listaVuelos(){ return Object.keys(_vuelos||{}).map(function(k){ return Object.assign({guia:k}, _vuelos[k]); }); }
+function vueloAbierto(v){ return (v.inventario&&v.inventario.estado!=='DEFINITIVO') || lineasArray(v.faltan).length || ['incompleto','bloqueado','pendiente'].indexOf(v.ambarx)>=0 || lineasArray(v.avisos).some(function(a){return a.nivel==='bad';}); }
+function semanaActual(){ var d=new Date(), t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())), n=t.getUTCDay()||7; t.setUTCDate(t.getUTCDate()+4-n); var y=new Date(Date.UTC(t.getUTCFullYear(),0,1)); return 'S'+Math.ceil(((t-y)/864e5+1)/7); }
+function pintarVuelos(){
+  var vs=listaVuelos().sort(function(a,b){ return String(b.semana||'').localeCompare(String(a.semana||'')) || String(b.guia).localeCompare(String(a.guia)); });
+  var sem=semanaActual(), av=[];
+  vs.filter(function(v){ return String(v.semana||'').toUpperCase().replace(/\s/g,'')===sem; }).forEach(function(v){ lineasArray(v.avisos).forEach(function(a){ av.push({n:a.nivel==='bad'?'bad':'warn', g:v.guia, t:a.texto}); }); });
+  av.sort(function(a,b){ return (a.n==='bad'?0:1)-(b.n==='bad'?0:1); });
+  document.getElementById('vuAvisos').innerHTML = av.length ? '<div class="card"><b>Avisos de esta semana ('+sem+')</b>'+av.map(function(a){ return '<div style="padding:7px 0;border-top:1px solid var(--filo);margin-top:6px;"><span class="chip '+a.n+'">'+(a.n==='bad'?'Urgente':'Revisar')+'</span> <span class="cod">'+esc(a.g)+'</span><div>'+esc(a.t)+'</div></div>'; }).join('')+'</div>' : '';
+  var solo=document.getElementById('vuF').value==='abiertos', lista=solo?vs.filter(vueloAbierto):vs;
+  if(!lista.length){ document.getElementById('vuLista').innerHTML='<div class="vacio">'+(vs.length?(solo?'No hay vuelos con nada pendiente.':''):'Todavía no han llegado vuelos a esta app.')+'</div>'; return; }
+  document.getElementById('vuLista').innerHTML=lista.map(function(v){
+    var inv=v.inventario||{}, ie=inv.estado||'SIN INVENTARIO', a=AMBV[v.ambarx]||AMBV.pendiente, fac=lineasArray(v.facturas);
+    var tot=fac.reduce(function(s,f){return s+(+f.usd||0);},0);
+    var rows=fac.map(function(f){ return '<tr><td>'+esc(f.finca)+'</td><td>'+esc(f.num)+'</td><td>'+usd(f.usd)+'</td><td>'+(f.ambarx?'<span class="chip ok">'+esc(f.ambarx)+'</span>':(v.ambarx==='anterior'?'—':'<span class="chip '+(v.ambarx==='pendiente'?'warn':'bad')+'">No grabada</span>'))+'</td></tr>'; }).join('')+
+      lineasArray(v.faltan).map(function(f){ return '<tr><td>'+esc(f.finca)+'</td><td colspan="2" class="sub">'+esc(f.detalle||'falta la factura')+'</td><td><span class="chip bad">Falta</span></td></tr>'; }).join('');
+    return '<div class="card"><div class="card-head"><div><b>'+esc(v.guia)+'</b><div class="sub">'+esc([v.origen,v.transitario,v.cajas?v.cajas+' cajas':'',v.semana].filter(Boolean).join(' · '))+'</div></div>'+
+      '<div style="text-align:right;"><span class="chip '+(ie==='DEFINITIVO'?'ok':'bad')+'">Inventario '+esc(String(ie).toLowerCase())+'</span><br><span class="chip '+a[0]+'" style="margin-top:4px;">'+a[1]+'</span></div></div>'+
+      '<table><tr><th>Finca</th><th>Factura</th><th>USD</th><th>AmbarX</th></tr>'+rows+
+      '<tr><td colspan="2" class="sub">Facturas'+(v.fobMaster?' · Master '+usd(v.fobMaster):'')+'</td><td><b>'+(fac.some(function(f){return f.usd!=null;})?usd(tot):'—')+'</b></td><td></td></tr></table>'+
+      (lineasArray(v.avisos).length?'<div class="sub" style="margin-top:6px;">'+lineasArray(v.avisos).map(function(x){return '• '+esc(x.texto);}).join('<br>')+'</div>':'')+
+      (inv.url?'<div style="margin-top:6px;"><a href="'+esc(inv.url)+'" target="_blank" rel="noopener">Abrir inventario</a></div>':'')+'</div>';
+  }).join('');
+}
+
+/* ── SAN VALENTÍN 2027: previsión ── */
+function pintarSV(){
+  var g=campana().grupos||{}, u=asignarSV().usado, ks=Object.keys(g);
+  document.getElementById('svTabla').innerHTML = ks.length ? '<div class="card"><table><tr><th>Producto</th><th>Previsión</th><th>Pedido</th><th>Queda</th><th></th></tr>'+ks.map(function(k){
+    var G=g[k], us=u[k]||0, q=G.prev-us, pct=G.prev?Math.min(100,us/G.prev*100):0;
+    return '<tr><td>'+esc(G.n)+' <span class="sub">('+esc(G.u)+')</span></td><td>'+nf(G.prev)+'</td><td>'+nf(us)+'</td><td class="'+(q<0?'exceso':'')+'">'+nf(q)+'</td><td><div class="bar2"><i class="'+(us>G.prev?'over':'')+'" style="width:'+pct+'%"></i></div></td></tr>';
+  }).join('')+'</table></div>' : '<div class="vacio">Todavía no se ha cargado el catálogo de la campaña.</div>';
+}
+
+/* ── AJUSTES ── */
+var _ajCli=null;
+function buscarClienteAj(q){
+  q=(q||'').toLowerCase().trim(); var dd=document.getElementById('ddAjCli');
+  var res=Object.keys(_clientes).filter(function(c){ var x=_clientes[c]; return !q || (c+' '+x.nombre+' '+(x.denominacion||'')+' '+(x.poblacion||'')).toLowerCase().indexOf(q)>=0; }).slice(0,30);
+  dd.innerHTML=res.map(function(c){ var x=_clientes[c]; return '<div data-c="'+esc(c)+'">#'+esc(c)+' · '+esc(x.nombre)+(x.poblacion?' <span class="sub">'+esc(x.poblacion)+'</span>':'')+'</div>'; }).join('');
+  dd.classList.add('open');
+  dd.querySelectorAll('div[data-c]').forEach(function(el){ el.addEventListener('mousedown',function(e){ e.preventDefault(); elegirClienteAj(el.getAttribute('data-c')); }); });
+  document.getElementById('ajCli').onblur=function(){ setTimeout(function(){dd.classList.remove('open');},150); };
+}
+function elegirClienteAj(c){
+  _ajCli=c; document.getElementById('ddAjCli').classList.remove('open'); document.getElementById('ajCli').value='';
+  document.getElementById('ajSel').style.display=''; document.getElementById('ajNombre').textContent='#'+c+' · '+nombreCliCod(c);
+  document.getElementById('ajEmail').value=emailCli(c); document.getElementById('ajTel').value=telCli(c); document.getElementById('ajEmail').focus();
+}
+function guardarContactoAj(){
+  if(!_ajCli) return;
+  var em=document.getElementById('ajEmail').value.trim(), tel=document.getElementById('ajTel').value.trim();
+  if(em && !listaEmails(em).length){ toast('Ese email no parece válido'); return; }
+  guardarContacto(_ajCli,{email:em, tel:tel}).then(function(){ toast('Guardado para '+nombreCliCod(_ajCli)); document.getElementById('ajSel').style.display='none'; _ajCli=null; }, function(e){ toast('⚠ No se guardó: '+e.message); });
+}
+function guardarEmailsBulk(){
+  var ls=document.getElementById('ajBulk').value.split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean), ok=[], mal=[];
+  ls.forEach(function(l){ var p=l.split(/[;,\t]+/).map(function(s){return s.trim().replace(/^#/,'');}), c=p[0], em=p.filter(function(x){return x.indexOf('@')>=0;}).join('; ');
+    if(_clientes[c] && listaEmails(em).length) ok.push([c,em]); else mal.push(l); });
+  if(!ok.length){ toast('Ninguna línea válida (código de AmbarX y email)'); return; }
+  var upd={}; ok.forEach(function(x){ upd[sanitizarClave(x[0])+'/email']=x[1]; upd[sanitizarClave(x[0])+'/actualizado']=ahoraISO(); });
+  refContactos.update(upd).then(function(){ toast(ok.length+' email(s) guardado(s)'+(mal.length?' · '+mal.length+' línea(s) sin guardar':'')); document.getElementById('ajBulk').value=mal.join('\n'); });
+}
+function guardarFirma(){ refConfig.child('firma').set(document.getElementById('ajFirma').value).then(function(){ toast('Firma guardada'); }); }
+function guardarPrecios(){
+  var its=campItems(); if(!its.length){ toast('No hay catálogo de campaña'); return; }
+  var nuevos=its.map(function(i,k){ var v=document.getElementById('pr-'+k).value; return Object.assign({}, i, {p: v==='' ? null : Number(v)}); });
+  refConfig.child('campana/items').set(nuevos).then(function(){ toast('Precios guardados'); });
+}
+function pintarAjustes(){
+  var fi=document.getElementById('ajFirma'); if(document.activeElement!==fi) fi.value=firma();
+  var cs=Object.keys(_contactos||{}).filter(function(c){ return emailCli(c)||telCli(c); }).sort(function(a,b){ return nombreCliCod(a).localeCompare(nombreCliCod(b)); });
+  document.getElementById('ajTabla').innerHTML = cs.length ? '<table class="izq"><tr><th>Cód.</th><th>Cliente</th><th>Email / teléfono</th></tr>'+cs.map(function(c){
+    return '<tr><td>'+esc(c)+'</td><td><a href="#" onclick="elegirClienteAj(\''+esc(c)+'\');return false;">'+esc(nombreCliCod(c))+'</a></td><td style="word-break:break-all;">'+esc(emailCli(c))+(telCli(c)?'<div class="sub">'+esc(telCli(c))+'</div>':'')+'</td></tr>';
+  }).join('')+'</table>' : '<div class="nota">Aún no hay emails guardados.</div>';
+  var pr=document.getElementById('ajPrecios');
+  if(!pr.contains(document.activeElement)){
+    var its=campItems();
+    pr.innerHTML = its.length ? '<table class="izq"><tr><th>Cód.</th><th>Artículo</th><th>Precio €</th></tr>'+its.map(function(i,k){
+      return '<tr><td>'+esc(i.c)+'</td><td>'+esc(i.d||nombreArt(i.c))+'</td><td style="width:100px;"><input id="pr-'+k+'" type="number" min="0" step="0.01" inputmode="decimal" value="'+(i.p==null?'':esc(i.p))+'"></td></tr>';
+    }).join('')+'</table>' : '<div class="nota">Todavía no se ha cargado el catálogo de la campaña.</div>';
+  }
+}
+
+function pintarExtras(){
+  var nAb=listaVuelos().filter(vueloAbierto).length, b=document.getElementById('nVuelos');
+  b.textContent=nAb; b.style.display=nAb?'':'none';
+  if(_tab==='stock') pintarStock();
+  else if(_tab==='vuelos') pintarVuelos();
+  else if(_tab==='sv') pintarSV();
+  else if(_tab==='ajustes') pintarAjustes();
+}
+
 /* ══ DATOS EN VIVO ══ */
 function escuchar(ref, nombre, setter){ ref.on('value', function(s){ setter(s.val()||{}); _listos[nombre]=true; pintar(); }); }
 escuchar(refPedidos,'pedidos',function(v){_pedidos=v;});
@@ -785,6 +1332,10 @@ escuchar(refArticulos,'articulos',function(v){_articulos=v;});
 escuchar(refClientes,'clientes',function(v){_clientes=v;});
 escuchar(refStock,'stock',function(v){_stock=v;});
 escuchar(refEtiq,'etiq',function(v){_etiq=v;});
+escuchar(refStockAmb,'stockAmb',function(v){_stockAmb=(v&&v.items)?v:null;});
+escuchar(refVuelos,'vuelos',function(v){_vuelos=v;});
+escuchar(refContactos,'contactos',function(v){_contactos=v;});
+escuchar(refConfig,'config',function(v){_config=v;});
 document.body.classList.add('pantalla');
 </script>
 <div id="bfLogin" style="display:none;position:fixed;inset:0;z-index:99999;background:#f4f4f4;align-items:center;justify-content:center;font-family:Arial,sans-serif">
