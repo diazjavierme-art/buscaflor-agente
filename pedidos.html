@@ -119,32 +119,71 @@ details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
 .bar2 i{display:block;height:100%;background:var(--verde);} .bar2 i.over{background:var(--rojo);}
 .izq td,.izq th{text-align:left;font-family:inherit;}
 .izq td:last-child{text-align:right;}
+
+/* ══ Diseño para móvil (19-11-2026). La pantalla del almacén mantiene su diseño. ══ */
+body{font-size:15px;padding-bottom:calc(72px + env(safe-area-inset-bottom,0px));}
+header#cab{position:sticky;top:0;z-index:30;padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top,0px));border-bottom:1px solid var(--filo);gap:10px;}
+header#cab h1{font-size:19px;}
+.cab-txt{min-width:0;}
+.ico{flex:0 0 auto;width:42px;height:42px;border-radius:21px;border:1px solid var(--filo);background:var(--papel);color:var(--navy);font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.ico:active{background:var(--navy-suave);}
+main{padding:12px 12px 16px;}
+.btn{min-height:44px;font-size:14.5px;border-radius:10px;}
+.btn.peq{min-height:36px;font-size:13px;}
+.btn.ancho{width:100%;margin:2px 0 10px;}
+textarea,input,select{font-size:16px;padding:11px 12px;border-radius:10px;}
+input[type=checkbox]{width:20px;height:20px;}
+.card{border-radius:14px;padding:14px;}
+.card-head b{font-size:16.5px;}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
+.chips .tag{margin-left:0;}
+.lin{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--filo);}
+.lin-a{min-width:0;font-size:14.5px;}
+.lin-n{text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:600;white-space:nowrap;font-size:15px;}
+.lin-n small{display:block;font-weight:400;font-size:11px;color:var(--gris);font-family:'IBM Plex Sans',sans-serif;}
+.lin.hecha .lin-a{color:var(--gris);text-decoration:line-through;}
+.lin.parcial .pend{color:var(--oro);}
+.dia-cab{position:sticky;top:calc(63px + env(safe-area-inset-top,0px));background:var(--fondo);z-index:5;padding-top:8px;}
+.linea{border-radius:10px;padding:10px;}
+.dd div{padding:11px 12px;font-size:14px;}
+.barra-fija{position:sticky;bottom:calc(66px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;background:var(--fondo);padding:10px 0;margin-top:10px;z-index:6;}
+.barra-fija .btn{flex:1;}
+details{margin-top:10px;} details summary{font-size:13.5px;padding:8px 0;}
+.bnav{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;background:var(--papel);border-top:1px solid var(--filo);padding-bottom:env(safe-area-inset-bottom,0px);max-width:620px;margin:0 auto;}
+.bnav button{flex:1;position:relative;border:0;background:none;font-family:inherit;font-size:11px;font-weight:600;color:var(--gris);padding:7px 2px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;min-height:58px;}
+.bnav button .i{font-size:20px;line-height:24px;}
+.bnav button.activa{color:var(--navy);}
+.bnav button.activa .i{transform:scale(1.08);}
+.bnav button.mas-grande .i{width:40px;height:30px;border-radius:15px;background:var(--navy);color:#fff;font-size:22px;line-height:30px;}
+.bd{position:absolute;top:4px;left:calc(50% + 8px);min-width:17px;height:17px;border-radius:9px;background:var(--navy);color:#fff;font-size:10px;line-height:17px;padding:0 4px;}
+.bd.rojo{background:var(--rojo);}
+.sheet-bg{position:fixed;inset:0;z-index:100;background:rgba(15,23,32,.38);display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .15s;}
+.sheet-bg.ver{opacity:1;pointer-events:auto;}
+.sheet{width:100%;max-width:620px;background:var(--papel);border-radius:18px 18px 0 0;padding:8px 10px calc(10px + env(safe-area-inset-bottom,0px));transform:translateY(30px);transition:transform .15s;max-height:85vh;overflow:auto;}
+.sheet-bg.ver .sheet{transform:none;}
+.sh-t{font-size:12.5px;font-weight:600;color:var(--gris);text-align:center;padding:8px 6px 10px;}
+.sh-op{display:block;width:100%;text-align:left;border:0;border-top:1px solid var(--filo);background:none;font-family:inherit;font-size:16px;color:var(--tinta);padding:13px 10px 13px 46px;position:relative;cursor:pointer;}
+.sh-op .i{position:absolute;left:12px;top:12px;width:24px;text-align:center;font-size:18px;}
+.sh-op small{display:block;font-size:12px;color:var(--gris);margin-top:2px;}
+.sh-op.peligro{color:var(--rojo);}
+.sh-op.sh-x{text-align:center;padding-left:10px;font-weight:600;color:var(--navy);margin-top:6px;border:1px solid var(--filo);border-radius:12px;}
+.toast{bottom:calc(80px + env(safe-area-inset-bottom,0px));}
+#bfLogout{display:none!important;}
+/* Pantalla del almacén: sin barra inferior, cabecera con salida */
+body.pantalla{padding-bottom:0;font-size:14px;}
+body.pantalla .bnav{display:none;}
+body.pantalla header#cab{position:static;}
 </style>
 </head>
 <body>
-<header>
-  <h1>Buscaflor · Pedidos</h1>
-  <a href="./">Ir al stock →</a>
+<header id="cab">
+  <div class="cab-txt"><h1 id="cabTitulo">Para hoy</h1><div class="sub" id="cabSub">Buscaflor · Pedidos</div></div>
+  <button class="ico" id="cabMenu" onclick="menuSeccion()" aria-label="Más opciones">⋯</button>
+  <button class="btn peq" id="cabSalirPantalla" onclick="verTab('abiertos')" style="display:none;">← Salir de la pantalla</button>
 </header>
-<div class="tabs">
-  <div class="tab activa" data-tab="pantalla" onclick="verTab('pantalla')">🖥 Pantalla almacén</div>
-  <div class="tab" data-tab="abiertos" onclick="verTab('abiertos')">Para hoy</div>
-  <div class="tab" data-tab="futuros" onclick="verTab('futuros')">Próximos <span id="nFuturos" class="tag ab" style="display:none;"></span></div>
-  <div class="tab" data-tab="nuevo" onclick="verTab('nuevo')">＋ Nuevo pedido</div>
-  <div class="tab" data-tab="cerrados" onclick="verTab('cerrados')">Cerrados</div>
-  <div class="tab" data-tab="stock" onclick="verTab('stock')">Stock</div>
-  <div class="tab" data-tab="vuelos" onclick="verTab('vuelos')">Vuelos <span id="nVuelos" class="tag pedir" style="display:none;"></span></div>
-  <div class="tab" data-tab="sv" onclick="verTab('sv')">SV 2027</div>
-  <div class="tab" data-tab="ajustes" onclick="verTab('ajustes')">Ajustes</div>
-</div>
 <main>
   <section id="tab-pantalla"><div id="pantalla"><div class="vacio">Conectando…</div></div></section>
   <section id="tab-abiertos" style="display:none;">
-    <div class="toolbar">
-      <button class="btn peq" onclick="pdfPreparacion(fechaISO())">PDF de preparación de hoy</button>
-      <button class="btn peq" onclick="exportarAmbarx(false)">Excel para AmbarX (no exportados)</button>
-      <button class="btn peq" onclick="exportarAmbarx(true)">Exportar todos</button>
-    </div>
     <div id="listaAbiertos"><div class="vacio">Conectando…</div></div>
   </section>
   <section id="tab-futuros" style="display:none;"><div id="listaFuturos"></div></section>
@@ -154,10 +193,7 @@ details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
     <div class="alerta oro" id="stOrigen">Cargando el stock de AmbarX…</div>
     <div class="kpis" id="stKpi"></div>
     <input id="stQ" type="search" placeholder="Buscar: freedom 60, clavel, 904…" oninput="pintarStock()">
-    <div class="fila-btn">
-      <button class="btn primario" onclick="compartirStock()">Enviar stock en PDF (WhatsApp…)</button>
-      <button class="btn" onclick="copiarStockTexto()">Copiar como texto</button>
-    </div>
+    <div class="fila-btn"><button class="btn primario" onclick="menuStock()">Enviar stock a clientes…</button></div>
     <div id="stTabla"></div>
     <p class="nota" style="text-align:center;">Stock del almacén según el informe de AmbarX. «Libre» = stock menos lo que falta por servir de los pedidos abiertos. Si algo no cuadra, corrígelo en AmbarX y se verá aquí en el siguiente cruce.</p>
   </section>
@@ -210,17 +246,15 @@ details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
   <section id="tab-nuevo" style="display:none;">
     <div id="paso1">
       <p class="nota">Haz una foto a la nota del pedido, pega el texto o díctalo. La app lo pasa a artículos de AmbarX y lo revisas antes de guardar.</p>
-      <label>Foto de la nota</label>
-      <input type="file" id="inFoto" accept="image/*" capture="environment" onchange="elegirFoto(this)">
-      <img id="fotoPrev" class="foto-prev" style="display:none;">
-      <label>Texto (o dictado)</label>
       <textarea id="inTexto" placeholder="Ej: Floristería Rocío — 2 freedom 60, 6 ramos clavel blanco fancy, 3 nardos grandes"></textarea>
+      <img id="fotoPrev" class="foto-prev" style="display:none;">
       <div class="fila-btn">
+        <label class="btn" style="margin:0;text-transform:none;letter-spacing:0;font-size:inherit;color:var(--navy);display:flex;align-items:center;justify-content:center;">📷 Foto<input type="file" id="inFoto" accept="image/*" capture="environment" onchange="elegirFoto(this)" style="display:none;"></label>
         <button class="btn" id="btnDictar" onclick="dictar()">🎤 Dictar</button>
-        <button class="btn primario" id="btnInterpretar" onclick="interpretar()">Interpretar pedido</button>
       </div>
+      <button class="btn primario ancho" id="btnInterpretar" onclick="interpretar()">Interpretar pedido</button>
       <div class="cargando" id="cargando">Leyendo el pedido…</div>
-      <details id="detLote"><summary><b>Cargar varios pedidos de una vez</b></summary>
+      <details id="detLote"><summary>Cargar varios pedidos de una vez</summary>
         <p class="nota">Pega el bloque que te pasa Claude: cada pedido empieza por «Cliente:» y cada línea lleva el código del artículo entre paréntesis, como (#584). Se carga tal cual, sin interpretar.</p>
         <textarea id="inLote" placeholder="Cliente: FRANCISCO MANUEL EGEA (#1)&#10;Fecha de entrega: 06/11/2026&#10;11 paq FREEDOM 60 (#4)&#10;1500 tallos CLAVEL FCY MIXTO (#346) - 3 cajas&#10;&#10;Cliente: …" oninput="_lote=null;document.getElementById('btnLote').disabled=true;"></textarea>
         <div class="fila-btn">
@@ -229,7 +263,7 @@ details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
         </div>
         <div id="loteRes"></div>
       </details>
-      <details><summary>API key de Claude</summary>
+      <details id="detApi"><summary>API key de Claude</summary>
         <p class="nota">Es la misma que usa la app de stock para leer albaranes (se guarda solo en este navegador).</p>
         <div class="fila-btn"><input type="password" id="inApiKey" placeholder="sk-ant-…"><button class="btn peq" onclick="guardarApiKey()">Guardar</button></div>
       </details>
@@ -251,13 +285,23 @@ details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
       <div class="fila-btn"><button class="btn peq" onclick="anadirLinea()">＋ Añadir línea</button></div>
       <label>Nota del pedido</label>
       <input id="revNota" placeholder="Opcional">
-      <div class="fila-btn">
+      <div class="barra-fija">
         <button class="btn" onclick="volverPaso1()">← Volver</button>
         <button class="btn primario" onclick="guardarPedido()">Guardar pedido</button>
       </div>
     </div>
   </section>
 </main>
+<nav class="bnav" id="bnav">
+  <button data-tab="abiertos" onclick="verTab('abiertos')"><span class="i">📋</span>Hoy</button>
+  <button data-tab="futuros" onclick="verTab('futuros')"><span class="i">📅</span>Próximos<span id="nFuturos" class="bd" style="display:none;"></span></button>
+  <button data-tab="nuevo" class="mas-grande" onclick="verTab('nuevo')"><span class="i">＋</span>Nuevo</button>
+  <button data-tab="stock" onclick="verTab('stock')"><span class="i">📦</span>Stock</button>
+  <button data-tab="mas" onclick="menuMas()"><span class="i">☰</span>Más<span id="nVuelos" class="bd rojo" style="display:none;"></span></button>
+</nav>
+<div class="sheet-bg" id="sheetBg" onclick="if(event.target===this)cerrarMenu()">
+  <div class="sheet"><div class="sh-t" id="shT"></div><div id="shOps"></div><button class="sh-op sh-x" onclick="cerrarMenu()">Cancelar</button></div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script type="text/plain" id="bfApp">
@@ -393,9 +437,15 @@ function stockDisponible(codigo, excluirId){
 }
 
 /* ══ LISTADOS ══ */
+var TITULOS={pantalla:'Pantalla del almacén', abiertos:'Para hoy', futuros:'Próximos días', nuevo:'Nuevo pedido', cerrados:'Pedidos cerrados', stock:'Stock', vuelos:'Vuelos', sv:'San Valentín 2027', ajustes:'Ajustes'};
+var EN_MAS=['cerrados','vuelos','sv','ajustes'];
 function verTab(t){
-  document.querySelectorAll('.tab').forEach(function(x){ x.classList.toggle('activa', x.getAttribute('data-tab')===t); });
+  document.querySelectorAll('#bnav button').forEach(function(x){ var d=x.getAttribute('data-tab'); x.classList.toggle('activa', d===t || (d==='mas' && EN_MAS.indexOf(t)>=0)); });
   document.body.classList.toggle('pantalla', t==='pantalla');
+  document.getElementById('cabTitulo').textContent=TITULOS[t]||'';
+  document.getElementById('cabMenu').style.display = ['abiertos','futuros','nuevo','stock'].indexOf(t)>=0 ? '' : 'none';
+  document.getElementById('cabSalirPantalla').style.display = t==='pantalla' ? '' : 'none';
+  window.scrollTo(0,0);
   ['pantalla','abiertos','futuros','nuevo','cerrados','stock','vuelos','sv','ajustes'].forEach(function(s){ document.getElementById('tab-'+s).style.display = s===t?'':'none'; });
   if(t==='nuevo'){ var k=leerApiKey(); document.getElementById('inApiKey').value = k?'••••••••':''; }
   _tab=t;
@@ -418,46 +468,87 @@ function pintar(){
   pintarExtras();
 }
 function tarjeta(id){
-  var p=_pedidos[id], c=calcularPedido(p), abierto=p.estado==='abierto';
-  var h='<div class="card"><div class="card-head"><div><b>'+esc(p.cliente.nombre||'Sin cliente')+'</b>'+
+  var p=_pedidos[id], c=calcularPedido(p), abierto=p.estado==='abierto', pct=Math.round(c.avance*100);
+  var chips=[];
+  if(c.cierres.length) chips.push('<span class="tag cerr">'+esc(c.cierres.join(' + '))+'</span>');
+  if(!abierto) chips.push('<span class="tag ab">'+esc(p.estado)+'</span>');
+  if(esSV(p)) chips.push('<span class="chip warn">San Valentín</span>');
+  if(p.confirmacion) chips.push('<span class="chip ok">Confirmado</span>');
+  if(p.exportado) chips.push('<span class="chip n">En AmbarX</span>');
+  var h='<div class="card"><div class="card-head"><div style="min-width:0;"><b>'+esc(p.cliente.nombre||'Sin cliente')+'</b>'+
     (p.cliente.codigo?' <span class="cod">#'+esc(p.cliente.codigo)+'</span>':'')+
-    '<div class="sub">Entrega '+fmtFecha(p.fechaEntrega)+' · '+c.cajas+' caja'+(c.cajas!==1?'s':'')+' impresa'+(c.cajas!==1?'s':'')+
-    (c.cierres.length?' · <span class="tag cerr">'+esc(c.cierres.join(' + '))+'</span>':'')+
-    (abierto?'':' · <span class="tag ab">'+esc(p.estado)+'</span>')+
-    (esSV(p)?' · <span class="chip warn">San Valentín</span>':'')+
-    (p.confirmacion?' · <span class="chip ok">Confirmado ('+esc(p.confirmacion.via)+')</span>':'')+
-    (p.exportado?' · <span class="chip n">En AmbarX</span>':'')+'</div></div>'+
-    '<div class="sub" style="text-align:right;">'+Math.round(c.avance*100)+'%</div></div>';
-  h+='<div class="barra"><div style="width:'+Math.round(c.avance*100)+'%"></div></div>';
-  h+='<table><tr><th>Artículo</th><th>Pedido</th><th>Servido</th><th>Falta</th></tr>';
+    '<div class="sub">Entrega '+fmtFecha(p.fechaEntrega)+' · '+c.cajas+' caja'+(c.cajas!==1?'s':'')+'</div>'+
+    (chips.length?'<div class="chips">'+chips.join('')+'</div>':'')+'</div>'+
+    '<button class="ico" onclick="menuPedido(\''+id+'\')" aria-label="Opciones del pedido">⋯</button></div>';
+  h+='<div class="barra"><div style="width:'+pct+'%"></div></div>';
   c.lineas.forEach(function(l){
-    h+='<tr><td>'+esc(nombreArt(l.codigo))+' <span class="cod">#'+esc(l.codigo)+'</span>'+(l.alternativas.length?'<div class="sub">o '+l.alternativas.map(function(a){return esc(nombreArt(a))+' #'+esc(a);}).join(' o ')+'</div>':'')+(l.pedir&&l.pendiente>0?'<span class="tag pedir">PEDIR</span>':'')+chipSV(p,l.codigo)+(l.nota?'<div class="sub">'+esc(l.nota)+'</div>':'')+'</td>'+
-       '<td>'+l.cantidad+'</td><td class="'+(l.servido>l.cantidad?'exceso':(l.servido?'ok':''))+'">'+l.servido+'</td>'+
-       '<td class="'+(l.pendiente?'pend':'ok')+'">'+(l.pendiente||'✓')+'</td></tr>';
+    var cls = l.pendiente===0 ? 'hecha' : (l.servido>0 ? 'parcial' : '');
+    h+='<div class="lin '+cls+'"><div class="lin-a">'+esc(nombreArt(l.codigo))+' <span class="cod">#'+esc(l.codigo)+'</span>'+
+      (l.alternativas.length?'<div class="sub">o '+l.alternativas.map(function(a){return esc(nombreArt(a));}).join(' o ')+'</div>':'')+
+      (l.pedir&&l.pendiente>0?' <span class="tag pedir">PEDIR</span>':'')+chipSV(p,l.codigo)+(l.nota?'<div class="sub">'+esc(l.nota)+'</div>':'')+'</div>'+
+      '<div class="lin-n">'+(l.pendiente===0?'<span class="ok">✓ '+nf(l.servido)+'</span>':'<span class="pend">faltan '+nf(l.pendiente)+'</span>')+
+      '<small>'+(l.pendiente===0?'':'de '+nf(l.cantidad)+(l.servido?' · '+(l.servido>l.cantidad?'<span class="exceso">':'')+'servido '+nf(l.servido)+(l.servido>l.cantidad?'</span>':''):''))+' '+unidadDe(l.codigo)+'</small></div></div>';
   });
   c.fuera.forEach(function(f){
-    h+='<tr><td>'+esc(nombreArt(f.codigo))+' <span class="cod">#'+esc(f.codigo)+'</span><div class="sub exceso">Servido fuera del pedido</div></td><td>—</td><td class="exceso">'+f.servido+'</td><td></td></tr>';
+    h+='<div class="lin"><div class="lin-a">'+esc(nombreArt(f.codigo))+' <span class="cod">#'+esc(f.codigo)+'</span><div class="sub exceso">Servido fuera del pedido</div></div><div class="lin-n exceso">'+nf(f.servido)+'</div></div>';
   });
-  h+='</table>';
-  if(p.nota) h+='<div class="sub" style="margin-top:6px;">📝 '+esc(p.nota)+'</div>';
-  if(abierto && esContado(p.cliente)){
-    h+='<div class="alerta oro" style="margin-top:8px;">Cliente sin ficha propia (contado): las cajas no se asignan solas. '+
-       '<button class="btn peq" onclick="vincularCajas(\''+id+'\')">Vincular cajas</button></div>';
-  }
-  if(abierto && c.cierres.length) h+='<div class="alerta ok">Ya hay albarán/factura en AmbarX para estas cajas. Si está todo, ciérralo.</div>';
-  if(abierto){
-    h+='<div class="fila-btn"><button class="btn peq" onclick="editarPedido(\''+id+'\')">✎ Editar</button>'+
-       '<button class="btn peq primario" onclick="terminarPedido(\''+id+'\')">✓ Terminado</button>'+
-       '<button class="btn peq peligro" onclick="cancelarPedido(\''+id+'\')">Cancelar</button></div>';
-  } else {
-    h+='<div class="fila-btn"><button class="btn peq" onclick="reabrirPedido(\''+id+'\')">Reabrir</button></div>';
-  }
-  if(p.estado!=='cancelado'){
-    h+='<div class="fila-btn"><button class="btn peq" onclick="abrirConfirmar(\''+id+'\')">✉ Confirmar al cliente</button>'+
-       (p.cliente.codigo?'<button class="btn peq" onclick="listadoCliente(\''+esc(p.cliente.codigo)+'\')">📄 Pedidos de este cliente</button>':'')+'</div>'+
-       '<div id="conf-'+id+'"></div>';
-  }
-  return h+'</div>';
+  if(p.nota) h+='<div class="sub" style="margin-top:8px;">📝 '+esc(p.nota)+'</div>';
+  if(abierto && esContado(p.cliente)) h+='<div class="alerta oro" style="margin-top:8px;">Cliente de contado: las cajas no se asignan solas. Vincúlalas desde ⋯</div>';
+  if(abierto && c.cierres.length) h+='<div class="alerta ok">Ya hay albarán/factura en AmbarX para estas cajas. Si está todo, termínalo.</div>';
+  if(abierto) h+='<div class="fila-btn"><button class="btn primario" onclick="terminarPedido(\''+id+'\')">✓ Terminado · '+pct+'%</button></div>';
+  return h+'<div id="conf-'+id+'"></div></div>';
+}
+
+/* ── Menús (hoja que sube desde abajo) ── */
+var _ops=[];
+function abrirMenu(titulo, ops){
+  _ops=ops.filter(Boolean);
+  document.getElementById('shT').textContent=titulo||'';
+  document.getElementById('shOps').innerHTML=_ops.map(function(o,i){ return '<button class="sh-op'+(o.peligro?' peligro':'')+'" onclick="elegirOp('+i+')"><span class="i">'+(o.i||'')+'</span>'+esc(o.t)+(o.d?'<small>'+esc(o.d)+'</small>':'')+'</button>'; }).join('');
+  document.getElementById('sheetBg').classList.add('ver');
+}
+function cerrarMenu(){ document.getElementById('sheetBg').classList.remove('ver'); }
+function elegirOp(i){ var o=_ops[i]; cerrarMenu(); if(o && o.fn) setTimeout(o.fn, 120); }
+function menuPedido(id){
+  var p=_pedidos[id]; if(!p) return; var ab=p.estado==='abierto', cod=p.cliente.codigo;
+  abrirMenu(p.cliente.nombre||'Pedido', [
+    ab && {i:'✎', t:'Editar pedido', fn:function(){ editarPedido(id); }},
+    p.estado!=='cancelado' && {i:'✉', t:'Confirmar al cliente', d:'Email, WhatsApp o copiar el texto', fn:function(){ abrirConfirmar(id); }},
+    cod && {i:'📄', t:'Pedidos de este cliente en PDF', fn:function(){ listadoCliente(cod); }},
+    ab && esContado(p.cliente) && {i:'🔗', t:'Vincular cajas impresas', fn:function(){ vincularCajas(id); }},
+    !ab && {i:'↺', t:'Reabrir pedido', fn:function(){ reabrirPedido(id); }},
+    ab && {i:'✕', t:'Cancelar pedido', peligro:true, fn:function(){ cancelarPedido(id); }}
+  ]);
+}
+function menuSeccion(){
+  if(_tab==='abiertos') abrirMenu('Pedidos de hoy', [
+    {i:'🖨', t:'PDF de preparación de hoy', fn:function(){ pdfPreparacion(fechaISO()); }},
+    {i:'📤', t:'Excel para AmbarX', d:'Solo los pedidos aún no pasados', fn:function(){ exportarAmbarx(false); }},
+    {i:'📤', t:'Excel para AmbarX con todos', d:'Incluye los ya pasados', fn:function(){ exportarAmbarx(true); }},
+    {i:'🖥', t:'Pantalla del almacén', fn:function(){ verTab('pantalla'); }}]);
+  else if(_tab==='futuros') abrirMenu('Próximos días', [
+    {i:'🖨', t:'PDF de preparación de mañana', fn:function(){ pdfPreparacion(diaSiguiente(fechaISO())); }},
+    {i:'📤', t:'Excel para AmbarX', d:'Solo los pedidos aún no pasados', fn:function(){ exportarAmbarx(false); }}]);
+  else if(_tab==='nuevo') abrirMenu('Nuevo pedido', [
+    {i:'📥', t:'Cargar varios pedidos de una vez', fn:function(){ var d=document.getElementById('detLote'); d.open=true; d.scrollIntoView({behavior:'smooth'}); }},
+    {i:'🔑', t:'API key de Claude', fn:function(){ var d=document.getElementById('detApi'); d.open=true; d.scrollIntoView({behavior:'smooth'}); }}]);
+  else if(_tab==='stock') menuStock();
+}
+function menuStock(){
+  abrirMenu('Enviar stock a clientes', [
+    {i:'📄', t:'PDF del stock', d:'Se abre el menú para compartir: WhatsApp, email…', fn:compartirStock},
+    {i:'📋', t:'Copiar como texto', d:'Para pegarlo en un WhatsApp', fn:copiarStockTexto}]);
+}
+function menuMas(){
+  var nAb=listaVuelos().filter(vueloAbierto).length;
+  abrirMenu('Más', [
+    {i:'✈', t:'Vuelos', d:nAb?nAb+' con algo pendiente':'Facturas y estado en AmbarX', fn:function(){ verTab('vuelos'); }},
+    {i:'✔', t:'Pedidos cerrados', fn:function(){ verTab('cerrados'); }},
+    {i:'♥', t:'San Valentín 2027', d:'Previsión y flor asegurada', fn:function(){ verTab('sv'); }},
+    {i:'⚙', t:'Ajustes', d:'Emails de clientes, firma y precios', fn:function(){ verTab('ajustes'); }},
+    {i:'🖥', t:'Pantalla del almacén', fn:function(){ verTab('pantalla'); }},
+    {i:'↗', t:'Ir a la app de stock', fn:function(){ location.href='./'; }},
+    {i:'⎋', t:'Cerrar sesión', peligro:true, fn:function(){ document.getElementById('bfLogout').click(); }}]);
 }
 
 /* ══ CIERRE AUTOMÁTICO ══
@@ -1026,16 +1117,20 @@ function textoConfirmacion(p){
 }
 function abrirConfirmar(id){
   var p=_pedidos[id], el=document.getElementById('conf-'+id); if(!p||!el) return;
-  if(el.innerHTML){ el.innerHTML=''; return; }
+  if(el.innerHTML){ el.scrollIntoView({behavior:'smooth',block:'center'}); return; }
   var c=p.cliente.codigo, em=emailCli(c), wa=movilWA(telCli(c));
   el.innerHTML='<div class="alerta oro" style="margin-top:6px;">'+
     (p.confirmacion?'<div class="ok" style="margin-bottom:6px;">Ya confirmado por '+esc(p.confirmacion.via)+(p.confirmacion.a?' a '+esc(p.confirmacion.a):'')+' el '+esc(String(p.confirmacion.fecha).replace('T',' ').slice(0,16))+'.</div>':'')+
     '<label style="margin-top:0;">Email del cliente</label><input id="cfEm-'+id+'" type="email" value="'+esc(em)+'" placeholder="cliente@correo.com">'+
     '<div class="prev-txt">'+esc(textoConfirmacion(p))+'</div>'+
-    '<div class="fila-btn"><button class="btn peq primario" onclick="confirmarEmail(\''+id+'\')">Enviar por email</button>'+
-    '<button class="btn peq" onclick="confirmarWhatsApp(\''+id+'\')">WhatsApp'+(wa?' ('+wa.slice(2)+')':'')+'</button>'+
-    '<button class="btn peq" onclick="confirmarCopiar(\''+id+'\')">Copiar texto</button></div>'+
-    '<div class="nota">El email se abre en tu app de correo (Gmail…) con el destinatario y el texto puestos: solo tienes que pulsar Enviar.</div></div>';
+    '<div class="fila-btn"><button class="btn primario" onclick="menuConfirmar(\''+id+'\')">Enviar confirmación…</button><button class="btn" onclick="document.getElementById(\'conf-'+id+'\').innerHTML=\'\'">Cerrar</button></div></div>';
+}
+function menuConfirmar(id){
+  var p=_pedidos[id], wa=movilWA(telCli(p.cliente.codigo)), em=(document.getElementById('cfEm-'+id)||{}).value||'';
+  abrirMenu('Confirmar a '+(p.cliente.nombre||'cliente'), [
+    {i:'✉', t:'Por email', d:em?'Se abre tu correo con '+em:'Escribe antes el email', fn:function(){ confirmarEmail(id); }},
+    {i:'💬', t:'Por WhatsApp', d:wa?'Al '+wa.slice(2):'Eliges el contacto en WhatsApp', fn:function(){ confirmarWhatsApp(id); }},
+    {i:'📋', t:'Copiar el texto', fn:function(){ confirmarCopiar(id); }}]);
 }
 function marcarConfirmado(id, via, a){ refPedidos.child(id).update({confirmacion:{via:via, fecha:ahoraISO(), a:a||''}}); }
 function confirmarEmail(id){
@@ -1336,7 +1431,7 @@ escuchar(refStockAmb,'stockAmb',function(v){_stockAmb=(v&&v.items)?v:null;});
 escuchar(refVuelos,'vuelos',function(v){_vuelos=v;});
 escuchar(refContactos,'contactos',function(v){_contactos=v;});
 escuchar(refConfig,'config',function(v){_config=v;});
-document.body.classList.add('pantalla');
+verTab(window.innerWidth>=900 ? 'pantalla' : 'abiertos');
 </script>
 <div id="bfLogin" style="display:none;position:fixed;inset:0;z-index:99999;background:#f4f4f4;align-items:center;justify-content:center;font-family:Arial,sans-serif">
   <form id="bfLoginForm" style="background:#fff;border:1px solid #ccc;border-radius:8px;padding:24px;width:min(320px,90vw)">
