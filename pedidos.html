@@ -241,6 +241,13 @@ body.pantalla header#cab{position:static;}
       <div id="ajTabla" style="max-height:340px;overflow:auto;margin-top:8px;"></div>
     </div>
     <div class="card">
+      <b>Reglas para interpretar pedidos</b>
+      <p class="nota">La app las tiene siempre en cuenta al leer un pedido. Ej.: «Las rosas rojas de Egea son Freedom 70; si no hay, Freedom 60», «1 caja de clavel son 500 tallos fancy». Cuando corriges un pedido, te propone guardarlo aquí.</p>
+      <div id="ajReglas"></div>
+      <textarea id="ajRegla" style="min-height:64px;margin-top:8px;" placeholder="Escribe una regla nueva…"></textarea>
+      <div class="fila-btn"><button class="btn peq primario" onclick="anadirReglaAj()">Añadir regla</button></div>
+    </div>
+    <div class="card">
       <b>Firma de los mensajes</b>
       <textarea id="ajFirma" style="min-height:70px;margin-top:8px;"></textarea>
       <div class="fila-btn"><button class="btn peq" onclick="guardarFirma()">Guardar firma</button></div>
@@ -516,6 +523,55 @@ function tarjeta(id){
   return h+'<div id="conf-'+id+'"></div></div>';
 }
 
+/* ── REGLAS QUE LA APP APRENDE ──
+   Se guardan en buscaflor/configPedidos/reglas y van en las instrucciones al interpretar cada pedido. */
+function reglas(){ return lineasArray(_config && _config.reglas); }
+function reglasPrompt(){
+  var rs=reglas(); if(!rs.length) return '';
+  return 'REGLAS DE BUSCAFLOR (las ha fijado Javier; mandan sobre cualquier otra regla de estas instrucciones):\n'+rs.map(function(x){ return '- '+x.texto; }).join('\n')+'\n\n';
+}
+function guardarReglas(lista){ return refConfig.child('reglas').set(lista); }
+function anadirReglas(textos){
+  var rs=reglas(), ya={}; rs.forEach(function(x){ ya[x.texto.toLowerCase()]=true; });
+  var nuevas=textos.map(function(t){return String(t||'').trim();}).filter(function(t){ return t && !ya[t.toLowerCase()]; });
+  if(!nuevas.length){ toast('Esa regla ya estaba guardada'); return Promise.resolve(); }
+  return guardarReglas(rs.concat(nuevas.map(function(t){ return {texto:t, creada:ahoraISO()}; })))
+    .then(function(){ toast(nuevas.length===1?'Regla guardada':nuevas.length+' reglas guardadas'); });
+}
+function anadirReglaAj(){
+  var ta=document.getElementById('ajRegla'), t=ta.value.trim(); if(!t){ toast('Escribe la regla'); return; }
+  anadirReglas([t]).then(function(){ ta.value=''; });
+}
+function borrarRegla(i){
+  var rs=reglas(), x=rs[i]; if(!x) return;
+  if(!confirm('¿Borrar esta regla?\n\n'+x.texto)) return;
+  rs.splice(i,1); guardarReglas(rs).then(function(){ toast('Regla borrada'); });
+}
+// Compara lo que leyó la IA con lo que has dejado al revisar y propone reglas
+function sugerirReglas(r){
+  if(!r || !r.ia) return [];
+  var out=[], cod=r.cliente.codigo, cli=r.cliente.nombre||'';
+  if(cod && r.ia.cliente!==String(cod) && r.ia.nombreEscrito && r.ia.nombreEscrito.toLowerCase()!==cli.toLowerCase())
+    out.push('«'+r.ia.nombreEscrito+'» en los pedidos es el cliente '+cli+' (#'+cod+').');
+  r.lineas.forEach(function(l){
+    if(!l.ia || !l.texto || !l.codigo || !(l.cantidad>0)) return;
+    if(l.ia.codigo!==l.codigo){
+      var nombre=String(l.texto).replace(/^\s*\d+(?:[.,]\d+)?\s*(?:[-–x×]\s*)?/,'').trim()||l.texto;
+      out.push((cod?'Para '+cli+' (#'+cod+'), «':'«')+nombre+'» es '+nombreArt(l.codigo)+' (#'+l.codigo+').');
+    } else if(l.ia.cantidad!==l.cantidad && /caja/i.test(l.texto)){
+      var n=parseFloat(((l.texto.match(/\d+(?:[.,]\d+)?/)||['1'])[0]).replace(',','.'))||1;
+      out.push('1 caja de '+nombreArt(l.codigo)+' (#'+l.codigo+') son '+nf(l.cantidad/n)+' '+unidadDe(l.codigo)+'.');
+    }
+  });
+  var ya={}; reglas().forEach(function(x){ ya[x.texto.toLowerCase()]=true; });
+  return out.filter(function(t,i){ return out.indexOf(t)===i && !ya[t.toLowerCase()]; });
+}
+function ofrecerReglas(sug){
+  abrirMenu('¿Guardo lo que has corregido para la próxima vez?', [
+    sug.length>1 && {i:'✓', t:'Guardar las '+sug.length+' reglas', fn:function(){ anadirReglas(sug); }}
+  ].concat(sug.map(function(t){ return {i:'＋', t:t, d:'Guardar solo esta', fn:function(){ anadirReglas([t]); }}; })));
+}
+
 /* ── Menús (hoja que sube desde abajo) ── */
 var _ops=[];
 function abrirMenu(titulo, ops){
@@ -768,6 +824,7 @@ function promptSistema(){
   'NOTACIÓN DE LAS NOTAS: comillas (") o "id." repiten la palabra de la línea de arriba (ej. "2 \\" rojo" debajo de "6 clav. blanco" = 2 clavel rojo). "2+7" = 9 (suma). "N > (M)": N es lo PEDIDO y M (en círculo, a la derecha) es lo ya servido: usa N como cantidad y pon "servido M" en nota. Importes sueltos tipo "14€" van en nota. "A / B" en una línea (ej. "1 sweetness 60 / mandala 60") es UNA línea que vale con cualquiera: codigo = la primera, "alternativas" = [códigos de las otras]. La fecha (ej. "28/x") es la fecha del pedido/entrega; un número de 9 cifras es un teléfono.\n\n'+
   'GRADO O MEDIDA QUE FALTA: si el artículo exacto depende de un dato que no está (ej. clavel FANCY o SELECT, nardos grandes/medianos/pequeños/super, medida de una rosa), NO adivines: pon "codigo": null, "duda": "qué falta", y en "opciones" los códigos posibles, poniendo primero los que hay en stock. Si solo hay uno posible en stock, ponlo como codigo y menciónalo en duda.\n'+
   'Si una variedad no existe en el catálogo, codigo null y explica en duda.\n\n'+
+  reglasPrompt()+
   'STOCK DISPONIBLE AHORA (codigo:cantidad): '+st+'\n\n'+
   'CATÁLOGO AMBARX (codigo|descripción):\n'+cat+'\n\n'+
   'CLIENTES AMBARX (codigo|nombre (denominación) · población):\n'+cli+'\n\n'+
@@ -812,9 +869,10 @@ function abrirRevision(j, textoOriginal){
     origen: _foto?'foto':'texto', textoOriginal: textoOriginal||'',
     lineas: (j.lineas||[]).map(function(l){
       var cod = l.codigo && art(l.codigo) ? String(l.codigo) : null;
-      return { texto:l.texto||'', codigo:cod, cantidad:+l.cantidad||0, alternativas:(l.alternativas||[]).map(String).filter(art), opciones:(l.opciones||[]).map(String).filter(art), duda:l.duda||'', nota:l.nota||'' };
+      return { texto:l.texto||'', codigo:cod, cantidad:+l.cantidad||0, alternativas:(l.alternativas||[]).map(String).filter(art), opciones:(l.opciones||[]).map(String).filter(art), duda:l.duda||'', nota:l.nota||'', ia:{codigo:cod, cantidad:+l.cantidad||0} };
     })
   };
+  _rev.ia = { cliente:codCli, nombreEscrito:String(cli.nombre||'').trim() };
   pintarRevision();
 }
 function editarPedido(id){
@@ -886,6 +944,7 @@ function guardarPedido(){
   r.fecha=document.getElementById('revFecha').value||fechaISO();
   r.nota=document.getElementById('revNota').value.trim();
   r.campana=document.getElementById('revSV').checked?'SV27':'';
+  var sugerencias=sugerirReglas(r);
   if(!r.cliente.nombre){ toast('Falta el cliente'); return; }
   var lineas=r.lineas.filter(function(l){return l.cantidad>0;});
   if(!lineas.length){ toast('El pedido no tiene líneas'); return; }
@@ -920,6 +979,7 @@ function guardarPedido(){
     toast('Pedido guardado'); _rev=null; _foto=null;
     document.getElementById('inTexto').value=''; document.getElementById('inFoto').value=''; document.getElementById('fotoPrev').style.display='none';
     volverPaso1(); verTab(r.fecha>fechaISO() ? 'futuros' : 'abiertos');
+    if(sugerencias.length) setTimeout(function(){ ofrecerReglas(sugerencias); }, 400);
   }
 }
 
@@ -1430,6 +1490,10 @@ function guardarPrecios(){
 }
 function pintarAjustes(){
   var fi=document.getElementById('ajFirma'); if(document.activeElement!==fi) fi.value=firma();
+  var rs=reglas();
+  document.getElementById('ajReglas').innerHTML = rs.length ? rs.map(function(x,i){
+    return '<div class="lin"><div class="lin-a">'+esc(x.texto)+'</div><button class="ico" style="width:34px;height:34px;font-size:15px;color:var(--rojo);" onclick="borrarRegla('+i+')" aria-label="Borrar regla">✕</button></div>';
+  }).join('') : '<div class="nota">Todavía no hay reglas.</div>';
   var cs=Object.keys(_contactos||{}).filter(function(c){ return emailCli(c)||telCli(c); }).sort(function(a,b){ return nombreCliCod(a).localeCompare(nombreCliCod(b)); });
   document.getElementById('ajTabla').innerHTML = cs.length ? '<table class="izq"><tr><th>Cód.</th><th>Cliente</th><th>Email / teléfono</th></tr>'+cs.map(function(c){
     return '<tr><td>'+esc(c)+'</td><td><a href="#" onclick="elegirClienteAj(\''+esc(c)+'\');return false;">'+esc(nombreCliCod(c))+'</a></td><td style="word-break:break-all;">'+esc(emailCli(c))+(telCli(c)?'<div class="sub">'+esc(telCli(c))+'</div>':'')+'</td></tr>';
