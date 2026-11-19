@@ -326,9 +326,10 @@ var refStockAmb  = db.ref('buscaflor/stockAmbarx');   // informe de stocks de Am
 var refVuelos    = db.ref('buscaflor/vuelos');        // vuelos con facturas y estado en AmbarX (tarea del servidor)
 var refContactos = db.ref('buscaflor/contactos');     // email y teléfono por código de cliente AmbarX
 var refConfig    = db.ref('buscaflor/configPedidos'); // firma y campaña de San Valentín
+var refProvArt   = db.ref('buscaflor/proveedoresArticulo'); // fincas/proveedores de cada artículo (última fecha de compra)
 
 var _pedidos = {}, _articulos = {}, _clientes = {}, _stock = {}, _etiq = {};
-var _stockAmb = null, _vuelos = {}, _contactos = {}, _config = {};
+var _stockAmb = null, _vuelos = {}, _contactos = {}, _config = {}, _provArt = {};
 var _listos = {};
 var CLAVE_API = 'bf_ak';
 var MODELO = 'claude-sonnet-4-6';
@@ -1264,6 +1265,11 @@ function exportarAmbarx(todos){
 var FAMILIAS=[['Rosas','paquetes',/CM\/25T|CM\/25TALLOS|25 ?TALLOS|\/10T/],['Clavel','tallos',/CLAVEL/],['Alstroemeria','paquetes',/ALSTRO/],['Paniculata','paquetes',/PANICULATA/],
   ['Eucalipto','mazos',/EUCALIPTO/],['Hortensia','tallos',/HORTENSIA/],['Verde','mazos',/HELECHO|LENTISCO|TUYA|ESPARRAGUERA|RUSCUS|PITTOSPORUM/],
   ['Otras flores','uds',/^(?!.*(TARRINA|BOLSA|CUBO|PALET|CAJA|PAPEL|CINTA|PETALOS|CELOFAN|BLONDA|ESPONJA))/],['Material y otros','uds',/.*/]];
+// Proveedores de un artículo: los de las compras de los últimos 30 días, el más reciente primero
+function proveedoresDe(c){
+  var o=(_provArt||{})[c]||{}, lim=new Date(); lim.setDate(lim.getDate()-30); lim=fechaISO(lim);
+  return Object.keys(o).filter(function(k){ return (o[k]||'')>=lim; }).sort(function(a,b){ return String(o[b]).localeCompare(String(o[a])) || a.localeCompare(b); });
+}
 function descStock(c){ var it=hayStockAmb() && _stockAmb.items[c]; return (it && it.d) || nombreArt(c); }
 function famDe(c){ var d=String(descStock(c)).toUpperCase(); for(var i=0;i<FAMILIAS.length;i++) if(FAMILIAS[i][2].test(d)) return i; return FAMILIAS.length-1; }
 function datosStock(q){
@@ -1288,7 +1294,8 @@ function pintarStock(){
     var t=D.G[i].reduce(function(s,c){return s+fisico(c);},0);
     return '<div class="fam" id="fam-'+i+'"><div class="fh"><b>'+FAMILIAS[i][0]+'</b><span>'+nf(t)+' '+FAMILIAS[i][1]+'</span></div>'+D.G[i].map(function(c){
       var f=fisico(c), ap=D.pend[c]||0, lib=f-ap;
-      return '<div class="sk"><span>'+esc(descStock(c))+' <span class="cod">#'+esc(c)+'</span></span><span class="n'+(f<0?' neg':'')+'">'+nf(f)+(ap?'<small class="'+(lib<0?'neg':'')+'">libre '+nf(lib)+'</small>':'')+'</span></div>';
+      var pv=proveedoresDe(c);
+      return '<div class="sk"><span>'+esc(descStock(c))+' <span class="cod">#'+esc(c)+'</span>'+(pv.length?'<span class="sub" style="display:block;">'+esc(pv.join(' · '))+'</span>':'')+'</span><span class="n'+(f<0?' neg':'')+'">'+nf(f)+(ap?'<small class="'+(lib<0?'neg':'')+'">libre '+nf(lib)+'</small>':'')+'</span></div>';
     }).join('')+'</div>';
   }).join('') : '<div class="vacio">No hay stock'+(q?' de «'+esc(q)+'»':'')+'.</div>';
 }
@@ -1310,10 +1317,12 @@ function compartirStock(){
   doc.text('Stock a '+now.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})+' · '+now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}),15,24);
   var body=[];
   F.forEach(function(f){
-    body.push([{content:f.fam.toUpperCase(),styles:{fontStyle:'bold'}},{content:nf(f.tot)+' '+f.u,styles:{fontStyle:'bold',halign:'right'}}]);
-    f.cs.forEach(function(c){ body.push(['   '+descStock(c),{content:nf(fisico(c)),styles:{halign:'right'}}]); });
+    body.push([{content:f.fam.toUpperCase(),styles:{fontStyle:'bold'}},'',{content:nf(f.tot)+' '+f.u,styles:{fontStyle:'bold',halign:'right'}}]);
+    f.cs.forEach(function(c){ body.push(['   '+descStock(c),{content:proveedoresDe(c).join(', '),styles:{fontSize:8.5,textColor:60}},{content:nf(fisico(c)),styles:{halign:'right'}}]); });
   });
-  tabla(doc,{startY:29, head:[['Artículo',{content:'Cantidad',styles:{halign:'right'}}]], body:body, styles:Object.assign({},TABLA.styles,{fontSize:10,lineColor:180,lineWidth:{bottom:0.1}})});
+  tabla(doc,{startY:29, head:[['Artículo','Proveedores',{content:'Cantidad',styles:{halign:'right'}}]], body:body,
+    styles:Object.assign({},TABLA.styles,{fontSize:10,lineColor:180,lineWidth:{bottom:0.1}}),
+    columnStyles:{0:{cellWidth:72},1:{cellWidth:83},2:{cellWidth:25,halign:'right'}}});
   piePaginas(doc);
   compartirPdf(doc,'Stock_Buscaflor_'+fechaISO(now)+'.pdf','Stock Buscaflor').then(function(r){ if(r==='descargado') toast('PDF descargado: ábrelo y compártelo por WhatsApp'); });
 }
@@ -1431,6 +1440,7 @@ escuchar(refStockAmb,'stockAmb',function(v){_stockAmb=(v&&v.items)?v:null;});
 escuchar(refVuelos,'vuelos',function(v){_vuelos=v;});
 escuchar(refContactos,'contactos',function(v){_contactos=v;});
 escuchar(refConfig,'config',function(v){_config=v;});
+escuchar(refProvArt,'provArt',function(v){_provArt=v;});
 verTab(window.innerWidth>=900 ? 'pantalla' : 'abiertos');
 </script>
 <div id="bfLogin" style="display:none;position:fixed;inset:0;z-index:99999;background:#f4f4f4;align-items:center;justify-content:center;font-family:Arial,sans-serif">
