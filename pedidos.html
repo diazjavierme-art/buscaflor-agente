@@ -195,7 +195,7 @@ body.pantalla header#cab{position:static;}
     <input id="stQ" type="search" placeholder="Buscar: freedom 60, clavel, 904…" oninput="pintarStock()">
     <div class="fila-btn"><button class="btn primario" onclick="menuStock()">Enviar stock a clientes…</button></div>
     <div id="stTabla"></div>
-    <p class="nota" style="text-align:center;">Stock del almacén según el informe de AmbarX. «Libre» = stock menos lo que falta por servir de los pedidos abiertos. Si algo no cuadra, corrígelo en AmbarX y se verá aquí en el siguiente cruce.</p>
+    <p class="nota" style="text-align:center;">Stock del almacén según el informe de AmbarX. «Reservado» = lo que falta por servir de los pedidos abiertos (los de San Valentín, solo su última semana); «libre» = stock menos reservado. Si algo no cuadra, corrígelo en AmbarX y se verá aquí en el siguiente cruce.</p>
   </section>
 
   <section id="tab-vuelos" style="display:none;">
@@ -1289,13 +1289,15 @@ function pintarStock(){
   var o=document.getElementById('stOrigen');
   if(hayStockAmb()){ o.className='alerta ok'; o.textContent='Stock de AmbarX del '+fechaStockTxt()+' ('+(_stockAmb.registros||Object.keys(_stockAmb.items).length)+' artículos). Se actualiza de lunes a sábado a las 6:30 y a las 19:30.'; }
   else { o.className='alerta oro'; o.textContent='Todavía no ha llegado el stock de AmbarX: se muestra el de la app de stock.'; }
+  var nRes=Object.keys(D.pend).filter(function(c){return D.pend[c]>0;}).length;
+  if(nRes) o.textContent+=' · '+nRes+' artículo'+(nRes===1?'':'s')+' con reservas de pedidos.';
   document.getElementById('stKpi').innerHTML=D.ord.map(function(i){ var t=D.G[i].reduce(function(s,c){return s+fisico(c);},0); return '<a class="kpi" href="#fam-'+i+'">'+FAMILIAS[i][0]+'<b>'+nf(t)+'</b>'+FAMILIAS[i][1]+'</a>'; }).join('');
   document.getElementById('stTabla').innerHTML = D.ord.length ? D.ord.map(function(i){
     var t=D.G[i].reduce(function(s,c){return s+fisico(c);},0);
     return '<div class="fam" id="fam-'+i+'"><div class="fh"><b>'+FAMILIAS[i][0]+'</b><span>'+nf(t)+' '+FAMILIAS[i][1]+'</span></div>'+D.G[i].map(function(c){
       var f=fisico(c), ap=D.pend[c]||0, lib=f-ap;
       var pv=proveedoresDe(c);
-      return '<div class="sk"><span>'+esc(descStock(c))+' <span class="cod">#'+esc(c)+'</span>'+(pv.length?'<span class="sub" style="display:block;">'+esc(pv.join(' · '))+'</span>':'')+'</span><span class="n'+(f<0?' neg':'')+'">'+nf(f)+(ap?'<small class="'+(lib<0?'neg':'')+'">libre '+nf(lib)+'</small>':'')+'</span></div>';
+      return '<div class="sk"><span>'+esc(descStock(c))+' <span class="cod">#'+esc(c)+'</span>'+(pv.length?'<span class="sub" style="display:block;">'+esc(pv.join(' · '))+'</span>':'')+'</span><span class="n'+(f<0?' neg':'')+'">'+nf(f)+(ap?'<small>reservado '+nf(ap)+'</small><small class="'+(lib<0?'neg':'ok')+'">libre '+nf(lib)+'</small>':'')+'</span></div>';
     }).join('')+'</div>';
   }).join('') : '<div class="vacio">No hay stock'+(q?' de «'+esc(q)+'»':'')+'.</div>';
 }
