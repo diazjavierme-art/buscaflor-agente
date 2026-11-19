@@ -341,7 +341,13 @@ function ahoraISO(d){ d=d||new Date(); return fechaISO(d)+'T'+pad(d.getHours())+
 function fmtFecha(iso){ if(!iso) return ''; var d=new Date(iso.slice(0,10)+'T00:00:00'); var D=['dom','lun','mar','mié','jue','vie','sáb'],M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; return D[d.getDay()]+' '+d.getDate()+' '+M[d.getMonth()]; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('ver'); clearTimeout(toast._t); toast._t=setTimeout(function(){t.classList.remove('ver');},3200); }
-function art(c){ return (c!=null && _articulos[c]) || null; }
+// Artículo del catálogo; si no está (alta reciente en AmbarX, p. ej. la paniculata 464), se toma del informe de stock de AmbarX
+function art(c){
+  if(c==null) return null;
+  if(_articulos[c]) return _articulos[c];
+  var it=_stockAmb && _stockAmb.items && _stockAmb.items[c];
+  return it ? {descripcion:it.d} : null;
+}
 function nombreArt(c){ var a=art(c); return a ? a.descripcion : (c==null?'¿?':'#'+c); }
 function cultivoDe(c){
   var d=String((art(c)||{}).descripcion||'').toUpperCase();
