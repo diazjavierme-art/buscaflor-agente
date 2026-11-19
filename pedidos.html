@@ -111,6 +111,16 @@ details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
 .sk{display:flex;justify-content:space-between;gap:10px;padding:7px 11px;border-top:1px solid var(--filo);font-size:13px;}
 .sk .n{font-family:'IBM Plex Mono',monospace;font-weight:600;white-space:nowrap;text-align:right;}
 .sk .n small{display:block;font-weight:400;font-size:10.5px;color:var(--gris);}
+.sk{align-items:baseline;}
+.sk .nm{flex:1;min-width:0;}
+.sk .c{flex:0 0 54px;text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:600;white-space:nowrap;}
+.sk .c.res{color:var(--oro);font-weight:500;}
+.sk .c.disp{color:var(--verde);}
+.sk .c.disp.neg{color:var(--rojo);}
+.sk.con-res{background:rgba(199,154,62,.06);}
+.sk-cab{font-size:10.5px;color:var(--gris);text-transform:uppercase;letter-spacing:.03em;padding-top:5px;padding-bottom:5px;}
+.sk-cab span:first-child{flex:1;} .sk-cab .c{font-family:inherit;font-weight:600;color:var(--gris);}
+.sk-tot{font-weight:600;background:var(--fondo);} .sk-tot span:first-child{flex:1;}
 .neg{color:var(--rojo);}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;}
 .toolbar .btn{flex:1 1 auto;}
@@ -1300,11 +1310,15 @@ function pintarStock(){
   document.getElementById('stKpi').innerHTML=D.ord.map(function(i){ var t=D.G[i].reduce(function(s,c){return s+fisico(c);},0); return '<a class="kpi" href="#fam-'+i+'">'+FAMILIAS[i][0]+'<b>'+nf(t)+'</b>'+FAMILIAS[i][1]+'</a>'; }).join('');
   document.getElementById('stTabla').innerHTML = D.ord.length ? D.ord.map(function(i){
     var t=D.G[i].reduce(function(s,c){return s+fisico(c);},0);
-    return '<div class="fam" id="fam-'+i+'"><div class="fh"><b>'+FAMILIAS[i][0]+'</b><span>'+nf(t)+' '+FAMILIAS[i][1]+'</span></div>'+D.G[i].map(function(c){
-      var f=fisico(c), ap=D.pend[c]||0, lib=f-ap;
-      var pv=proveedoresDe(c);
-      return '<div class="sk"><span>'+esc(descStock(c))+' <span class="cod">#'+esc(c)+'</span>'+(pv.length?'<span class="sub" style="display:block;">'+esc(pv.join(' · '))+'</span>':'')+'</span><span class="n'+(f<0?' neg':'')+'">'+nf(f)+(ap?'<small>reservado '+nf(ap)+'</small><small class="'+(lib<0?'neg':'ok')+'">libre '+nf(lib)+'</small>':'')+'</span></div>';
-    }).join('')+'</div>';
+    var tr=D.G[i].reduce(function(s,c){return s+(D.pend[c]||0);},0);
+    return '<div class="fam" id="fam-'+i+'"><div class="fh"><b>'+FAMILIAS[i][0]+'</b><span>'+FAMILIAS[i][1]+'</span></div>'+
+      '<div class="sk sk-cab"><span>Artículo</span><span class="c">Stock</span><span class="c">Reserv.</span><span class="c">Disp.</span></div>'+
+      D.G[i].map(function(c){
+      var f=fisico(c), ap=D.pend[c]||0, lib=f-ap, pv=proveedoresDe(c);
+      return '<div class="sk'+(ap?' con-res':'')+'"><span class="nm">'+esc(descStock(c))+' <span class="cod">#'+esc(c)+'</span>'+(pv.length?'<span class="sub" style="display:block;">'+esc(pv.join(' · '))+'</span>':'')+'</span>'+
+        '<span class="c'+(f<0?' neg':'')+'">'+nf(f)+'</span><span class="c res">'+(ap?nf(ap):'—')+'</span><span class="c disp'+(lib<0?' neg':'')+'">'+nf(lib)+'</span></div>';
+    }).join('')+
+      '<div class="sk sk-tot"><span>Total</span><span class="c">'+nf(t)+'</span><span class="c res">'+(tr?nf(tr):'—')+'</span><span class="c disp">'+nf(t-tr)+'</span></div></div>';
   }).join('') : '<div class="vacio">No hay stock'+(q?' de «'+esc(q)+'»':'')+'.</div>';
 }
 function lineasStockClientes(){
