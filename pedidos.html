@@ -207,7 +207,8 @@ body.pantalla header#cab{position:static;}
     <div class="alerta oro" id="stOrigen">Cargando el stock de AmbarX…</div>
     <div class="kpis" id="stKpi"></div>
     <input id="stQ" type="search" placeholder="Buscar: freedom 60, clavel, 904…" oninput="pintarStock()">
-    <div class="fila-btn"><button class="btn primario" onclick="menuStock()">Enviar stock a clientes…</button></div>
+    <div class="fila-btn"><button class="btn" id="btnPedirStock" onclick="pedirStock()">↻ Actualizar stock de AmbarX</button><button class="btn primario" onclick="menuStock()">Enviar a clientes…</button></div>
+    <div id="stPet" class="nota" style="margin:-4px 0 10px;"></div>
     <div id="stTabla"></div>
     <p class="nota" style="text-align:center;">Stock del almacén según el informe de AmbarX. «Reservado» = lo que falta por servir de los pedidos abiertos (los de San Valentín, solo su última semana); «libre» = stock menos reservado. Si algo no cuadra, corrígelo en AmbarX y se verá aquí en el siguiente cruce.</p>
   </section>
@@ -347,10 +348,11 @@ var refStockAmb  = db.ref('buscaflor/stockAmbarx');   // informe de stocks de Am
 var refVuelos    = db.ref('buscaflor/vuelos');        // vuelos con facturas y estado en AmbarX (tarea del servidor)
 var refContactos = db.ref('buscaflor/contactos');     // email y teléfono por código de cliente AmbarX
 var refConfig    = db.ref('buscaflor/configPedidos'); // firma y campaña de San Valentín
+var refPet       = db.ref('buscaflor/peticiones'); // petición de actualizar el stock (la atiende el script del ordenador de AmbarX)
 var refProvArt   = db.ref('buscaflor/proveedoresArticulo'); // fincas/proveedores de cada artículo (última fecha de compra)
 
 var _pedidos = {}, _articulos = {}, _clientes = {}, _stock = {}, _etiq = {};
-var _stockAmb = null, _vuelos = {}, _contactos = {}, _config = {}, _provArt = {};
+var _stockAmb = null, _vuelos = {}, _contactos = {}, _config = {}, _provArt = {}, _pet = {};
 var _listos = {};
 var CLAVE_API = 'bf_ak';
 var MODELO = 'claude-sonnet-4-6';
@@ -609,7 +611,28 @@ function menuSeccion(){
   else if(_tab==='nuevo') abrirMenu('Nuevo pedido', [
     {i:'📥', t:'Cargar varios pedidos de una vez', fn:function(){ var d=document.getElementById('detLote'); d.open=true; d.scrollIntoView({behavior:'smooth'}); }},
     {i:'🔑', t:'API key de Claude', fn:function(){ var d=document.getElementById('detApi'); d.open=true; d.scrollIntoView({behavior:'smooth'}); }}]);
-  else if(_tab==='stock') menuStock();
+  else if(_tab==='stock') abrirMenu('Stock', [
+    {i:'↻', t:'Actualizar stock de AmbarX', d:'Lo sube el ordenador de AmbarX en unos segundos', fn:pedirStock},
+    {i:'📄', t:'PDF del stock disponible', d:'Para WhatsApp o email', fn:compartirStock},
+    {i:'📋', t:'Copiar como texto', fn:copiarStockTexto}]);
+}
+function pedirStock(){
+  var p=(_pet&&_pet.stock)||{};
+  if((p.estado==='pedido'||p.estado==='enCurso') && minutosDesde(p.pedido)<3){ toast('Ya se está actualizando'); return; }
+  var u=firebase.auth().currentUser;
+  refPet.child('stock').update({pedido:ahoraISO(), por:(u&&u.email)||'', estado:'pedido', error:null}).then(function(){ toast('Pedido: se actualiza en unos segundos'); });
+}
+function minutosDesde(iso){ if(!iso) return 1e9; return (Date.now()-new Date(String(iso).length<=19?iso:iso).getTime())/60000; }
+function textoPeticion(){
+  var p=(_pet&&_pet.stock)||{}, ag=(_pet&&_pet.agenteStock)||{}, vivo=minutosDesde(ag.visto)<2, h=function(x){ return x?String(x).slice(11,16):''; };
+  var t='';
+  if(p.estado==='pedido') t = vivo ? '⏳ Pedido a las '+h(p.pedido)+'. El ordenador de AmbarX lo está recogiendo…'
+                                   : '⚠ Pedido a las '+h(p.pedido)+', pero el ordenador de AmbarX no responde. Tiene que estar encendido, con AmbarX abierto en Chrome y el script «Stock de AmbarX a la app» activo.';
+  else if(p.estado==='enCurso') t='⏳ Generando el informe en AmbarX…';
+  else if(p.estado==='error') t='⚠ No se pudo actualizar a las '+h(p.hecho)+': '+(p.error||'error');
+  else if(p.estado==='hecho') t='✓ Actualizado a las '+h(p.hecho)+' ('+(p.registros||'?')+' artículos).';
+  t += (t?' ':'')+(vivo?'Ordenador de AmbarX conectado.':(ag.visto?'Ordenador de AmbarX visto por última vez a las '+h(ag.visto)+'.':''));
+  return t;
 }
 function menuStock(){
   abrirMenu('Enviar stock a clientes', [
@@ -1376,6 +1399,8 @@ function fechaStockTxt(){
 function pintarStock(){
   var q=(document.getElementById('stQ').value||'').toLowerCase().trim(), D=datosStock(q);
   var o=document.getElementById('stOrigen');
+  var pe=(_pet&&_pet.stock)||{}; document.getElementById('stPet').textContent=textoPeticion();
+  document.getElementById('btnPedirStock').disabled = (pe.estado==='pedido'||pe.estado==='enCurso') && minutosDesde(pe.pedido)<3;
   if(hayStockAmb()){ o.className='alerta ok'; o.textContent='Stock de AmbarX del '+fechaStockTxt()+' ('+(_stockAmb.registros||Object.keys(_stockAmb.items).length)+' artículos). Se actualiza de lunes a sábado a las 6:30 y a las 19:30.'; }
   else { o.className='alerta oro'; o.textContent='Todavía no ha llegado el stock de AmbarX: se muestra el de la app de stock.'; }
   var nRes=Object.keys(D.pend).filter(function(c){return D.pend[c]>0;}).length;
@@ -1541,6 +1566,7 @@ escuchar(refVuelos,'vuelos',function(v){_vuelos=v;});
 escuchar(refContactos,'contactos',function(v){_contactos=v;});
 escuchar(refConfig,'config',function(v){_config=v;});
 escuchar(refProvArt,'provArt',function(v){_provArt=v;});
+escuchar(refPet,'pet',function(v){_pet=v;});
 verTab(window.innerWidth>=900 ? 'pantalla' : 'abiertos');
 </script>
 <div id="bfLogin" style="display:none;position:fixed;inset:0;z-index:99999;background:#f4f4f4;align-items:center;justify-content:center;font-family:Arial,sans-serif">
