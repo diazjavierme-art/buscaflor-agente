@@ -253,6 +253,10 @@ body.pantalla header#cab{position:static;}
       <div class="fila-btn"><button class="btn peq primario" onclick="anadirReglaAj()">Añadir regla</button></div>
     </div>
     <div class="card">
+      <b>Gasto en leer pedidos (Claude)</b>
+      <div id="ajGasto" class="nota" style="margin-top:6px;"></div>
+    </div>
+    <div class="card">
       <b>Firma de los mensajes</b>
       <textarea id="ajFirma" style="min-height:70px;margin-top:8px;"></textarea>
       <div class="fila-btn"><button class="btn peq" onclick="guardarFirma()">Guardar firma</button></div>
@@ -293,6 +297,7 @@ body.pantalla header#cab{position:static;}
 
     <div id="paso2" style="display:none;">
       <div id="avisosRev"></div>
+      <div id="lecturaRev" class="nota" style="margin:0 0 6px;"></div>
       <label>Cliente</label>
       <div class="sw">
         <input id="revCliente" autocomplete="off" placeholder="Buscar cliente de AmbarX…" oninput="buscarCliente(this.value)" onfocus="buscarCliente(this.value)">
@@ -355,7 +360,10 @@ var _pedidos = {}, _articulos = {}, _clientes = {}, _stock = {}, _etiq = {};
 var _stockAmb = null, _vuelos = {}, _contactos = {}, _config = {}, _provArt = {}, _pet = {};
 var _listos = {};
 var CLAVE_API = 'bf_ak';
-var MODELO = 'claude-sonnet-4-6';
+var MODELO = 'claude-sonnet-4-6';          // preciso (más caro): para repetir una lectura que ha salido mal
+var MODELO_RAPIDO = 'claude-haiku-4-5';     // por defecto: unas 3 veces más barato
+// Precios aproximados en USD por millón de tokens: entrada, salida, lectura de caché, escritura de caché
+var PRECIOS = {'claude-haiku-4-5':[1,5,0.1,1.25], 'claude-sonnet-4-6':[3,15,0.3,3.75]};
 
 /* ══ UTILIDADES ══ */
 function pad(n){ return String(n).padStart(2,'0'); }
@@ -817,10 +825,10 @@ function elegirFoto(inp){
     var img=new Image(), rd=new FileReader();
     rd.onload=function(e){ img.onload=function(){
         // Pantallazos largos: se limita el lado corto a 1200 px y el largo a 2600 px para que se lea bien
-        var w=img.width, hh=img.height, k=Math.min(1, 1200/Math.min(w,hh), 2600/Math.max(w,hh));
+        var w=img.width, hh=img.height, k=Math.min(1, 900/Math.min(w,hh), 1800/Math.max(w,hh)); // ligero pero legible
         var cv=document.createElement('canvas'); cv.width=Math.round(w*k); cv.height=Math.round(hh*k);
         cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
-        var url=cv.toDataURL('image/jpeg',0.85);
+        var url=cv.toDataURL('image/jpeg',0.8);
         _fotos.push({media_type:'image/jpeg', data:url.split(',')[1], url:url}); pintarFotos();
       }; img.src=e.target.result; };
     rd.readAsDataURL(f);
@@ -846,10 +854,10 @@ function dictar(){
 function leerApiKey(){ try{ return localStorage.getItem(CLAVE_API)||''; }catch(e){ return ''; } }
 function guardarApiKey(){ var v=document.getElementById('inApiKey').value.trim(); if(!v||/^•+$/.test(v)) return; try{ localStorage.setItem(CLAVE_API,v); toast('API key guardada'); }catch(e){ toast('No se pudo guardar'); } }
 
-function promptSistema(){
+// Parte fija del prompt (instrucciones, catálogo y clientes): va con caché para pagarla al 10 % en lecturas seguidas
+function promptFijo(){
   var cat = Object.keys(_articulos).map(function(c){ return c+'|'+_articulos[c].descripcion; }).join('\n');
   var cli = Object.keys(_clientes).map(function(c){ var x=_clientes[c]; return c+'|'+x.nombre+(x.denominacion&&x.denominacion!==x.nombre?' ('+x.denominacion+')':'')+(x.poblacion?' · '+x.poblacion:''); }).join('\n');
-  var st = codigosConStock().filter(function(c){return fisico(c)>0;}).map(function(c){ return c+':'+fisico(c); }).join(', ') || '(vacío)';
   return 'Eres el asistente de pedidos de Buscaflor, mayorista de flor cortada en Sevilla. Pasas notas de pedido de clientes (manuscritas, abreviadas, dictadas) a líneas con el CÓDIGO de artículo de AmbarX.\n\n'+
   'REGLAS DE UNIDADES (la cantidad SIEMPRE en la unidad de venta de AmbarX):\n'+
   '- CLAVEL: se vende por TALLOS. En los pedidos el número son RAMOS de 20 tallos → cantidad = ramos × 20. "clav. blanco" = clavel blanco.\n'+
@@ -860,15 +868,29 @@ function promptSistema(){
   'NOTACIÓN DE LAS NOTAS: comillas (") o "id." repiten la palabra de la línea de arriba (ej. "2 \\" rojo" debajo de "6 clav. blanco" = 2 clavel rojo). "2+7" = 9 (suma). "N > (M)": N es lo PEDIDO y M (en círculo, a la derecha) es lo ya servido: usa N como cantidad y pon "servido M" en nota. Importes sueltos tipo "14€" van en nota. "A / B" en una línea (ej. "1 sweetness 60 / mandala 60") es UNA línea que vale con cualquiera: codigo = la primera, "alternativas" = [códigos de las otras]. La fecha (ej. "28/x") es la fecha del pedido/entrega; un número de 9 cifras es un teléfono.\n\n'+
   'GRADO O MEDIDA QUE FALTA: si el artículo exacto depende de un dato que no está (ej. clavel FANCY o SELECT, nardos grandes/medianos/pequeños/super, medida de una rosa), NO adivines: pon "codigo": null, "duda": "qué falta", y en "opciones" los códigos posibles, poniendo primero los que hay en stock. Si solo hay uno posible en stock, ponlo como codigo y menciónalo en duda.\n'+
   'Si una variedad no existe en el catálogo, codigo null y explica en duda.\n\n'+
-  reglasPrompt()+
-  'STOCK DISPONIBLE AHORA (codigo:cantidad): '+st+'\n\n'+
   'CATÁLOGO AMBARX (codigo|descripción):\n'+cat+'\n\n'+
   'CLIENTES AMBARX (codigo|nombre (denominación) · población):\n'+cli+'\n\n'+
   'CLIENTE: busca el cliente por nombre/denominación/población. Si no está claro o no aparece, "cliente":{"codigo":null,"nombre":"<lo escrito>","candidatos":["cod1","cod2"]}.\n\n'+
   'Responde SOLO con este JSON, sin texto adicional:\n'+
   '{"cliente":{"codigo":"123 o null","nombre":"...","candidatos":[]},"fecha":"YYYY-MM-DD o vacío","telefono":"o vacío","nota":"comentario general o vacío","lineas":[{"texto":"lo que pone en la nota","codigo":"4 o null","cantidad":2,"alternativas":[],"opciones":["584","246"],"duda":"o vacío","nota":"o vacío"}]}';
 }
-function interpretar(){
+// Parte variable (reglas y stock): cambia a menudo, va fuera de la caché
+function promptVariable(){
+  var st = codigosConStock().filter(function(c){return fisico(c)>0;}).map(function(c){ return c+':'+fisico(c); }).join(', ') || '(vacío)';
+  return reglasPrompt()+'STOCK DISPONIBLE AHORA (codigo:cantidad): '+st;
+}
+function promptSistema(){ return promptFijo()+'\n\n'+promptVariable(); }
+function costeUSD(modelo, u){
+  var p=PRECIOS[modelo]||PRECIOS[MODELO]; u=u||{};
+  return ((u.input_tokens||0)*p[0]+(u.output_tokens||0)*p[1]+(u.cache_read_input_tokens||0)*p[2]+(u.cache_creation_input_tokens||0)*p[3])/1e6;
+}
+function apuntarGasto(modelo, usd){
+  var mes=fechaISO().slice(0,7);
+  refConfig.child('gastoIA/'+mes).transaction ? refConfig.child('gastoIA/'+mes).transaction(function(g){ g=g||{llamadas:0,usd:0}; g.llamadas++; g.usd=Math.round((g.usd+usd)*10000)/10000; return g; })
+    : refConfig.child('gastoIA/'+mes).once('value').then(function(s){ var g=s.val()||{llamadas:0,usd:0}; g.llamadas++; g.usd=Math.round((g.usd+usd)*10000)/10000; return refConfig.child('gastoIA/'+mes).set(g); });
+}
+function interpretar(preciso){
+  var modelo = preciso ? MODELO : MODELO_RAPIDO;
   var texto=document.getElementById('inTexto').value.trim();
   if(!_fotos.length && !texto){ toast('Elige fotos o pantallazos, pega el texto o díctalo'); return; }
   var key=leerApiKey();
@@ -881,17 +903,27 @@ function interpretar(){
   var ctl=new AbortController(); var tm=setTimeout(function(){ctl.abort();},90000);
   fetch('https://api.anthropic.com/v1/messages',{method:'POST', signal:ctl.signal,
     headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:MODELO, max_tokens:3000, system:promptSistema(), messages:[{role:'user',content:contenido}]})
+    body:JSON.stringify({model:modelo, max_tokens:3000,
+      system:[{type:'text', text:promptFijo(), cache_control:{type:'ephemeral'}}, {type:'text', text:promptVariable()}],
+      messages:[{role:'user',content:contenido}]})
   }).then(function(r){ if(!r.ok) return r.json().then(function(e){ throw new Error((e.error&&e.error.message)||('Error '+r.status)); }); return r.json(); })
   .then(function(data){
+    var usd=costeUSD(modelo, data.usage); try{ apuntarGasto(modelo, usd); }catch(e){ console.warn('gasto', e); }
+    _ultimaLectura={modelo:modelo, usd:usd, preciso:!!preciso};
     var txt=(data.content||[]).filter(function(x){return x.type==='text';}).map(function(x){return x.text;}).join('\n');
     var j=JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}')+1));
     abrirRevision(j, texto);
-  }).catch(function(e){ toast('⚠ '+(e.name==='AbortError'?'Sin respuesta, reintenta':e.message)); console.error(e); })
+  }).catch(function(e){
+    // Si el modelo rápido no está disponible en la cuenta, se repite con el preciso
+    if(!preciso && /model/i.test(String(e.message||''))){ setTimeout(function(){ interpretar(true); }, 50); return; }
+    toast('⚠ '+(e.name==='AbortError'?'Sin respuesta, reintenta':e.message)); console.error(e); })
   .finally(function(){ clearTimeout(tm); b.disabled=false; document.getElementById('cargando').classList.remove('activo'); });
 }
 
+function releerPreciso(){ volverPaso1(); interpretar(true); }
+
 /* ══ REVISIÓN ══ */
+var _ultimaLectura = null;
 var _rev = null; // {id?, cliente, lineas:[{texto,codigo,cantidad,opciones,duda,nota,pedir}], ...}
 function abrirRevision(j, textoOriginal){
   var cli = j.cliente||{};
@@ -909,6 +941,9 @@ function abrirRevision(j, textoOriginal){
     })
   };
   _rev.ia = { cliente:codCli, nombreEscrito:String(cli.nombre||'').trim() };
+  var lr=document.getElementById('lecturaRev'), L=_ultimaLectura; _ultimaLectura=null;
+  lr.innerHTML = L ? 'Leído con el modelo '+(L.preciso?'preciso':'rápido')+' · unos '+(L.usd*100).toFixed(1).replace('.',',')+' céntimos.'+
+    (L.preciso?'':' <a href="#" onclick="releerPreciso();return false;">¿Está mal? Volver a leer con más precisión</a>') : '';
   pintarRevision();
 }
 function editarPedido(id){
@@ -1528,6 +1563,8 @@ function guardarPrecios(){
 }
 function pintarAjustes(){
   var fi=document.getElementById('ajFirma'); if(document.activeElement!==fi) fi.value=firma();
+  var G=(_config&&_config.gastoIA)||{}, meses=Object.keys(G).sort().reverse().slice(0,3);
+  document.getElementById('ajGasto').innerHTML = meses.length ? meses.map(function(m){ return '<div>'+m+': <b>'+(G[m].usd||0).toFixed(2).replace('.',',')+' $</b> en '+G[m].llamadas+' lecturas (unos '+((G[m].usd||0)/(G[m].llamadas||1)*100).toFixed(1).replace('.',',')+' céntimos de media)</div>'; }).join('') : 'Todavía no hay lecturas apuntadas.';
   var rs=reglas();
   document.getElementById('ajReglas').innerHTML = rs.length ? rs.map(function(x,i){
     return '<div class="lin"><div class="lin-a">'+esc(x.texto)+'</div><button class="ico" style="width:34px;height:34px;font-size:15px;color:var(--rojo);" onclick="borrarRegla('+i+')" aria-label="Borrar regla">✕</button></div>';
