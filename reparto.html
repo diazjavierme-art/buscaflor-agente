@@ -127,7 +127,7 @@ var REP_DEF = {
 };
 
 // ---------- estado ----------
-var S = { fecha: hoyISO(), docs: {}, ent: {}, asig: {}, orden: {}, leido: '', pet: null, rep: {}, yo: null, miCom: null, vista: 'lista', filtroCom: null };
+var S = { dirs: {}, fecha: hoyISO(), docs: {}, ent: {}, asig: {}, orden: {}, leido: '', pet: null, rep: {}, yo: null, miCom: null, vista: 'lista', filtroCom: null };
 var refs = [];
 
 var DOM_REP='@reparto.rosasdebuscaflor.com';
@@ -145,6 +145,15 @@ function moverDia(n){ var d=new Date(S.fecha+'T12:00:00'); d.setDate(d.getDate()
 
 function reps(){ var r={}; Object.keys(REP_DEF).forEach(function(k){ r[k]=Object.assign({},REP_DEF[k]); }); Object.keys(S.rep||{}).forEach(function(k){ r[k]=Object.assign(r[k]||{}, S.rep[k]); }); return r; }
 function nombreRep(c){ var r=reps()[c]; return r ? r.nombre : ('Comercial ' + c); }
+// Dirección de entrega: primero el listado de reparto (configPedidos/direccionesReparto), si no la fiscal de AmbarX
+function entrega(d){
+  var c=String(d.cliCod||''), nom=String(d.cliente||'').toUpperCase(), hit=null;
+  Object.keys(S.dirs||{}).forEach(function(k){ var x=S.dirs[k]; if(hit||!x) return;
+    if(c && (x.codigos||[]).map(String).indexOf(c)>=0) hit=x;
+    else if((x.alias||[]).some(function(a){ return a && nom.indexOf(String(a).toUpperCase())>=0; })) hit=x; });
+  if(hit) return { direccion: hit.direccion||'', poblacion: hit.poblacion||'', tel: hit.tel || d.tel || '', nombre: hit.nombre||'', reparto: true };
+  return { direccion: d.direccion||'', poblacion: (d.poblacion||'').split(',')[0], tel: d.tel||'', nombre:'', reparto: false };
+}
 function comDe(d){ return S.asig[d.k] != null ? String(S.asig[d.k]) : String(d.comercial||''); }
 function esOficina(){ return S.miCom == null && !S.bloqueado; }
 
@@ -158,7 +167,7 @@ function ordenar(arr, com){
   return arr.sort(function(a,b){
     var ea=!!S.ent[a.k], eb=!!S.ent[b.k]; if(ea!==eb) return ea?1:-1;
     var ia=o.indexOf(a.k), ib=o.indexOf(b.k); if(ia<0) ia=999; if(ib<0) ib=999; if(ia!==ib) return ia-ib;
-    var pa=(a.poblacion||'')+(a.direccion||''), pb=(b.poblacion||'')+(b.direccion||''); return pa.localeCompare(pb) || (a.cliente||'').localeCompare(b.cliente||'');
+    var ea2=entrega(a), eb2=entrega(b), pa=(ea2.poblacion||'')+(ea2.direccion||''), pb=(eb2.poblacion||'')+(eb2.direccion||''); return pa.localeCompare(pb) || (a.cliente||'').localeCompare(b.cliente||'');
   });
 }
 
@@ -194,9 +203,10 @@ function totalesDe(docs){
 function tarjeta(d){
   var e=S.ent[d.k];
   var cls='card'+(e?(e.estado==='incidencia'?' inc':' hecha'):'');
-  var dir=[d.direccion, (d.poblacion||'').split(',')[0]].filter(Boolean).join(' · ');
-  var q=encodeURIComponent([d.direccion,d.poblacion].filter(Boolean).join(', '));
-  var tel=(d.tel||'').split(' ')[0];
+  var en=entrega(d);
+  var dir=[en.nombre, en.direccion, en.poblacion].filter(Boolean).join(' · ');
+  var q=encodeURIComponent([en.direccion,en.poblacion].filter(Boolean).join(', '));
+  var tel=(String(en.tel||'').replace(/\s/g,'').match(/(?:\+34)?[6789]\d{8}/)||[''])[0];
   var estado = !e ? '' : e.estado==='incidencia' ? '<span class="tag mal">No entregado · '+esc(e.motivo||'')+'</span>'
     : '<span class="tag ok">Entregado '+esc((e.hora||'').slice(11,16))+'</span><span class="tag">'+esc(textoCobro(e.cobro))+'</span>'+estadoAmbarx(e);
   return '<div class="'+cls+'"><div class="top" onclick="abrir(\''+d.k+'\')"><div><div class="cli">'+esc(d.cliente)+'</div>'+
@@ -273,7 +283,7 @@ function tablaLineas(d){
 function abrir(k){
   var d=S.docs[k]; if(!d) return; var e=S.ent[k];
   var h='<h3>'+esc(d.cliente)+'</h3><div class="nota">'+(d.tipo==='factura'?'Factura ':'Albarán ')+esc(d.num)+' · '+esc(nombreRep(comDe(d)))+'</div>'+
-    '<div class="nota">'+esc([d.direccion,d.poblacion].filter(Boolean).join(' · '))+(d.otraDireccion?' <b style="color:var(--rojo)">(en AmbarX tiene otra dirección de entrega)</b>':'')+(d.tel?' · 📞 '+esc(d.tel):'')+'</div>'+
+    (function(){ var en=entrega(d); return '<div class="nota"><b>Entrega:</b> '+esc([en.nombre,en.direccion,en.poblacion].filter(Boolean).join(' · ')||'sin dirección')+(en.tel?' · 📞 '+esc(en.tel):'')+(en.reparto?'':' <i>(dirección fiscal de AmbarX)</i>')+(d.otraDireccion?' <b style="color:var(--rojo)">(en AmbarX tiene otra dirección de entrega)</b>':'')+'</div>'; })()+
     tablaLineas(d);
   if (e) {
     h+='<label>Entrega</label><div class="nota">'+(e.estado==='incidencia'?'<b style="color:var(--rojo)">No entregado</b> · '+esc(e.motivo||''):'Entregado a las '+esc((e.hora||'').slice(11,16))+(e.recibe?' · recibe '+esc(e.recibe):'')+' · '+esc(textoCobro(e.cobro)))+(e.nota?'<br>Nota: '+esc(e.nota):'')+'<br>Por '+esc(e.por||'')+'</div>'+
@@ -284,7 +294,7 @@ function abrir(k){
   h+='<div class="fila-btn">'+(!e && !esOficina()?'<button class="btn primario" onclick="entregar(\''+k+'\')">✍️ Entregar y firmar</button>':'')+
     (e && e.estado!=='incidencia'?'<button class="btn" onclick="pdfEntrega(\''+k+'\')">PDF firmado</button>':'')+
     (e?'<button class="btn peligro" onclick="deshacer(\''+k+'\')">Deshacer entrega</button>':'')+
-    (esOficina()?'<button class="btn" onclick="reasignar(\''+k+'\')">Cambiar repartidor</button>':'')+
+    (esOficina()?'<button class="btn" onclick="reasignar(\''+k+'\')">Cambiar repartidor</button><button class="btn" onclick="editarDir(\''+k+'\')">Dirección de entrega</button>':'')+
     '<button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
   velo(h);
 }
@@ -292,6 +302,23 @@ function abrir(k){
 function reintentarAmbarx(k){
   var a=Object.assign({}, (S.ent[k]||{}).ambarx||{}); if(a.firma==='error') delete a.firma; if(a.email==='error') delete a.email; a.intentos=0; a.error=null;
   db.ref('buscaflor/reparto/'+S.fecha+'/entregas/'+k+'/ambarx').set(a).then(function(){ cerrarVelo(); toast('Se volverá a intentar en menos de un minuto'); });
+}
+function editarDir(k){
+  var d=S.docs[k], en=entrega(d);
+  velo('<h3>Dirección de entrega</h3><div class="nota">'+esc(d.cliente)+(d.cliCod?' · cliente '+esc(d.cliCod):'')+'. Se usará siempre para este cliente.</div>'+
+    '<label>Nombre de la tienda (opcional)</label><input id="dNom" value="'+esc(en.nombre)+'">'+
+    '<label>Dirección</label><input id="dDir" value="'+esc(en.direccion)+'">'+
+    '<label>Código postal y pueblo</label><input id="dPob" value="'+esc(en.poblacion)+'" placeholder="41011 Sevilla">'+
+    '<label>Teléfono</label><input id="dTel" type="tel" value="'+esc(en.tel)+'">'+
+    '<div class="fila-btn"><button class="btn primario" onclick="guardarDir(\''+k+'\')">Guardar</button><button class="btn" onclick="abrir(\''+k+'\')">Volver</button></div>');
+}
+function guardarDir(k){
+  var d=S.docs[k], c=String(d.cliCod||'');
+  var id=null; Object.keys(S.dirs||{}).forEach(function(x){ if(!id && c && (S.dirs[x].codigos||[]).map(String).indexOf(c)>=0) id=x; });
+  if(!id) id = c ? 'c'+c : 'n'+String(d.cliente||'').toUpperCase().replace(/[^A-Z0-9]+/g,'-').slice(0,40);
+  var v={ nombre:document.getElementById('dNom').value.trim(), direccion:document.getElementById('dDir').value.trim(), poblacion:document.getElementById('dPob').value.trim(), tel:document.getElementById('dTel').value.trim() };
+  if(!S.dirs[id]) { if(c) v.codigos=[c]; else v.alias=[String(d.cliente||'').trim()]; }
+  db.ref('buscaflor/configPedidos/direccionesReparto/'+id).update(v).then(function(){ toast('Dirección guardada'); abrir(k); }, function(e){ toast('Error: '+e.message); });
 }
 function deshacer(k){
   if(!confirm('¿Quitar la entrega (firma y cobro) de este documento?')) return;
@@ -430,7 +457,7 @@ function hojaRuta(c){
   doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('Hoja de ruta · '+nombreRep(c),14,15);
   doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.text(fechaLarga(S.fecha)+' · '+docs.length+' entregas · Rosas de Buscaflor',14,20);
   doc.autoTable({ startY:25, head:[['#','Cliente','Dirección','Teléfono','Documento','Total','Firma / cobro']],
-    body:docs.map(function(d,i){ return [i+1, d.cliente, [d.direccion,(d.poblacion||'').split(',')[0]].filter(Boolean).join(', '), d.tel||'', d.num, eur(d.total), '']; }),
+    body:docs.map(function(d,i){ var en=entrega(d); return [i+1, d.cliente+(en.nombre?'\n'+en.nombre:''), [en.direccion,en.poblacion].filter(Boolean).join(', '), en.tel||'', d.num, eur(d.total), '']; }),
     theme:'grid', styles:{fontSize:8.5,textColor:0,lineColor:120,lineWidth:0.1,minCellHeight:12,valign:'middle'}, headStyles:{fillColor:false,fontStyle:'bold'},
     columnStyles:{0:{cellWidth:7},5:{halign:'right'},6:{cellWidth:32}} });
   var y=doc.lastAutoTable.finalY+6; doc.setFont('helvetica','bold'); doc.text('Total: '+eur(docs.reduce(function(s,d){return s+(+d.total||0);},0)),196,y,{align:'right'});
@@ -500,6 +527,7 @@ firebase.auth().onAuthStateChanged(function(u){
   var caja=document.getElementById('bfLogin');
   if(!u){ if(arrancado) return location.reload(); caja.style.display='flex'; return; }
   caja.style.display='none'; arrancado=true;
+  db.ref('buscaflor/configPedidos/direccionesReparto').on('value', function(s){ S.dirs=s.val()||{}; pintar(); });
   db.ref('buscaflor/configPedidos/repartidores').on('value', function(s){
     S.rep=s.val()||{}; var em=(u.email||'').toLowerCase(), r=reps(); S.miCom=null;
     Object.keys(r).forEach(function(c){ if(r[c].email && r[c].email.toLowerCase()===em) S.miCom=c; });
