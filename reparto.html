@@ -150,7 +150,7 @@ function esOficina(){ return S.miCom == null && !S.bloqueado; }
 
 // Documentos que cuentan para el reparto: albaranes y facturas directas (las facturas de albaranes no se entregan)
 function lista(){
-  return Object.keys(S.docs).map(function(k){ var d=S.docs[k]; d.k=k; return d; })
+  return Object.keys(S.docs).map(function(k){ var d=S.docs[k]; d.k=k; d.cliente=String(d.cliente||'').trim(); return d; })
     .filter(function(d){ return !(d.tipo==='factura' && d.origen && !/directa/i.test(d.origen)); });
 }
 function ordenar(arr, com){
