@@ -650,6 +650,7 @@ function menuStock(){
 function menuMas(){
   var nAb=listaVuelos().filter(vueloAbierto).length;
   abrirMenu('Más', [
+    {i:'🚚', t:'Reparto', d:'Entregas, firmas y cobros de los repartidores', fn:function(){ location.href='reparto.html'; }},
     {i:'✈', t:'Vuelos', d:nAb?nAb+' con algo pendiente':'Facturas y estado en AmbarX', fn:function(){ verTab('vuelos'); }},
     {i:'✔', t:'Pedidos cerrados', fn:function(){ verTab('cerrados'); }},
     {i:'♥', t:'San Valentín 2027', d:'Previsión y flor asegurada', fn:function(){ verTab('sv'); }},

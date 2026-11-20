@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#1F344C">
+<title>Buscaflor · Reparto</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{--navy:#1F344C;--navy-suave:#EEF1F4;--papel:#fff;--fondo:#F7F8F9;--tinta:#1B2229;--gris:#6E7680;--filo:#E3E6E9;--verde:#2F7D5C;--rojo:#C0463A;--oro:#C79A3E;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--fondo);color:var(--tinta);min-height:100vh;max-width:620px;margin:0 auto;font-size:14px;padding-bottom:70px;}
+header{background:var(--papel);padding:12px 14px;border-bottom:3px solid var(--navy);position:sticky;top:0;z-index:5;}
+header .fila{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+header h1{font-size:16px;color:var(--navy);font-weight:600;}
+.fecha{display:flex;align-items:center;gap:6px;margin-top:8px;}
+.fecha button{border:1px solid var(--filo);background:var(--papel);border-radius:6px;width:36px;height:34px;font-size:16px;color:var(--navy);}
+.fecha .dia{flex:1;text-align:center;font-weight:600;color:var(--navy);}
+main{padding:12px;}
+.btn{padding:11px 12px;font-family:inherit;font-size:14px;font-weight:600;border:1px solid var(--navy);border-radius:8px;cursor:pointer;background:var(--papel);color:var(--navy);}
+.btn.primario{background:var(--navy);color:#fff;}
+.btn.verde{background:var(--verde);border-color:var(--verde);color:#fff;}
+.btn.peligro{border-color:var(--rojo);color:var(--rojo);}
+.btn.peq{padding:6px 10px;font-size:12px;border-radius:6px;}
+.btn:disabled{opacity:.5;}
+.fila-btn{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;}
+.fila-btn .btn{flex:1 1 auto;}
+input,select,textarea{font-family:inherit;font-size:15px;border:1px solid var(--filo);border-radius:8px;padding:10px;background:var(--papel);color:var(--tinta);width:100%;}
+label{font-size:11.5px;font-weight:600;color:var(--gris);display:block;margin:12px 0 5px;text-transform:uppercase;letter-spacing:.03em;}
+.nota{font-size:12px;color:var(--gris);margin:6px 0;}
+.alerta{border:1px solid var(--oro);background:rgba(199,154,62,.08);border-radius:8px;padding:9px 11px;font-size:13px;margin:8px 0;}
+.alerta.ok{border-color:var(--verde);background:rgba(47,125,92,.07);}
+.alerta.mal{border-color:var(--rojo);background:rgba(192,70,58,.06);}
+.resumen{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+.resumen div{background:var(--papel);border:1px solid var(--filo);border-radius:8px;padding:8px;text-align:center;}
+.resumen b{display:block;font-size:17px;color:var(--navy);font-family:'IBM Plex Mono',monospace;}
+.resumen span{font-size:11px;color:var(--gris);}
+.card{background:var(--papel);border:1px solid var(--filo);border-left:4px solid var(--oro);border-radius:8px;padding:11px 12px;margin-bottom:10px;}
+.card.hecha{border-left-color:var(--verde);opacity:.8;}
+.card.inc{border-left-color:var(--rojo);}
+.card .top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;}
+.card .cli{font-weight:600;font-size:15px;color:var(--navy);}
+.card .dir{font-size:12.5px;color:var(--gris);margin-top:2px;}
+.card .imp{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:15px;white-space:nowrap;}
+.card .acc{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap;}
+.card .acc a,.card .acc button{flex:1 1 auto;text-align:center;text-decoration:none;}
+.tag{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:10px;background:var(--navy-suave);color:var(--navy);margin-right:4px;}
+.tag.fac{background:#F3EAD6;color:#7A5A16;}
+.tag.ok{background:rgba(47,125,92,.12);color:var(--verde);}
+.tag.mal{background:rgba(192,70,58,.1);color:var(--rojo);}
+h2{font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 8px;display:flex;justify-content:space-between;align-items:center;}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}
+th{text-align:right;font-size:10.5px;color:var(--gris);font-weight:600;padding:4px;text-transform:uppercase;}
+td{padding:6px 4px;border-top:1px solid var(--filo);text-align:right;font-family:'IBM Plex Mono',monospace;}
+th:first-child,td:first-child{text-align:left;} td.txt{font-family:'IBM Plex Sans',sans-serif;text-align:left;}
+.velo{position:fixed;inset:0;background:rgba(20,30,40,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center;}
+.hoja{background:var(--papel);width:100%;max-width:620px;max-height:94vh;overflow:auto;border-radius:14px 14px 0 0;padding:16px 14px 24px;}
+.hoja h3{font-size:16px;color:var(--navy);margin-bottom:2px;}
+.chips{display:flex;gap:6px;flex-wrap:wrap;}
+.chips button{flex:1 1 40%;padding:12px 8px;border:1px solid var(--filo);border-radius:8px;background:var(--papel);font-family:inherit;font-size:14px;font-weight:600;color:var(--tinta);}
+.chips button.sel{border-color:var(--navy);background:var(--navy);color:#fff;}
+#firma{width:100%;height:190px;border:1px dashed var(--gris);border-radius:8px;background:#fff;touch-action:none;display:block;}
+.firma-img{max-width:100%;max-height:120px;border:1px solid var(--filo);border-radius:6px;background:#fff;}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:50;max-width:90vw;}
+.vacio{text-align:center;color:var(--gris);padding:30px 10px;}
+.mono{font-family:'IBM Plex Mono',monospace;}
+</style>
+</head>
+<body>
+<header>
+  <div class="fila"><h1 id="titulo">Reparto</h1><button class="btn peq" id="bMenu">⋯</button></div>
+  <div class="fecha"><button id="fAnt">‹</button><div class="dia" id="fDia"></div><button id="fSig">›</button><button id="fHoy" style="width:auto;padding:0 10px;font-size:13px">Hoy</button></div>
+</header>
+<main id="app"><div class="vacio">Cargando…</div></main>
+
+<div id="bfLogin" style="display:none;position:fixed;inset:0;z-index:99999;background:#f4f4f4;align-items:center;justify-content:center;font-family:Arial,sans-serif">
+  <form id="bfLoginForm" style="background:#fff;border:1px solid #ccc;border-radius:8px;padding:24px;width:min(320px,90vw)">
+    <div style="font-size:18px;font-weight:bold;margin-bottom:4px">Buscaflor · Reparto</div>
+    <div style="color:#666;font-size:13px;margin-bottom:16px">Inicia sesión para entrar</div>
+    <input id="bfEmail" type="email" autocomplete="username" placeholder="email" required style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;font-size:15px">
+    <input id="bfPass" type="password" autocomplete="current-password" placeholder="contraseña" required style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;font-size:15px">
+    <div id="bfLoginMsg" style="color:#c0392b;font-size:13px;min-height:18px;margin-bottom:8px"></div>
+    <button type="submit" style="width:100%;padding:10px;font-size:15px;background:#222;color:#fff;border:0;border-radius:4px;cursor:pointer">Entrar</button>
+  </form>
+</div>
+
+<script>
+var CFG = {
+  apiKey: "AIzaSyD0UwaxdqoAgei-pqr1abceXVj5jTzYw2o",
+  authDomain: "stock-buscaflor.firebaseapp.com",
+  databaseURL: "https://stock-buscaflor-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "stock-buscaflor",
+  storageBucket: "stock-buscaflor.firebasestorage.app",
+  messagingSenderId: "724662381940",
+  appId: "1:724662381940:web:b72b12168bb6dada4f9021"
+};
+firebase.initializeApp(CFG);
+var db = firebase.database();
+
+// Repartidores por defecto (= «Comercial» de AmbarX). Se pueden cambiar en ⋯ › Repartidores.
+var REP_DEF = {
+  '0': { nombre: 'Recogen en la nave', nave: true },
+  '1': { nombre: 'Francisco José' },
+  '2': { nombre: 'Juan' },
+  '3': { nombre: 'Javier' },
+  '6': { nombre: 'Jorge' },
+  '7': { nombre: 'Javier Gómez' },
+  '8': { nombre: 'Ludiflora', externo: true },
+  '9': { nombre: 'Cecotrans', externo: true },
+  '13': { nombre: 'Cecotrans Sevilla', externo: true }
+};
+
+// ---------- estado ----------
+var S = { fecha: hoyISO(), docs: {}, ent: {}, asig: {}, orden: {}, leido: '', pet: null, rep: {}, yo: null, miCom: null, vista: 'lista', filtroCom: null };
+var refs = [];
+
+function hoyISO(d){ d = d || new Date(); return d.getFullYear() + '-' + p2(d.getMonth()+1) + '-' + p2(d.getDate()); }
+function p2(n){ return String(n).padStart(2,'0'); }
+function ahora(){ var d=new Date(); return hoyISO(d)+'T'+p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds()); }
+function eur(n){ return (Math.round((+n||0)*100)/100).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €'; }
+function num(n){ return (+n||0).toLocaleString('es-ES',{maximumFractionDigits:2}); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function toast(t){ var e=document.createElement('div'); e.className='toast'; e.textContent=t; document.body.appendChild(e); setTimeout(function(){e.remove();},2600); }
+function fechaLarga(f){ var d=new Date(f+'T12:00:00'); var s=d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}); return (f===hoyISO()?'Hoy · ':'')+s.charAt(0).toUpperCase()+s.slice(1); }
+function moverDia(n){ var d=new Date(S.fecha+'T12:00:00'); d.setDate(d.getDate()+n); S.fecha=hoyISO(d); escuchar(); }
+
+function reps(){ var r={}; Object.keys(REP_DEF).forEach(function(k){ r[k]=Object.assign({},REP_DEF[k]); }); Object.keys(S.rep||{}).forEach(function(k){ r[k]=Object.assign(r[k]||{}, S.rep[k]); }); return r; }
+function nombreRep(c){ var r=reps()[c]; return r ? r.nombre : ('Comercial ' + c); }
+function comDe(d){ return S.asig[d.k] != null ? String(S.asig[d.k]) : String(d.comercial||''); }
+function esOficina(){ return S.miCom == null; }
+
+// Documentos que cuentan para el reparto: albaranes y facturas directas (las facturas de albaranes no se entregan)
+function lista(){
+  return Object.keys(S.docs).map(function(k){ var d=S.docs[k]; d.k=k; return d; })
+    .filter(function(d){ return !(d.tipo==='factura' && d.origen && !/directa/i.test(d.origen)); });
+}
+function ordenar(arr, com){
+  var o = (S.orden && S.orden[com]) || [];
+  return arr.sort(function(a,b){
+    var ea=!!S.ent[a.k], eb=!!S.ent[b.k]; if(ea!==eb) return ea?1:-1;
+    var ia=o.indexOf(a.k), ib=o.indexOf(b.k); if(ia<0) ia=999; if(ib<0) ib=999; if(ia!==ib) return ia-ib;
+    var pa=(a.poblacion||'')+(a.direccion||''), pb=(b.poblacion||'')+(b.direccion||''); return pa.localeCompare(pb) || (a.cliente||'').localeCompare(b.cliente||'');
+  });
+}
+
+// ---------- datos ----------
+function escuchar(){
+  refs.forEach(function(r){ r.off(); }); refs=[];
+  document.getElementById('fDia').textContent = fechaLarga(S.fecha);
+  var base='buscaflor/reparto/'+S.fecha+'/';
+  [['docs','docs'],['entregas','ent'],['asignar','asig'],['orden','orden'],['leido','leido']].forEach(function(x){
+    var r=db.ref(base+x[0]); refs.push(r);
+    r.on('value',function(s){ S[x[1]] = s.val() || (x[1]==='leido'?'':{}); pintar(); }, function(e){ pintarError(e); });
+  });
+  var rp=db.ref('buscaflor/peticiones/reparto'); refs.push(rp); rp.on('value',function(s){ S.pet=s.val(); pintar(); });
+}
+function pintarError(e){ document.getElementById('app').innerHTML='<div class="alerta mal">No se pueden leer los datos: '+esc(e&&e.message||e)+'</div>'; }
+
+// ---------- pantalla ----------
+function pintar(){
+  if (S.vista !== 'lista') return;
+  var app=document.getElementById('app');
+  var docs=lista();
+  if (!esOficina()) return pintarRepartidor(app, docs);
+  pintarOficina(app, docs);
+}
+
+function totalesDe(docs){
+  var t={n:docs.length, hechas:0, efectivo:0, tarjeta:0, transferencia:0, pendiente:0, inc:0};
+  docs.forEach(function(d){ var e=S.ent[d.k]; if(!e) return; if(e.estado==='incidencia'){t.inc++;return;} t.hechas++; var c=e.cobro||{}; var f=c.forma||'pendiente'; if(f==='efectivo'||f==='tarjeta'||f==='transferencia') t[f]+= +c.importe||0; else t.pendiente += +d.total||0; });
+  return t;
+}
+
+function tarjeta(d){
+  var e=S.ent[d.k];
+  var cls='card'+(e?(e.estado==='incidencia'?' inc':' hecha'):'');
+  var dir=[d.direccion, (d.poblacion||'').split(',')[0]].filter(Boolean).join(' · ');
+  var q=encodeURIComponent([d.direccion,d.poblacion].filter(Boolean).join(', '));
+  var tel=(d.tel||'').split(' ')[0];
+  var estado = !e ? '' : e.estado==='incidencia' ? '<span class="tag mal">No entregado · '+esc(e.motivo||'')+'</span>'
+    : '<span class="tag ok">Entregado '+esc((e.hora||'').slice(11,16))+'</span><span class="tag">'+esc(textoCobro(e.cobro))+'</span>';
+  return '<div class="'+cls+'"><div class="top" onclick="abrir(\''+d.k+'\')"><div><div class="cli">'+esc(d.cliente)+'</div>'+
+    '<div class="dir">'+esc(dir||'(sin dirección en AmbarX)')+'</div>'+
+    '<div style="margin-top:5px"><span class="tag'+(d.tipo==='factura'?' fac':'')+'">'+(d.tipo==='factura'?'Factura ':'Albarán ')+esc(d.num)+'</span>'+estado+'</div></div>'+
+    '<div class="imp">'+eur(d.total)+'</div></div>'+
+    (!esOficina() && !e ? '<div class="acc">'+(q?'<a class="btn peq" href="https://www.google.com/maps/dir/?api=1&destination='+q+'" target="_blank">📍 Ir</a>':'')+
+      (tel?'<a class="btn peq" href="tel:'+esc(tel)+'">📞 Llamar</a>':'')+
+      '<button class="btn peq" onclick="mover(\''+d.k+'\',-1)">↑</button><button class="btn peq" onclick="mover(\''+d.k+'\',1)">↓</button>'+
+      '<button class="btn peq primario" onclick="entregar(\''+d.k+'\')">✍️ Entregar</button></div>' : '')+
+    '</div>';
+}
+function textoCobro(c){ c=c||{}; var f=c.forma||'pendiente'; return f==='efectivo'?'Efectivo '+eur(c.importe):f==='tarjeta'?'Tarjeta '+eur(c.importe):f==='transferencia'?'Transferencia '+eur(c.importe):'Sin cobrar'; }
+
+function pintarRepartidor(app, docs){
+  var mios=ordenar(docs.filter(function(d){ return comDe(d)===String(S.miCom); }), String(S.miCom));
+  var t=totalesDe(mios);
+  var h='<div class="resumen"><div><b>'+t.hechas+'/'+t.n+'</b><span>entregas</span></div><div><b>'+num(t.efectivo)+'</b><span>€ efectivo</span></div><div><b>'+num(t.tarjeta)+'</b><span>€ tarjeta</span></div></div>';
+  if (!mios.length) h+='<div class="vacio">No tienes entregas para este día.<br><br>'+(S.leido?'Última lectura de AmbarX: '+esc(S.leido.slice(11,16)):'Todavía no se han leído los albaranes de AmbarX.')+'</div>';
+  h+=mios.map(tarjeta).join('');
+  app.innerHTML=h;
+}
+
+function pintarOficina(app, docs){
+  var r=reps(), grupos={};
+  docs.forEach(function(d){ var c=comDe(d); (grupos[c]=grupos[c]||[]).push(d); });
+  var pet=S.pet||{};
+  var estadoPet = pet.estado==='pedido'&&pet.fecha===S.fecha ? 'Pedido a AmbarX, esperando al servidor…' : pet.estado==='enCurso' ? 'El servidor está leyendo AmbarX…' : pet.estado==='error' ? 'Error: '+esc(pet.error) : '';
+  var h='<div class="fila-btn"><button class="btn primario" onclick="pedirLectura()">↻ Leer albaranes y facturas de AmbarX</button></div>'+
+    '<div class="nota">'+(S.leido?'Leído de AmbarX a las '+esc(S.leido.slice(11,16)):'Sin leer todavía para este día')+(estadoPet?' · <b>'+estadoPet+'</b>':'')+'</div>';
+  var t=totalesDe(docs);
+  h+='<div class="resumen"><div><b>'+t.hechas+'/'+t.n+'</b><span>entregados</span></div><div><b>'+num(t.efectivo)+'</b><span>€ efectivo</span></div><div><b>'+num(t.tarjeta)+'</b><span>€ tarjeta</span></div></div>';
+  if (!docs.length) h+='<div class="vacio">No hay albaranes ni facturas para este día.</div>';
+  Object.keys(grupos).sort(function(a,b){ return (+a)-(+b); }).forEach(function(c){
+    var g=ordenar(grupos[c], c), tg=totalesDe(g), ab=S.filtroCom===c;
+    h+='<h2><span onclick="S.filtroCom=S.filtroCom===\''+c+'\'?null:\''+c+'\';pintar()">'+(ab?'▾ ':'▸ ')+esc(nombreRep(c))+' · '+tg.hechas+'/'+tg.n+'</span>'+
+      '<span><button class="btn peq" onclick="hojaRuta(\''+c+'\')">Hoja de ruta</button></span></h2>';
+    h+='<div class="nota">Total '+eur(g.reduce(function(s,d){return s+(+d.total||0);},0))+' · efectivo '+eur(tg.efectivo)+' · tarjeta '+eur(tg.tarjeta)+(tg.transferencia?' · transf. '+eur(tg.transferencia):'')+(tg.inc?' · <b style="color:var(--rojo)">'+tg.inc+' sin entregar</b>':'')+'</div>';
+    if (ab) h+=g.map(tarjeta).join('');
+  });
+  app.innerHTML=h;
+}
+
+// ---------- acciones ----------
+function pedirLectura(){
+  db.ref('buscaflor/peticiones/reparto').set({ pedido: ahora(), fecha: S.fecha, por: (firebase.auth().currentUser||{}).email||'', estado: 'pedido' })
+    .then(function(){ toast('Pedido. El servidor lo lee en menos de un minuto.'); }, function(e){ toast('Error: '+e.message); });
+}
+function mover(k, dir){
+  var com=String(S.miCom), mios=ordenar(lista().filter(function(d){ return comDe(d)===com && !S.ent[d.k]; }), com).map(function(d){return d.k;});
+  var i=mios.indexOf(k), j=i+dir; if(i<0||j<0||j>=mios.length) return;
+  mios[i]=mios[j]; mios[j]=k;
+  db.ref('buscaflor/reparto/'+S.fecha+'/orden/'+com).set(mios);
+}
+
+function velo(html){ cerrarVelo(); var v=document.createElement('div'); v.className='velo'; v.id='velo'; v.innerHTML='<div class="hoja">'+html+'</div>'; v.onclick=function(e){ if(e.target===v) cerrarVelo(); }; document.body.appendChild(v); S.vista='hoja'; return v; }
+function cerrarVelo(){ var v=document.getElementById('velo'); if(v) v.remove(); S.vista='lista'; pintar(); }
+
+function tablaLineas(d){
+  var ls=d.lineas||[];
+  if (d.error) return '<div class="alerta mal">No se pudo leer el detalle en AmbarX: '+esc(d.error)+'</div>';
+  return '<table><tr><th>Artículo</th><th>Uds</th><th>Precio</th><th>Importe</th></tr>'+ls.map(function(l){
+    return '<tr><td class="txt">'+esc(l.d)+(l.dto?' <span class="nota">-'+num(l.dto)+'%</span>':'')+'</td><td>'+num(l.u)+'</td><td>'+num(l.p)+'</td><td>'+num(l.t)+'</td></tr>'; }).join('')+
+    '<tr><td class="txt"><b>Total con IVA</b></td><td></td><td></td><td><b>'+num(d.total)+'</b></td></tr></table>';
+}
+
+function abrir(k){
+  var d=S.docs[k]; if(!d) return; var e=S.ent[k];
+  var h='<h3>'+esc(d.cliente)+'</h3><div class="nota">'+(d.tipo==='factura'?'Factura ':'Albarán ')+esc(d.num)+' · '+esc(nombreRep(comDe(d)))+'</div>'+
+    '<div class="nota">'+esc([d.direccion,d.poblacion].filter(Boolean).join(' · '))+(d.otraDireccion?' <b style="color:var(--rojo)">(en AmbarX tiene otra dirección de entrega)</b>':'')+(d.tel?' · 📞 '+esc(d.tel):'')+'</div>'+
+    tablaLineas(d);
+  if (e) {
+    h+='<label>Entrega</label><div class="nota">'+(e.estado==='incidencia'?'<b style="color:var(--rojo)">No entregado</b> · '+esc(e.motivo||''):'Entregado a las '+esc((e.hora||'').slice(11,16))+(e.recibe?' · recibe '+esc(e.recibe):'')+' · '+esc(textoCobro(e.cobro)))+(e.nota?'<br>Nota: '+esc(e.nota):'')+'<br>Por '+esc(e.por||'')+'</div>'+
+      (e.firma?'<img class="firma-img" src="'+e.firma+'">':'');
+  }
+  h+='<div class="fila-btn">'+(!e && !esOficina()?'<button class="btn primario" onclick="entregar(\''+k+'\')">✍️ Entregar y firmar</button>':'')+
+    (e && e.estado!=='incidencia'?'<button class="btn" onclick="pdfEntrega(\''+k+'\')">PDF firmado</button>':'')+
+    (e?'<button class="btn peligro" onclick="deshacer(\''+k+'\')">Deshacer entrega</button>':'')+
+    (esOficina()?'<button class="btn" onclick="reasignar(\''+k+'\')">Cambiar repartidor</button>':'')+
+    '<button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
+  velo(h);
+}
+
+function deshacer(k){
+  if(!confirm('¿Quitar la entrega (firma y cobro) de este documento?')) return;
+  db.ref('buscaflor/reparto/'+S.fecha+'/entregas/'+k).remove().then(function(){ cerrarVelo(); toast('Entrega quitada'); });
+}
+function reasignar(k){
+  var r=reps(), d=S.docs[k];
+  var h='<h3>Cambiar repartidor</h3><div class="nota">'+esc(d.cliente)+' · '+esc(d.num)+'</div><div class="chips" style="margin-top:10px">'+
+    Object.keys(r).map(function(c){ return '<button class="'+(comDe(d)===c?'sel':'')+'" onclick="hacerReasignar(\''+k+'\',\''+c+'\')">'+esc(r[c].nombre)+'</button>'; }).join('')+'</div>'+
+    '<div class="fila-btn"><button class="btn" onclick="cerrarVelo()">Cancelar</button></div>';
+  velo(h);
+}
+function hacerReasignar(k,c){
+  var d=S.docs[k]; var ref=db.ref('buscaflor/reparto/'+S.fecha+'/asignar/'+k);
+  (String(d.comercial)===c ? ref.remove() : ref.set(c)).then(function(){ cerrarVelo(); toast('Asignado a '+nombreRep(c)); });
+}
+
+// ---------- entregar: firma + cobro ----------
+var F = null;
+function entregar(k){
+  var d=S.docs[k];
+  F={ k:k, forma:null, trazos:0 };
+  var h='<h3>'+esc(d.cliente)+'</h3><div class="nota">'+(d.tipo==='factura'?'Factura ':'Albarán ')+esc(d.num)+' · <b>'+eur(d.total)+'</b></div>'+
+    '<details style="margin:6px 0"><summary class="nota">Ver lo que lleva ('+(d.lineas||[]).length+' líneas)</summary>'+tablaLineas(d)+'</details>'+
+    '<label>Cobro</label><div class="chips" id="chCobro">'+
+      [['efectivo','💶 Efectivo'],['tarjeta','💳 Tarjeta'],['transferencia','🏦 Transferencia'],['pendiente','No cobra']].map(function(x){ return '<button data-f="'+x[0]+'">'+x[1]+'</button>'; }).join('')+'</div>'+
+    '<div id="cajaImp" style="display:none"><label>Importe cobrado</label><input id="imp" type="number" inputmode="decimal" step="0.01" value="'+(+d.total||0).toFixed(2)+'"></div>'+
+    '<label>Firma del cliente</label><canvas id="firma"></canvas><div style="text-align:right"><button class="btn peq" onclick="borrarFirma()">Borrar firma</button></div>'+
+    '<label>Nombre de quien recibe (opcional)</label><input id="recibe" autocomplete="off">'+
+    '<label>Nota (opcional)</label><input id="notaE" autocomplete="off" placeholder="Ej.: dejado en la trastienda">'+
+    '<div class="fila-btn"><button class="btn verde" onclick="guardarEntrega()">✔ Guardar entrega</button></div>'+
+    '<div class="fila-btn"><button class="btn peligro" onclick="noEntregado()">No se ha podido entregar</button><button class="btn" onclick="cerrarVelo()">Cancelar</button></div>';
+  velo(h);
+  document.querySelectorAll('#chCobro button').forEach(function(b){ b.onclick=function(){
+    F.forma=b.dataset.f; document.querySelectorAll('#chCobro button').forEach(function(x){ x.classList.toggle('sel', x===b); });
+    document.getElementById('cajaImp').style.display = F.forma==='pendiente' ? 'none' : 'block';
+  }; });
+  prepararFirma();
+}
+function prepararFirma(){
+  var c=document.getElementById('firma'), r=c.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+  c.width=r.width*dpr; c.height=r.height*dpr; var x=c.getContext('2d'); x.scale(dpr,dpr); x.lineWidth=2.2; x.lineCap='round'; x.lineJoin='round'; x.strokeStyle='#111';
+  var dib=false, last=null;
+  function pt(e){ var b=c.getBoundingClientRect(); return {x:e.clientX-b.left, y:e.clientY-b.top}; }
+  c.onpointerdown=function(e){ dib=true; last=pt(e); c.setPointerCapture(e.pointerId); F.trazos++; x.beginPath(); x.arc(last.x,last.y,1,0,7); x.fill(); };
+  c.onpointermove=function(e){ if(!dib) return; var p=pt(e); x.beginPath(); x.moveTo(last.x,last.y); x.lineTo(p.x,p.y); x.stroke(); last=p; };
+  c.onpointerup=c.onpointercancel=function(){ dib=false; };
+}
+function borrarFirma(){ var c=document.getElementById('firma'); c.getContext('2d').clearRect(0,0,c.width,c.height); F.trazos=0; }
+function firmaPng(){
+  // Reduce la firma a 600 px de ancho como máximo para que ocupe poco
+  var c=document.getElementById('firma'), w=Math.min(600,c.width), h=Math.round(c.height*w/c.width);
+  var o=document.createElement('canvas'); o.width=w; o.height=h; var x=o.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,w,h); x.drawImage(c,0,0,w,h);
+  return o.toDataURL('image/jpeg',0.6);
+}
+function guardarEntrega(){
+  var d=S.docs[F.k];
+  if(!F.forma){ toast('Marca cómo cobra (o «No cobra»)'); return; }
+  if(!F.trazos){ if(!confirm('No hay firma. ¿Guardar la entrega sin firma?')) return; }
+  var imp = F.forma==='pendiente' ? 0 : +(document.getElementById('imp').value||0);
+  var e={ estado:'entregado', hora:ahora(), firma: F.trazos?firmaPng():null, recibe:document.getElementById('recibe').value.trim(), nota:document.getElementById('notaE').value.trim(),
+    cobro:{ forma:F.forma, importe:imp }, por:(firebase.auth().currentUser||{}).email||'', comercial:comDe(d), num:d.num, total:+d.total||0 };
+  db.ref('buscaflor/reparto/'+S.fecha+'/entregas/'+F.k).set(e).then(function(){
+    var k=F.k; cerrarVelo(); toast('Entrega guardada');
+    if (imp && Math.abs(imp-(+d.total||0))>0.01 && F.forma!=='pendiente') toast('Ojo: cobrado '+eur(imp)+' de '+eur(d.total));
+    ofrecerPdf(k);
+  }, function(err){ toast('No se ha guardado: '+err.message); });
+}
+function ofrecerPdf(k){
+  var d=S.docs[k];
+  velo('<h3>Entrega guardada ✔</h3><div class="nota">'+esc(d.cliente)+' · '+esc(d.num)+'</div><div class="fila-btn"><button class="btn primario" onclick="pdfEntrega(\''+k+'\')">Enviar el '+(d.tipo==='factura'?'documento':'albarán')+' firmado al cliente</button></div><div class="fila-btn"><button class="btn" onclick="cerrarVelo()">Seguir con el reparto</button></div>');
+}
+function noEntregado(){
+  var m=prompt('¿Por qué no se ha entregado? (cerrado, no está, rechaza…)'); if(m===null) return;
+  var d=S.docs[F.k];
+  db.ref('buscaflor/reparto/'+S.fecha+'/entregas/'+F.k).set({ estado:'incidencia', motivo:m||'sin motivo', hora:ahora(), por:(firebase.auth().currentUser||{}).email||'', comercial:comDe(d), num:d.num, total:+d.total||0 })
+    .then(function(){ cerrarVelo(); toast('Apuntado como no entregado'); });
+}
+
+// ---------- PDF (sin fondos, para no gastar tinta) ----------
+function nuevoPdf(){ if(!window.jspdf){ toast('No se ha cargado el generador de PDF'); return null; } return new window.jspdf.jsPDF({unit:'mm',format:'a4'}); }
+function compartirPdf(doc, nombre, titulo){
+  var blob=new Blob([doc.output('arraybuffer')],{type:'application/pdf'});
+  try{ var file=new File([blob],nombre,{type:'application/pdf'}); if(navigator.canShare&&navigator.canShare({files:[file]})) return navigator.share({files:[file],title:titulo}).catch(function(){}); }catch(e){}
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=nombre; document.body.appendChild(a); a.click(); setTimeout(function(){a.remove();},500);
+}
+function pdfEntrega(k){
+  var d=S.docs[k], e=S.ent[k]||{}, doc=nuevoPdf(); if(!doc) return;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.text('ROSAS DE BUSCAFLOR LAMEJOR, S.L.',14,16);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.text('CIF B91821579',14,21);
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.text((d.tipo==='factura'?'Factura ':'Albarán ')+d.num,196,16,{align:'right'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.text('Fecha: '+d.fecha.split('-').reverse().join('/'),196,21,{align:'right'});
+  doc.setFontSize(10); var y=32;
+  [d.nombreFiscal||d.cliente, d.nif, d.direccion, d.poblacion].filter(Boolean).forEach(function(t){ doc.text(String(t),14,y); y+=5; });
+  doc.autoTable({ startY:y+3, head:[['Artículo','Uds','Precio','%Dto','IVA %','Importe']],
+    body:(d.lineas||[]).map(function(l){ return [l.d, num(l.u), num(l.p), l.dto?num(l.dto):'', num(l.iva), num(l.t)]; }),
+    theme:'plain', styles:{fontSize:9,textColor:0,lineColor:150,lineWidth:0.1}, headStyles:{fontStyle:'bold',lineWidth:{bottom:0.3}},
+    columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'}} });
+  y=doc.lastAutoTable.finalY+7;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('Total (IVA incluido): '+eur(d.total),196,y,{align:'right'}); y+=10;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text('Entregado el '+(e.hora||'').slice(0,10).split('-').reverse().join('/')+' a las '+(e.hora||'').slice(11,16)+(e.recibe?' · Recibe: '+e.recibe:''),14,y); y+=5;
+  doc.text('Cobro: '+textoCobro(e.cobro),14,y); y+=4;
+  if (e.firma){ try{ doc.text('Firma del cliente:',14,y+4); doc.addImage(e.firma,'JPEG',14,y+6,70,22); }catch(err){} }
+  compartirPdf(doc, d.num+'_firmado.pdf', (d.tipo==='factura'?'Factura ':'Albarán ')+d.num);
+}
+function hojaRuta(c){
+  var docs=ordenar(lista().filter(function(d){ return comDe(d)===c; }), c), doc=nuevoPdf(); if(!doc) return;
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('Hoja de ruta · '+nombreRep(c),14,15);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.text(fechaLarga(S.fecha)+' · '+docs.length+' entregas · Rosas de Buscaflor',14,20);
+  doc.autoTable({ startY:25, head:[['#','Cliente','Dirección','Teléfono','Documento','Total','Firma / cobro']],
+    body:docs.map(function(d,i){ return [i+1, d.cliente, [d.direccion,(d.poblacion||'').split(',')[0]].filter(Boolean).join(', '), d.tel||'', d.num, eur(d.total), '']; }),
+    theme:'grid', styles:{fontSize:8.5,textColor:0,lineColor:120,lineWidth:0.1,minCellHeight:12,valign:'middle'}, headStyles:{fillColor:false,fontStyle:'bold'},
+    columnStyles:{0:{cellWidth:7},5:{halign:'right'},6:{cellWidth:32}} });
+  var y=doc.lastAutoTable.finalY+6; doc.setFont('helvetica','bold'); doc.text('Total: '+eur(docs.reduce(function(s,d){return s+(+d.total||0);},0)),196,y,{align:'right'});
+  compartirPdf(doc,'ruta_'+S.fecha+'_'+nombreRep(c).replace(/\s+/g,'-')+'.pdf','Hoja de ruta');
+}
+
+// ---------- menú ----------
+function menu(){
+  var u=firebase.auth().currentUser||{};
+  var h='<h3>'+esc(esOficina()?'Oficina':nombreRep(S.miCom))+'</h3><div class="nota">'+esc(u.email||'')+'</div><div class="fila-btn" style="flex-direction:column">'+
+    (esOficina()?'<button class="btn" onclick="caja()">Caja del día por repartidor</button><button class="btn" onclick="verRepartidores()">Repartidores y accesos</button><a class="btn" style="text-align:center;text-decoration:none" href="pedidos.html">Ir a la app de pedidos</a>':'<button class="btn" onclick="pedirLectura();cerrarVelo()">↻ Pedir lectura de AmbarX</button>')+
+    '<button class="btn peligro" onclick="firebase.auth().signOut()">Cerrar sesión</button><button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
+  velo(h);
+}
+function caja(){
+  var docs=lista(), grupos={}; docs.forEach(function(d){ var c=comDe(d); (grupos[c]=grupos[c]||[]).push(d); });
+  var filas=Object.keys(grupos).sort(function(a,b){return a-b;}).map(function(c){ var t=totalesDe(grupos[c]); return [nombreRep(c), t.hechas+'/'+t.n, t.efectivo, t.tarjeta, t.transferencia, t.pendiente]; });
+  var tot=filas.reduce(function(s,f){ return [s[0],s[1],s[2]+f[2],s[3]+f[3],s[4]+f[4],s[5]+f[5]]; },['Total','',0,0,0,0]);
+  var h='<h3>Caja · '+esc(fechaLarga(S.fecha))+'</h3><table><tr><th>Repartidor</th><th>Entr.</th><th>Efectivo</th><th>Tarjeta</th><th>Transf.</th><th>Sin cobrar</th></tr>'+
+    filas.concat([tot]).map(function(f,i){ var b=i===filas.length; return '<tr>'+'<td class="txt">'+(b?'<b>':'')+esc(f[0])+(b?'</b>':'')+'</td><td>'+f[1]+'</td><td>'+num(f[2])+'</td><td>'+num(f[3])+'</td><td>'+num(f[4])+'</td><td>'+num(f[5])+'</td></tr>'; }).join('')+'</table>'+
+    '<div class="nota">«Sin cobrar» suma lo entregado sin cobro. Lo no entregado no cuenta.</div><div class="fila-btn"><button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
+  velo(h);
+}
+function verRepartidores(){
+  var r=reps();
+  var h='<h3>Repartidores</h3><div class="nota">El número es el «Comercial» de AmbarX. Pon el email con el que entra cada repartidor: al entrar solo verá sus entregas. Los transportistas externos no necesitan acceso (usa la hoja de ruta).</div>'+
+    Object.keys(r).sort(function(a,b){return a-b;}).map(function(c){ var x=r[c]; return '<div class="card" style="border-left-color:var(--navy)"><b class="mono">'+esc(c)+'</b> · '+esc(x.nombre)+(x.externo?' <span class="tag">externo</span>':'')+(x.nave?' <span class="tag">nave</span>':'')+
+      '<div class="nota">'+(x.email?'Acceso: '+esc(x.email):'Sin acceso')+'</div>'+(!x.externo&&!x.nave?'<button class="btn peq" onclick="editarRep(\''+c+'\')">'+(x.email?'Cambiar acceso':'Dar acceso')+'</button>':'')+'</div>'; }).join('')+
+    '<div class="fila-btn"><button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
+  velo(h);
+}
+function editarRep(c){
+  var x=reps()[c];
+  velo('<h3>Acceso de '+esc(x.nombre)+'</h3><label>Email</label><input id="rEm" type="email" value="'+esc(x.email||'')+'">'+
+    '<label>Contraseña nueva (solo si es una cuenta nueva)</label><input id="rPw" type="text" autocomplete="off" placeholder="mínimo 6 caracteres">'+
+    '<div class="nota">Si el email ya tiene cuenta, deja la contraseña vacía.</div>'+
+    '<div class="fila-btn"><button class="btn primario" onclick="guardarRep(\''+c+'\')">Guardar</button><button class="btn" onclick="verRepartidores()">Volver</button></div>');
+}
+function guardarRep(c){
+  var em=document.getElementById('rEm').value.trim().toLowerCase(), pw=document.getElementById('rPw').value;
+  var paso = Promise.resolve();
+  if (em && pw) {
+    // Crea la cuenta con una segunda conexión para no cerrar la sesión de la oficina
+    var app2 = firebase.apps.find(function(a){ return a.name==='alta'; }) || firebase.initializeApp(CFG,'alta');
+    paso = app2.auth().createUserWithEmailAndPassword(em, pw).then(function(){ return app2.auth().signOut(); })
+      .catch(function(e){ if(e.code==='auth/email-already-in-use') return; throw e; });
+  }
+  paso.then(function(){ return db.ref('buscaflor/configPedidos/repartidores/'+c).update({ email: em||null, nombre: reps()[c].nombre }); })
+    .then(function(){ toast('Guardado'); verRepartidores(); }, function(e){ toast('Error: '+(e.message||e)); });
+}
+
+// ---------- arranque ----------
+document.getElementById('fAnt').onclick=function(){ moverDia(-1); };
+document.getElementById('fSig').onclick=function(){ moverDia(1); };
+document.getElementById('fHoy').onclick=function(){ S.fecha=hoyISO(); escuchar(); };
+document.getElementById('bMenu').onclick=menu;
+
+var arrancado=false;
+firebase.auth().onAuthStateChanged(function(u){
+  var caja=document.getElementById('bfLogin');
+  if(!u){ if(arrancado) return location.reload(); caja.style.display='flex'; return; }
+  caja.style.display='none'; arrancado=true;
+  db.ref('buscaflor/configPedidos/repartidores').on('value', function(s){
+    S.rep=s.val()||{}; var em=(u.email||'').toLowerCase(), r=reps(); S.miCom=null;
+    Object.keys(r).forEach(function(c){ if(r[c].email && r[c].email.toLowerCase()===em) S.miCom=c; });
+    document.getElementById('titulo').textContent = esOficina() ? 'Reparto · Oficina' : 'Reparto · '+nombreRep(S.miCom);
+    pintar();
+  });
+  escuchar();
+});
+document.getElementById('bfLoginForm').onsubmit=function(e){
+  e.preventDefault(); var m=document.getElementById('bfLoginMsg'); m.textContent='Entrando…';
+  firebase.auth().signInWithEmailAndPassword(document.getElementById('bfEmail').value.trim(), document.getElementById('bfPass').value)
+    .then(function(){ m.textContent=''; }, function(err){ var c=err&&err.code||''; m.textContent=/invalid|wrong-password|user-not-found/.test(c)?'Email o contraseña incorrectos':c==='auth/too-many-requests'?'Demasiados intentos; espera un poco':'Error: '+(err.message||c); });
+};
+</script>
+</body>
+</html>

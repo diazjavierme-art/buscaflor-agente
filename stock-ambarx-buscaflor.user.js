@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Buscaflor - Stock de AmbarX a la app de pedidos
+// @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.1.0
-// @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). También se puede lanzar desde la propia página de AmbarX.
+// @version      0.2.0
+// @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto.
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
 // @grant        none
@@ -23,6 +23,9 @@
   const LS_AUTH = 'bf_stock_auth';                  // solo el token de refresco, nunca la contraseña
   const LS_LOCK = 'bf_stock_lock';                  // evita que dos pestañas de AmbarX lo hagan a la vez
   const CADA = 15000;                               // cada cuánto mira si hay peticiones
+  const RUTA_PET_REP = 'buscaflor/peticiones/reparto'; // {pedido, fecha, por, estado, hecho, docs, error}
+  const RUTA_REP = 'buscaflor/reparto';                // /<YYYY-MM-DD>/docs/<nº>
+  const REP_AUTO_MIN = 10;                             // de 6:30 a 15:00 refresca solo cada 10 min
 
   const pad = n => String(n).padStart(2, '0');
   const ahoraISO = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
@@ -113,23 +116,108 @@
   }
 
   // Abre el informe en un marco oculto (sin tocar la pantalla en la que se está trabajando)
-  async function conMarco(fn) {
+  async function conMarco(fn, ruta) {
     const base = location.pathname.split('/AmbarX/')[0] + '/AmbarX/';
     const fr = document.createElement('iframe');
     fr.style.cssText = 'position:fixed;left:-3000px;top:0;width:1400px;height:900px;opacity:0;pointer-events:none';
-    fr.src = base + 'almacen/informestock/stocks';
+    fr.src = base + (ruta || 'almacen/informestock/stocks');
     document.body.appendChild(fr);
     try {
-      await new Promise((ok, ko) => { fr.onload = ok; setTimeout(() => ko(new Error('AmbarX no ha abierto el informe')), 45000); });
+      await new Promise((ok, ko) => { fr.onload = ok; setTimeout(() => ko(new Error('AmbarX no ha abierto ' + (ruta || 'el informe'))), 45000); });
       await espera(2500);
       return await fn(fr.contentDocument);
     } finally { setTimeout(() => fr.remove(), 1500); }
   }
 
+  // ---------------- Leer albaranes y facturas de venta (para la app de reparto) ----------------
+  const hondo = (raiz, sel) => { const out = []; const w = n => { if (!n || !n.querySelectorAll) return; n.querySelectorAll(sel).forEach(e => out.push(e)); n.querySelectorAll('*').forEach(e => { if (e.shadowRoot) w(e.shadowRoot); }); }; w(raiz); return out; };
+  async function hastaQue(fn, ms, paso) { const t0 = Date.now(); while (Date.now() - t0 < ms) { let v = null; try { v = fn(); } catch (e) {} if (v) return v; await espera(paso || 500); } return null; }
+  const numEs = s => { const n = parseFloat(String(s || '').replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')); return isNaN(n) ? 0 : n; };
+  const itemsDe = g => ((g && g._dataProviderController && g._dataProviderController.rootCache && g._dataProviderController.rootCache.items) || []).filter(Boolean);
+
+  // Lista de albaranes o facturas: devuelve las cabeceras de la fecha dd/mm/aaaa
+  async function leerListado(doc, fechaES) {
+    const g = await hastaQue(() => { const x = hondo(doc, 'vaadin-grid')[0]; return x && x.size > 0 && itemsDe(x).length >= Math.min(x.size, 50) ? x : null; }, 40000);
+    if (!g) throw new Error('No se abre la lista de documentos de AmbarX');
+    const out = [];
+    for (const it of itemsDe(g)) {
+      const v = Object.entries(it);
+      const lab = re => { const e = v.find(([k, x]) => /_label$/.test(k) && re.test(String(x))); return e ? String(e[1]) : ''; };
+      const ref = re => { const e = v.find(([k, x]) => /_href$/.test(k) && re.test(String(x))); if (!e) return ''; const pre = e[0].replace(/_href$/, ''); return String(it[pre + '_representacion'] || ''); };
+      const num = lab(/^[A-Z]{1,3}-\d+$/), fecha = lab(/^\d{2}\/\d{2}\/\d{4}$/);
+      if (!num || fecha !== fechaES) continue;
+      const cli = ref(/\/clientes\/editar\//), com = ref(/\/personal\/editar\//);
+      const cob = v.find(([k, x]) => /_texto$/.test(k) && /cobrad/i.test(String(x)));
+      out.push({ num, comercial: (com.match(/^\d+/) || [''])[0], cliCod: (cli.match(/^\d+/) || [''])[0], cliente: cli.replace(/^\d+\s*\/\s*/, ''),
+        total: numEs(lab(/€/)), cobroAmbarx: cob ? String(cob[1]) : '' });
+    }
+    return out;
+  }
+
+  // Un documento abierto: líneas, datos del cliente y origen
+  async function leerDocumento(doc) {
+    const g = await hastaQue(() => { const x = hondo(doc, 'vaadin-grid')[0]; const t = doc.body && doc.body.innerText || ''; return x && /Datos fiscales/.test(t) && itemsDe(x).length >= (x.size || 0) ? x : null; }, 40000);
+    if (!g) throw new Error('No se abre el documento en AmbarX');
+    await espera(400);
+    const lineas = itemsDe(g).map(it => {
+      const l = Object.keys(it).filter(k => /_label$/.test(k)).map(k => String(it[k] || ''));
+      return { c: l[0] || '', d: l[1] || '', u: numEs(l[2]), p: numEs(l[3]), dto: numEs(l[l.length - 4]), iva: numEs(l[l.length - 2]), t: numEs(l[l.length - 1]) };
+    }).filter(x => x.d || x.c);
+    const t = doc.body.innerText;
+    const fis = ((t.split('Datos fiscales')[1] || '').split(/R[ée]g\. IVA|Recargo|Agencia transporte/)[0] || '').split('\n').map(x => x.trim()).filter(Boolean);
+    const contacto = fis.find(x => /@|\d{9}/.test(x) && !/^[A-Z]?\d{7,8}[A-Z]?$/.test(x)) || '';
+    const tel = (contacto.replace(/\s/g, '').match(/(?:\+34)?[6789]\d{8}/g) || []).join(' ');
+    const poblacion = fis.find(x => /,\s*\d{5}/.test(x)) || '';
+    const iPob = fis.indexOf(poblacion);
+    const origen = ((t.split(/\nOrigen\n/)[1] || '').split('\n')[0] || '').trim();
+    const otraDir = hondo(doc, 'vaadin-checkbox').some(cb => /direcci[oó]n diferente/i.test(cb.label || cb.textContent || '') && cb.checked);
+    return { lineas, nombreFiscal: fis[0] || '', nif: fis[1] || '', direccion: iPob > 1 ? fis.slice(2, iPob).join(', ') : '', poblacion, tel, origen, otraDireccion: otraDir };
+  }
+
+  async function subirReparto(fechaISO, pedidoISO, porPeticion) {
+    if (ocupado || !cogerCerrojo()) return;
+    ocupado = true; ultimoErr = ''; fase = 'Reparto: empezando…'; pintar();
+    const f = fechaISO || ahoraISO().slice(0, 10);
+    const fechaES = f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(0, 4);
+    try {
+      if (porPeticion) await fb('PATCH', RUTA_PET_REP, { estado: 'enCurso', empezado: ahoraISO() });
+      const previos = (await fb('GET', RUTA_REP + '/' + f + '/docs')) || {};
+      const docs = {};
+      for (const [tipo, ruta] of [['albaran', 'ventas/albaranes'], ['factura', 'ventas/facturas']]) {
+        fase = 'Reparto: lista de ' + (tipo === 'albaran' ? 'albaranes' : 'facturas') + '…'; pintar();
+        const lista = await conMarco(doc => leerListado(doc, fechaES), ruta);
+        let i = 0;
+        for (const h of lista) {
+          i++;
+          const k = h.num.replace(/[.#$\/\[\]]/g, '-');
+          const prev = previos[k];
+          let det = prev && prev.total === h.total && prev.lineas ? prev : null;
+          if (!det) {
+            fase = 'Reparto: ' + tipo + ' ' + h.num + ' (' + i + '/' + lista.length + ')'; pintar();
+            try { det = await conMarco(doc => leerDocumento(doc), ruta + '/editar/' + encodeURIComponent(h.num)); }
+            catch (e) { det = { error: String(e.message || e) }; }
+          }
+          docs[k] = Object.assign({}, det, h, { tipo, fecha: f, leido: (prev && det === prev && prev.leido) || ahoraISO() });
+        }
+      }
+      fase = 'Reparto: subiendo…'; pintar();
+      await fb('PUT', RUTA_REP + '/' + f + '/docs', docs);
+      await fb('PUT', RUTA_REP + '/' + f + '/leido', ahoraISO());
+      const n = Object.keys(docs).length;
+      if (porPeticion) await fb('PATCH', RUTA_PET_REP, { estado: 'hecho', hecho: ahoraISO(), atendido: pedidoISO, docs: n, error: null });
+      ultimo = { hora: ahoraISO(), n, que: 'docs de reparto' };
+    } catch (e) {
+      ultimoErr = 'Reparto: ' + String(e.message || e);
+      if (porPeticion) { try { await fb('PATCH', RUTA_PET_REP, { estado: 'error', error: ultimoErr, atendido: pedidoISO, hecho: ahoraISO() }); } catch (e2) {} }
+      console.error('[bf-reparto]', e);
+    } finally { ocupado = false; fase = ''; soltarCerrojo(); pintar(); }
+  }
+  let ultimoAutoRep = 0;
+
   // ---------------- Hacer la subida ----------------
   let ocupado = false, ultimo = null, ultimoErr = '', fase = '';
   function cogerCerrojo() {
-    try { const l = JSON.parse(localStorage.getItem(LS_LOCK) || 'null'); if (l && Date.now() - l.t < 180000) return false; localStorage.setItem(LS_LOCK, JSON.stringify({ t: Date.now() })); return true; } catch (e) { return true; }
+    try { const l = JSON.parse(localStorage.getItem(LS_LOCK) || 'null'); if (l && Date.now() - l.t < 900000) return false; localStorage.setItem(LS_LOCK, JSON.stringify({ t: Date.now() })); return true; } catch (e) { return true; }
   }
   function soltarCerrojo() { try { localStorage.removeItem(LS_LOCK); } catch (e) {} }
 
@@ -142,7 +230,7 @@
       fase = 'Subiendo a la app…'; pintar();
       await fb('PUT', RUTA_STOCK, s);
       await fb('PATCH', RUTA_PET, { estado: 'hecho', hecho: ahoraISO(), atendido: pedidoISO || ahoraISO(), leido: s.leido, registros: s.registros, total: s.total, error: null });
-      ultimo = { hora: ahoraISO(), n: s.registros, total: s.total };
+      ultimo = { hora: ahoraISO(), n: s.registros, total: s.total, que: 'art.' };
     } catch (e) {
       ultimoErr = String(e.message || e);
       try { await fb('PATCH', RUTA_PET, { estado: 'error', error: ultimoErr, atendido: pedidoISO || ahoraISO(), hecho: ahoraISO() }); } catch (e2) {}
@@ -156,7 +244,11 @@
     try {
       await fb('PUT', RUTA_AGENTE, { visto: ahoraISO(), equipo: location.host });
       const p = await fb('GET', RUTA_PET);
-      if (p && p.pedido && p.estado === 'pedido' && (!p.atendido || p.pedido > p.atendido)) await subirStock(p.pedido);
+      if (p && p.pedido && p.estado === 'pedido' && (!p.atendido || p.pedido > p.atendido)) { await subirStock(p.pedido); return; }
+      const r = await fb('GET', RUTA_PET_REP);
+      if (r && r.pedido && r.estado === 'pedido' && (!r.atendido || r.pedido > r.atendido)) { ultimoAutoRep = Date.now(); await subirReparto(r.fecha, r.pedido, true); return; }
+      const h = new Date(), min = h.getHours() * 60 + h.getMinutes();
+      if (h.getDay() !== 0 && min >= 390 && min <= 900 && Date.now() - ultimoAutoRep > REP_AUTO_MIN * 60000) { ultimoAutoRep = Date.now(); await subirReparto(null, null, false); }
     } catch (e) { errSesion = String(e.message || e); pintar(); }
   }
   setInterval(vigilar, CADA);
@@ -169,25 +261,26 @@
     if (!badge) {
       badge = document.createElement('div');
       badge.style.cssText = 'position:fixed;right:8px;bottom:8px;z-index:99999;font:12px/1.3 Arial,sans-serif;padding:5px 9px;border-radius:4px;color:#fff;opacity:.9;cursor:pointer;max-width:420px';
-      badge.title = 'Stock de AmbarX → app de pedidos (pulsa para opciones)';
+      badge.title = 'Stock y reparto de AmbarX → app (pulsa para opciones)';
       badge.onclick = menu;
       document.body.appendChild(badge);
     }
     badge.style.background = !sesion ? '#e67e22' : (ultimoErr ? '#c0392b' : (ocupado ? '#1f3a5f' : '#2e7d32'));
-    badge.textContent = 'Stock → app: ' + (!sesion ? 'SIN SESIÓN (pulsa aquí)' : ocupado ? (fase || 'trabajando…') :
-      ultimoErr ? 'ERROR · ' + ultimoErr : ultimo ? 'subido ' + ultimo.hora.slice(11, 16) + ' (' + ultimo.n + ' art.)' : 'esperando peticiones') + (errSesion && sesion ? ' · ' + errSesion : '');
+    badge.textContent = 'AmbarX → app: ' + (!sesion ? 'SIN SESIÓN (pulsa aquí)' : ocupado ? (fase || 'trabajando…') :
+      ultimoErr ? 'ERROR · ' + ultimoErr : ultimo ? 'subido ' + ultimo.hora.slice(11, 16) + ' (' + ultimo.n + ' ' + (ultimo.que || 'art.') + ')' : 'esperando peticiones') + (errSesion && sesion ? ' · ' + errSesion : '');
   }
   function menu() {
     if (document.getElementById('bf-stock-menu')) return;
     const f = document.createElement('div'); f.id = 'bf-stock-menu';
     f.style.cssText = 'position:fixed;right:8px;bottom:40px;z-index:100000;background:#fff;color:#222;border:1px solid #999;border-radius:6px;padding:10px;font:13px Arial,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3);width:260px';
     f.innerHTML = '<b>Stock de AmbarX → app de pedidos</b><br><br>' + (sesion
-      ? '<div style="margin-bottom:8px">Sesión: ' + (sesion.email || '') + '</div><button id="bf-ya">Subir el stock ahora</button> <button id="bf-out">Salir</button> <button id="bf-no">Cerrar</button>'
+      ? '<div style="margin-bottom:8px">Sesión: ' + (sesion.email || '') + '</div><button id="bf-ya">Subir el stock ahora</button> <button id="bf-rep">Subir reparto de hoy</button><br><br><button id="bf-out">Salir</button> <button id="bf-no">Cerrar</button>'
       : '<input id="bf-em" type="email" placeholder="email" style="width:100%;box-sizing:border-box;margin-bottom:6px"><input id="bf-pw" type="password" placeholder="contraseña" style="width:100%;box-sizing:border-box;margin-bottom:6px"><div id="bf-msg" style="color:#c0392b;min-height:16px"></div><button id="bf-ok">Entrar</button> <button id="bf-no">Cerrar</button>');
     document.body.appendChild(f);
     f.querySelector('#bf-no').onclick = () => f.remove();
     if (sesion) {
       f.querySelector('#bf-ya').onclick = () => { f.remove(); subirStock(null); };
+      f.querySelector('#bf-rep').onclick = () => { f.remove(); ultimoAutoRep = Date.now(); subirReparto(null, null, false); };
       f.querySelector('#bf-out').onclick = () => { sesion = null; idToken = null; localStorage.removeItem(LS_AUTH); f.remove(); pintar(); };
     } else {
       f.querySelector('#bf-em').focus();
