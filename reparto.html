@@ -64,7 +64,18 @@ th:first-child,td:first-child{text-align:left;} td.txt{font-family:'IBM Plex San
 .chips{display:flex;gap:6px;flex-wrap:wrap;}
 .chips button{flex:1 1 40%;padding:12px 8px;border:1px solid var(--filo);border-radius:8px;background:var(--papel);font-family:inherit;font-size:14px;font-weight:600;color:var(--tinta);}
 .chips button.sel{border-color:var(--navy);background:var(--navy);color:#fff;}
-#firma{width:100%;height:190px;border:1px dashed var(--gris);border-radius:8px;background:#fff;touch-action:none;display:block;}
+#cajaFirma{width:100%;height:150px;border:2px dashed var(--gris);border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;color:var(--gris);font-weight:600;font-size:15px;overflow:hidden;}
+#cajaFirma img{max-width:100%;max-height:100%;}
+.pad{position:fixed;inset:0;background:#fff;z-index:40;display:flex;flex-direction:column;}
+.pad .cab{padding:10px 14px;border-bottom:1px solid var(--filo);font-size:13px;color:var(--gris);}
+.pad .cab b{color:var(--navy);font-size:15px;}
+.pad .area{flex:1 1 0;min-height:0;position:relative;}
+.pad canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block;background:#fff;}
+.pad .linea-firma{position:absolute;left:8%;right:8%;bottom:22%;border-bottom:1px solid #bbb;pointer-events:none;}
+.pad .pie{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--filo);}
+.pad .pie .btn{flex:1;padding:14px 8px;font-size:15px;}
+.interr{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--filo);border-radius:8px;margin-top:8px;}
+.interr input{width:22px;height:22px;flex:none;}
 .firma-img{max-width:100%;max-height:120px;border:1px solid var(--filo);border-radius:6px;background:#fff;}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:50;max-width:90vw;}
 .vacio{text-align:center;color:var(--gris);padding:30px 10px;}
@@ -183,7 +194,7 @@ function tarjeta(d){
   var q=encodeURIComponent([d.direccion,d.poblacion].filter(Boolean).join(', '));
   var tel=(d.tel||'').split(' ')[0];
   var estado = !e ? '' : e.estado==='incidencia' ? '<span class="tag mal">No entregado · '+esc(e.motivo||'')+'</span>'
-    : '<span class="tag ok">Entregado '+esc((e.hora||'').slice(11,16))+'</span><span class="tag">'+esc(textoCobro(e.cobro))+'</span>';
+    : '<span class="tag ok">Entregado '+esc((e.hora||'').slice(11,16))+'</span><span class="tag">'+esc(textoCobro(e.cobro))+'</span>'+estadoAmbarx(e);
   return '<div class="'+cls+'"><div class="top" onclick="abrir(\''+d.k+'\')"><div><div class="cli">'+esc(d.cliente)+'</div>'+
     '<div class="dir">'+esc(dir||'(sin dirección en AmbarX)')+'</div>'+
     '<div style="margin-top:5px"><span class="tag'+(d.tipo==='factura'?' fac':'')+'">'+(d.tipo==='factura'?'Factura ':'Albarán ')+esc(d.num)+'</span>'+estado+'</div></div>'+
@@ -193,6 +204,13 @@ function tarjeta(d){
       '<button class="btn peq" onclick="mover(\''+d.k+'\',-1)">↑</button><button class="btn peq" onclick="mover(\''+d.k+'\',1)">↓</button>'+
       '<button class="btn peq primario" onclick="entregar(\''+d.k+'\')">✍️ Entregar</button></div>' : '')+
     '</div>';
+}
+function estadoAmbarx(e){
+  if(!e || e.estado!=='entregado' || !e.firma) return '';
+  var a=e.ambarx||{}, t='';
+  t += a.firma==='firmado'||a.firma==='yaFirmado' ? '<span class="tag ok">Firmado en AmbarX</span>' : a.firma==='error' ? '<span class="tag mal">Firma: error en AmbarX</span>' : '<span class="tag">Firma → AmbarX…</span>';
+  if(e.enviarEmail) t += a.email==='enviado' ? '<span class="tag ok">Email enviado</span>' : a.email==='sinEmail' ? '<span class="tag mal">Sin email en AmbarX</span>' : a.email==='error' ? '<span class="tag mal">Email: error</span>' : '<span class="tag">Email pendiente</span>';
+  return t;
 }
 function textoCobro(c){ c=c||{}; var f=c.forma||'pendiente'; return f==='efectivo'?'Efectivo '+eur(c.importe):f==='tarjeta'?'Tarjeta '+eur(c.importe):f==='transferencia'?'Transferencia '+eur(c.importe):'Sin cobrar'; }
 
@@ -255,7 +273,9 @@ function abrir(k){
     tablaLineas(d);
   if (e) {
     h+='<label>Entrega</label><div class="nota">'+(e.estado==='incidencia'?'<b style="color:var(--rojo)">No entregado</b> · '+esc(e.motivo||''):'Entregado a las '+esc((e.hora||'').slice(11,16))+(e.recibe?' · recibe '+esc(e.recibe):'')+' · '+esc(textoCobro(e.cobro)))+(e.nota?'<br>Nota: '+esc(e.nota):'')+'<br>Por '+esc(e.por||'')+'</div>'+
-      (e.firma?'<img class="firma-img" src="'+e.firma+'">':'');
+      (e.firma?'<img class="firma-img" src="'+e.firma+'">':'')+
+      '<div style="margin-top:6px">'+estadoAmbarx(e)+'</div>'+((e.ambarx||{}).para&&(e.ambarx.para.length)?'<div class="nota">Enviado a '+esc(e.ambarx.para.join(', '))+'</div>':'')+((e.ambarx||{}).error?'<div class="nota" style="color:var(--rojo)">'+esc(e.ambarx.error)+'</div>':'')+
+      (esOficina() && e.ambarx && (e.ambarx.firma==='error'||e.ambarx.email==='error') ? '<div class="fila-btn"><button class="btn peq" onclick="reintentarAmbarx(\''+k+'\')">Reintentar en AmbarX</button></div>':'');
   }
   h+='<div class="fila-btn">'+(!e && !esOficina()?'<button class="btn primario" onclick="entregar(\''+k+'\')">✍️ Entregar y firmar</button>':'')+
     (e && e.estado!=='incidencia'?'<button class="btn" onclick="pdfEntrega(\''+k+'\')">PDF firmado</button>':'')+
@@ -265,6 +285,10 @@ function abrir(k){
   velo(h);
 }
 
+function reintentarAmbarx(k){
+  var a=Object.assign({}, (S.ent[k]||{}).ambarx||{}); if(a.firma==='error') delete a.firma; if(a.email==='error') delete a.email; a.intentos=0; a.error=null;
+  db.ref('buscaflor/reparto/'+S.fecha+'/entregas/'+k+'/ambarx').set(a).then(function(){ cerrarVelo(); toast('Se volverá a intentar en menos de un minuto'); });
+}
 function deshacer(k){
   if(!confirm('¿Quitar la entrega (firma y cobro) de este documento?')) return;
   db.ref('buscaflor/reparto/'+S.fecha+'/entregas/'+k).remove().then(function(){ cerrarVelo(); toast('Entrega quitada'); });
@@ -285,13 +309,14 @@ function hacerReasignar(k,c){
 var F = null;
 function entregar(k){
   var d=S.docs[k];
-  F={ k:k, forma:null, trazos:0 };
+  F={ k:k, forma:null, firma:null };
   var h='<h3>'+esc(d.cliente)+'</h3><div class="nota">'+(d.tipo==='factura'?'Factura ':'Albarán ')+esc(d.num)+' · <b>'+eur(d.total)+'</b></div>'+
     '<details style="margin:6px 0"><summary class="nota">Ver lo que lleva ('+(d.lineas||[]).length+' líneas)</summary>'+tablaLineas(d)+'</details>'+
     '<label>Cobro</label><div class="chips" id="chCobro">'+
       [['efectivo','💶 Efectivo'],['tarjeta','💳 Tarjeta'],['transferencia','🏦 Transferencia'],['pendiente','No cobra']].map(function(x){ return '<button data-f="'+x[0]+'">'+x[1]+'</button>'; }).join('')+'</div>'+
     '<div id="cajaImp" style="display:none"><label>Importe cobrado</label><input id="imp" type="number" inputmode="decimal" step="0.01" value="'+(+d.total||0).toFixed(2)+'"></div>'+
-    '<label>Firma del cliente</label><canvas id="firma"></canvas><div style="text-align:right"><button class="btn peq" onclick="borrarFirma()">Borrar firma</button></div>'+
+    '<label>Firma del cliente</label><div id="cajaFirma" onclick="abrirPad()">✍️ Toca aquí para que firme el cliente</div>'+
+    '<label class="interr"><input type="checkbox" id="chkEmail" '+((d.emails||[]).length||!d.v?'checked':'')+'><span style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--tinta);font-weight:500">Enviar el '+(d.tipo==='factura'?'documento':'albarán')+' firmado por email'+((d.emails||[]).length?' a <b>'+esc(d.emails.join(', '))+'</b>':d.v?' <b style="color:var(--rojo)">(el cliente no tiene email en AmbarX)</b>':' a los correos del cliente en AmbarX')+'</span></label>'+
     '<label>Nombre de quien recibe (opcional)</label><input id="recibe" autocomplete="off">'+
     '<label>Nota (opcional)</label><input id="notaE" autocomplete="off" placeholder="Ej.: dejado en la trastienda">'+
     '<div class="fila-btn"><button class="btn verde" onclick="guardarEntrega()">✔ Guardar entrega</button></div>'+
@@ -301,40 +326,66 @@ function entregar(k){
     F.forma=b.dataset.f; document.querySelectorAll('#chCobro button').forEach(function(x){ x.classList.toggle('sel', x===b); });
     document.getElementById('cajaImp').style.display = F.forma==='pendiente' ? 'none' : 'block';
   }; });
-  prepararFirma();
 }
-function prepararFirma(){
-  var c=document.getElementById('firma'), r=c.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
-  c.width=r.width*dpr; c.height=r.height*dpr; var x=c.getContext('2d'); x.scale(dpr,dpr); x.lineWidth=2.2; x.lineCap='round'; x.lineJoin='round'; x.strokeStyle='#111';
-  var dib=false, last=null;
+// Firma a pantalla completa: el repartidor da la vuelta al móvil y el cliente firma con el dedo
+var P=null;
+function abrirPad(){
+  var d=S.docs[F.k];
+  var v=document.createElement('div'); v.className='pad'; v.id='pad';
+  v.innerHTML='<div class="cab"><b>'+esc(d.cliente)+'</b><br>'+(d.tipo==='factura'?'Factura ':'Albarán ')+esc(d.num)+' · '+eur(d.total)+' · Firme con el dedo en la zona blanca</div>'+
+    '<div class="area"><canvas id="lienzo"></canvas><div class="linea-firma"></div></div>'+
+    '<div class="pie"><button class="btn" onclick="cerrarPad()">Cancelar</button><button class="btn" onclick="limpiarPad()">Borrar</button><button class="btn verde" onclick="aceptarPad()">✔ Listo</button></div>';
+  document.body.appendChild(v);
+  try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function(){}); }catch(e){}
+  setTimeout(iniciarLienzo,60);
+  window.addEventListener('resize', reajustar);
+}
+function iniciarLienzo(){
+  var c=document.getElementById('lienzo'); if(!c) return;
+  var r=c.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+  c.width=Math.round(r.width*dpr); c.height=Math.round(r.height*dpr);
+  var x=c.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0); x.lineWidth=2.6; x.lineCap='round'; x.lineJoin='round'; x.strokeStyle='#111'; x.fillStyle='#111';
+  P={c:c,x:x,trazos:[],actual:null};
   function pt(e){ var b=c.getBoundingClientRect(); return {x:e.clientX-b.left, y:e.clientY-b.top}; }
-  c.onpointerdown=function(e){ dib=true; last=pt(e); c.setPointerCapture(e.pointerId); F.trazos++; x.beginPath(); x.arc(last.x,last.y,1,0,7); x.fill(); };
-  c.onpointermove=function(e){ if(!dib) return; var p=pt(e); x.beginPath(); x.moveTo(last.x,last.y); x.lineTo(p.x,p.y); x.stroke(); last=p; };
-  c.onpointerup=c.onpointercancel=function(){ dib=false; };
+  c.onpointerdown=function(e){ e.preventDefault(); c.setPointerCapture(e.pointerId); var p=pt(e); P.actual=[p]; P.trazos.push(P.actual); x.beginPath(); x.arc(p.x,p.y,1.3,0,7); x.fill(); };
+  c.onpointermove=function(e){ if(!P.actual) return; var p=pt(e), l=P.actual[P.actual.length-1]; x.beginPath(); x.moveTo(l.x,l.y); x.lineTo(p.x,p.y); x.stroke(); P.actual.push(p); };
+  c.onpointerup=c.onpointercancel=function(){ P.actual=null; };
 }
-function borrarFirma(){ var c=document.getElementById('firma'); c.getContext('2d').clearRect(0,0,c.width,c.height); F.trazos=0; }
-function firmaPng(){
-  // Reduce la firma a 600 px de ancho como máximo para que ocupe poco
-  var c=document.getElementById('firma'), w=Math.min(600,c.width), h=Math.round(c.height*w/c.width);
-  var o=document.createElement('canvas'); o.width=w; o.height=h; var x=o.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,w,h); x.drawImage(c,0,0,w,h);
-  return o.toDataURL('image/jpeg',0.6);
+function redibujar(){ var c=P.c,x=P.x; x.clearRect(0,0,c.width,c.height); P.trazos.forEach(function(t){ x.beginPath(); t.forEach(function(p,i){ i?x.lineTo(p.x,p.y):x.moveTo(p.x,p.y); }); if(t.length===1){ x.arc(t[0].x,t[0].y,1.3,0,7); x.fill(); } else x.stroke(); }); }
+function reajustar(){ if(!P) return; var t=P.trazos; iniciarLienzo(); if(P){ P.trazos=t; redibujar(); } }
+function limpiarPad(){ if(P){ P.trazos=[]; redibujar(); } }
+function cerrarPad(){ window.removeEventListener('resize', reajustar); var v=document.getElementById('pad'); if(v) v.remove(); P=null; try{ screen.orientation.unlock(); }catch(e){} }
+function aceptarPad(){
+  if(!P || !P.trazos.length){ toast('El cliente todavía no ha firmado'); return; }
+  // Recorta la firma a lo dibujado y la guarda en PNG de 700 px como máximo
+  var xs=[],ys=[]; P.trazos.forEach(function(t){ t.forEach(function(p){ xs.push(p.x); ys.push(p.y); }); });
+  var m=12, x0=Math.max(0,Math.min.apply(null,xs)-m), y0=Math.max(0,Math.min.apply(null,ys)-m), x1=Math.max.apply(null,xs)+m, y1=Math.max.apply(null,ys)+m;
+  var w=x1-x0, h=y1-y0, k=Math.min(1, 700/w, 300/h)*1.0; if(w<40||h<15){ k=1; }
+  var o=document.createElement('canvas'); o.width=Math.max(1,Math.round(w*k)); o.height=Math.max(1,Math.round(h*k));
+  var g=o.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,o.width,o.height); g.lineWidth=Math.max(1.6,2.6*k); g.lineCap='round'; g.lineJoin='round'; g.strokeStyle='#111'; g.fillStyle='#111';
+  P.trazos.forEach(function(t){ g.beginPath(); t.forEach(function(p,i){ var X=(p.x-x0)*k, Y=(p.y-y0)*k; i?g.lineTo(X,Y):g.moveTo(X,Y); }); if(t.length===1){ g.arc((t[0].x-x0)*k,(t[0].y-y0)*k,1.5,0,7); g.fill(); } else g.stroke(); });
+  F.firma=o.toDataURL('image/png');
+  cerrarPad();
+  var cj=document.getElementById('cajaFirma'); if(cj) cj.innerHTML='<img src="'+F.firma+'">';
 }
 function guardarEntrega(){
   var d=S.docs[F.k];
   if(!F.forma){ toast('Marca cómo cobra (o «No cobra»)'); return; }
-  if(!F.trazos){ if(!confirm('No hay firma. ¿Guardar la entrega sin firma?')) return; }
+  if(!F.firma){ if(!confirm('No hay firma. ¿Guardar la entrega sin firma?')) return; }
+  var conEmail=!!(document.getElementById('chkEmail')||{}).checked;
   var imp = F.forma==='pendiente' ? 0 : +(document.getElementById('imp').value||0);
-  var e={ estado:'entregado', hora:ahora(), firma: F.trazos?firmaPng():null, recibe:document.getElementById('recibe').value.trim(), nota:document.getElementById('notaE').value.trim(),
+  var e={ estado:'entregado', hora:ahora(), firma: F.firma||null, enviarEmail: conEmail && !!F.firma, tipo:d.tipo, recibe:document.getElementById('recibe').value.trim(), nota:document.getElementById('notaE').value.trim(),
     cobro:{ forma:F.forma, importe:imp }, por:(firebase.auth().currentUser||{}).email||'', comercial:comDe(d), num:d.num, total:+d.total||0 };
   db.ref('buscaflor/reparto/'+S.fecha+'/entregas/'+F.k).set(e).then(function(){
     var k=F.k; cerrarVelo(); toast('Entrega guardada');
     if (imp && Math.abs(imp-(+d.total||0))>0.01 && F.forma!=='pendiente') toast('Ojo: cobrado '+eur(imp)+' de '+eur(d.total));
-    ofrecerPdf(k);
+    ofrecerPdf(k, e);
   }, function(err){ toast('No se ha guardado: '+err.message); });
 }
-function ofrecerPdf(k){
+function ofrecerPdf(k, e0){
   var d=S.docs[k];
-  velo('<h3>Entrega guardada ✔</h3><div class="nota">'+esc(d.cliente)+' · '+esc(d.num)+'</div><div class="fila-btn"><button class="btn primario" onclick="pdfEntrega(\''+k+'\')">Enviar el '+(d.tipo==='factura'?'documento':'albarán')+' firmado al cliente</button></div><div class="fila-btn"><button class="btn" onclick="cerrarVelo()">Seguir con el reparto</button></div>');
+  var e=e0||S.ent[k]||{};
+  velo('<h3>Entrega guardada ✔</h3><div class="nota">'+esc(d.cliente)+' · '+esc(d.num)+'</div>'+(e.firma?'<div class="alerta ok">La firma se pasa sola al '+(d.tipo==='factura'?'documento':'albarán')+' de AmbarX'+(e.enviarEmail?' y AmbarX se lo envía al cliente por email':'')+' en un par de minutos.</div>':'')+'<div class="fila-btn"><button class="btn" onclick="pdfEntrega(\''+k+'\')">Mandar copia por WhatsApp</button></div><div class="fila-btn"><button class="btn" onclick="cerrarVelo()">Seguir con el reparto</button></div>');
 }
 function noEntregado(){
   var m=prompt('¿Por qué no se ha entregado? (cerrado, no está, rechaza…)'); if(m===null) return;
@@ -367,7 +418,7 @@ function pdfEntrega(k){
   doc.setFont('helvetica','normal'); doc.setFontSize(9);
   doc.text('Entregado el '+(e.hora||'').slice(0,10).split('-').reverse().join('/')+' a las '+(e.hora||'').slice(11,16)+(e.recibe?' · Recibe: '+e.recibe:''),14,y); y+=5;
   doc.text('Cobro: '+textoCobro(e.cobro),14,y); y+=4;
-  if (e.firma){ try{ doc.text('Firma del cliente:',14,y+4); doc.addImage(e.firma,'JPEG',14,y+6,70,22); }catch(err){} }
+  if (e.firma){ try{ doc.text('Firma del cliente:',14,y+4); doc.addImage(e.firma,/png/.test(e.firma.slice(0,30))?'PNG':'JPEG',14,y+6,70,22); }catch(err){} }
   compartirPdf(doc, d.num+'_firmado.pdf', (d.tipo==='factura'?'Factura ':'Albarán ')+d.num);
 }
 function hojaRuta(c){

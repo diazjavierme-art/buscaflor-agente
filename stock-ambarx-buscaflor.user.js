@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.2.0
-// @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto.
+// @version      0.3.0
+// @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX.
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
 // @grant        none
@@ -167,11 +167,12 @@
     const fis = ((t.split('Datos fiscales')[1] || '').split(/R[ée]g\. IVA|Recargo|Agencia transporte/)[0] || '').split('\n').map(x => x.trim()).filter(Boolean);
     const contacto = fis.find(x => /@|\d{9}/.test(x) && !/^[A-Z]?\d{7,8}[A-Z]?$/.test(x)) || '';
     const tel = (contacto.replace(/\s/g, '').match(/(?:\+34)?[6789]\d{8}/g) || []).join(' ');
+    const emails = (contacto.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).map(x => x.toLowerCase());
     const poblacion = fis.find(x => /,\s*\d{5}/.test(x)) || '';
     const iPob = fis.indexOf(poblacion);
     const origen = ((t.split(/\nOrigen\n/)[1] || '').split('\n')[0] || '').trim();
     const otraDir = hondo(doc, 'vaadin-checkbox').some(cb => /direcci[oó]n diferente/i.test(cb.label || cb.textContent || '') && cb.checked);
-    return { lineas, nombreFiscal: fis[0] || '', nif: fis[1] || '', direccion: iPob > 1 ? fis.slice(2, iPob).join(', ') : '', poblacion, tel, origen, otraDireccion: otraDir };
+    return { v: 2, lineas, nombreFiscal: fis[0] || '', nif: fis[1] || '', direccion: iPob > 1 ? fis.slice(2, iPob).join(', ') : '', poblacion, tel, emails, origen, otraDireccion: otraDir };
   }
 
   async function subirReparto(fechaISO, pedidoISO, porPeticion) {
@@ -191,7 +192,7 @@
           i++;
           const k = h.num.replace(/[.#$\/\[\]]/g, '-');
           const prev = previos[k];
-          let det = prev && prev.total === h.total && prev.lineas ? prev : null;
+          let det = prev && prev.v === 2 && prev.total === h.total && prev.lineas ? prev : null;
           if (!det) {
             fase = 'Reparto: ' + tipo + ' ' + h.num + ' (' + i + '/' + lista.length + ')'; pintar();
             try { det = await conMarco(doc => leerDocumento(doc), ruta + '/editar/' + encodeURIComponent(h.num)); }
@@ -211,6 +212,102 @@
       if (porPeticion) { try { await fb('PATCH', RUTA_PET_REP, { estado: 'error', error: ultimoErr, atendido: pedidoISO, hecho: ahoraISO() }); } catch (e2) {} }
       console.error('[bf-reparto]', e);
     } finally { ocupado = false; fase = ''; soltarCerrojo(); pintar(); }
+  }
+
+  // ---------------- Firmas y emails de las entregas (app de reparto → AmbarX) ----------------
+  const boton = (doc, re) => hondo(doc, 'vaadin-button').find(b => re.test((b.textContent || '').trim()) && !b.disabled && b.offsetParent !== null) || hondo(doc, 'vaadin-button').find(b => re.test((b.textContent || '').trim()) && !b.disabled);
+  const textoDe = doc => hondo(doc, '*').filter(e => e.childElementCount === 0).map(e => e.textContent || '').join('\n') + '\n' + (doc.body ? doc.body.innerText : '');
+
+  // Abre /AmbarX/movil › Firmar, carga el documento y estampa la firma (la misma pantalla que usa la app de Querry)
+  async function firmarEnAmbarx(doc, tipo, num, firma, obs) {
+    const W = doc.defaultView;
+    const bF = await hastaQue(() => boton(doc, /^Firmar$/), 30000); if (!bF) throw new Error('No se abre el menú móvil de AmbarX');
+    bF.click();
+    const cb = await hastaQue(() => { const c = hondo(doc, 'vaadin-combo-box')[0]; return c && (c.filteredItems || []).length ? c : null; }, 20000); if (!cb) throw new Error('No se abre «Firmar documento»');
+    const clave = tipo === 'factura' ? '2' : '1';
+    if (cb.value !== clave) { const it = cb.filteredItems.find(i => i.key === clave); if (it) cb.selectedItem = it; }
+    if (!await hastaQue(() => cb.value === clave, 5000)) throw new Error('No se puede elegir el tipo de documento');
+    await espera(400);
+    const tf = hondo(doc, 'vaadin-text-field')[0]; tf.value = num; tf.dispatchEvent(new W.CustomEvent('change', { bubbles: true })); await espera(600);
+    const cargar = async () => { boton(doc, /^Cargar$/).click(); return hastaQue(() => { const t = textoDe(doc); if (/ya est[aá] firmado/i.test(t)) return 'ya'; if (new RegExp('Documento:[^\\n]*' + num.replace('-', '\\-')).test(t) && boton(doc, /^Firmar documento$/)) return 'ok'; if (/no existe|no encontrado|no se ha encontrado/i.test(t)) return 'no'; return null; }, 20000); };
+    const r = await cargar();
+    if (r === 'ya') return 'yaFirmado';
+    if (r !== 'ok') throw new Error(r === 'no' ? 'AmbarX no encuentra el documento ' + num : 'AmbarX no carga el documento ' + num);
+    boton(doc, /^Firmar documento$/).click();
+    const sp = await hastaQue(() => { const x = hondo(doc, 'signature-pad')[0]; return x && x._pad && x._canvas && x._canvas.width ? x : null; }, 15000);
+    if (!sp) throw new Error('No se abre el recuadro de firma de AmbarX');
+    // Encaja la firma en el recuadro de AmbarX sin deformarla
+    const img = await new Promise((ok, ko) => { const i = new W.Image(); i.onload = () => ok(i); i.onerror = () => ko(new Error('Firma ilegible')); i.src = firma; });
+    const cw = sp._canvas.width, ch = sp._canvas.height, k = Math.min(cw / img.width, ch / img.height);
+    const w = Math.round(img.width * k), h = Math.round(img.height * k);
+    await sp._pad.fromDataURL(firma, { ratio: 1, width: w, height: h, xOffset: Math.round((cw - w) / 2), yOffset: Math.round((ch - h) / 2) });
+    await espera(400);
+    if (sp.estaVacia()) throw new Error('La firma no se ha podido pasar a AmbarX');
+    const ta = hondo(doc, 'vaadin-text-area')[0];
+    if (ta && obs) { ta.value = obs.slice(0, 250); ta.dispatchEvent(new W.CustomEvent('change', { bubbles: true })); await espera(400); }
+    boton(doc, /^Aceptar$/).click();
+    await hastaQue(() => !hondo(doc, 'signature-pad').length, 20000);
+    await espera(1500);
+    // Comprobación: al volver a cargarlo, AmbarX debe decir que ya está firmado
+    const bc = boton(doc, /^Cargar$/);
+    if (bc) { bc.click(); const ok = await hastaQue(() => /ya est[aá] firmado/i.test(textoDe(doc)), 12000); if (!ok) throw new Error('AmbarX no confirma la firma (se volverá a comprobar)'); }
+    return 'firmado';
+  }
+
+  // Abre el documento y lo envía por email con el formato habitual y los correos del cliente
+  async function emailDesdeAmbarx(doc) {
+    const env = await hastaQue(() => hondo(doc, 'vaadin-button').find(b => { const i = b.querySelector('vaadin-icon'); return i && i.getAttribute('icon') === 'vaadin:envelope'; }), 40000);
+    if (!env) throw new Error('No encuentro «Enviar por email» en el documento');
+    await espera(800); env.click();
+    const sig = await hastaQue(() => boton(doc, /^Siguiente$/), 20000); if (!sig) throw new Error('No sale la ventana de formato del email');
+    await espera(500); sig.click();
+    const enviar = await hastaQue(() => /Enviar email/.test(textoDe(doc)) && boton(doc, /^Enviar$/), 30000);
+    if (!enviar) throw new Error('No se abre la ventana «Enviar email»');
+    await espera(1200);
+    const txt = hondo(doc, '*').map(e => e.childElementCount === 0 ? (e.textContent || '') : '').join(' ');
+    const para = [...new Set((txt.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).map(x => x.toLowerCase()).filter(x => !/rosasdebuscaflor/i.test(x)))];
+    if (!para.length) { const x = boton(doc, /^Cancelar$|^Cerrar$/); if (x) x.click(); return { email: 'sinEmail', para: [] }; }
+    enviar.click();
+    const fin = await hastaQue(() => { const t = textoDe(doc); if (/error al enviar|no se ha podido enviar/i.test(t)) return 'error'; return !/Enviar email/.test(t) ? 'ok' : null; }, 60000, 1000);
+    if (fin !== 'ok') throw new Error(fin === 'error' ? 'AmbarX da error al enviar el email' : 'AmbarX no confirma el envío del email');
+    return { email: 'enviado', para };
+  }
+
+  async function pasarEntregas() {
+    if (ocupado) return;
+    const f = ahoraISO().slice(0, 10);
+    const ent = (await fb('GET', RUTA_REP + '/' + f + '/entregas')) || {};
+    const pend = Object.keys(ent).filter(k => { const e = ent[k], a = e.ambarx || {}; return e.estado === 'entregado' && (a.intentos || 0) < 3 && ((e.firma && !a.firma) || (e.enviarEmail && a.firma && a.firma !== 'error' && !a.email)); });
+    if (!pend.length || !cogerCerrojo()) return;
+    ocupado = true; ultimoErr = ''; pintar();
+    try {
+      const docs = (await fb('GET', RUTA_REP + '/' + f + '/docs')) || {};
+      for (const k of pend) {
+        const e = ent[k], d = docs[k] || {}, a = Object.assign({}, e.ambarx || {});
+        const tipo = e.tipo || d.tipo || 'albaran', num = e.num || d.num || k;
+        try {
+          if (e.firma && !a.firma) {
+            fase = 'Firmando ' + num + ' en AmbarX…'; pintar();
+            const obs = ['App reparto', e.recibe ? 'Recibe: ' + e.recibe : '', e.cobro ? 'Cobro: ' + (e.cobro.forma || '') + (e.cobro.importe ? ' ' + String(e.cobro.importe).replace('.', ',') + ' €' : '') : '', e.nota || ''].filter(Boolean).join(' · ');
+            a.firma = await conMarco(doc => firmarEnAmbarx(doc, tipo, num, e.firma, obs), 'movil');
+            a.firmaHora = ahoraISO();
+          }
+          if (e.enviarEmail && a.firma && !a.email) {
+            fase = 'Enviando ' + num + ' por email…'; pintar();
+            const r = await conMarco(doc => emailDesdeAmbarx(doc), (tipo === 'factura' ? 'ventas/facturas' : 'ventas/albaranes') + '/editar/' + encodeURIComponent(num));
+            a.email = r.email; a.para = r.para; a.emailHora = ahoraISO();
+          }
+          a.error = null;
+        } catch (err) {
+          a.intentos = (a.intentos || 0) + 1; a.error = String(err.message || err);
+          if (a.intentos >= 3) { if (!a.firma) a.firma = 'error'; else if (!a.email) a.email = 'error'; }
+          console.error('[bf-reparto] ' + num, err);
+        }
+        await fb('PUT', RUTA_REP + '/' + f + '/entregas/' + k + '/ambarx', a);
+      }
+      ultimo = { hora: ahoraISO(), n: pend.length, que: 'entregas a AmbarX' };
+    } catch (e) { ultimoErr = 'Entregas: ' + String(e.message || e); }
+    finally { ocupado = false; fase = ''; soltarCerrojo(); pintar(); }
   }
   let ultimoAutoRep = 0;
 
@@ -247,6 +344,7 @@
       if (p && p.pedido && p.estado === 'pedido' && (!p.atendido || p.pedido > p.atendido)) { await subirStock(p.pedido); return; }
       const r = await fb('GET', RUTA_PET_REP);
       if (r && r.pedido && r.estado === 'pedido' && (!r.atendido || r.pedido > r.atendido)) { ultimoAutoRep = Date.now(); await subirReparto(r.fecha, r.pedido, true); return; }
+      await pasarEntregas(); if (ocupado) return;
       const h = new Date(), min = h.getHours() * 60 + h.getMinutes();
       if (h.getDay() !== 0 && min >= 390 && min <= 900 && Date.now() - ultimoAutoRep > REP_AUTO_MIN * 60000) { ultimoAutoRep = Date.now(); await subirReparto(null, null, false); }
     } catch (e) { errSesion = String(e.message || e); pintar(); }
