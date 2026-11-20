@@ -1656,6 +1656,7 @@ verTab(window.innerWidth>=900 ? 'pantalla' : 'abiertos');
     document.body.appendChild(s);
   }
   firebase.auth().onAuthStateChanged(function(u){
+    if (u && /@reparto\.rosasdebuscaflor\.com$/i.test(u.email || '')) { location.replace('reparto.html'); return; }
     if (u) { caja.style.display = 'none'; salir.textContent = 'Salir (' + u.email + ')'; salir.style.display = 'block'; arrancar(); }
     else if (arrancada) { location.reload(); }
     else { caja.style.display = 'flex'; salir.style.display = 'none'; document.getElementById('bfEmail').focus(); }
