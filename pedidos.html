@@ -129,6 +129,10 @@ details summary{cursor:pointer;font-size:12px;color:var(--gris);margin-top:6px;}
 .bar2 i{display:block;height:100%;background:var(--verde);} .bar2 i.over{background:var(--rojo);}
 .izq td,.izq th{text-align:left;font-family:inherit;}
 .izq td:last-child{text-align:right;}
+.fotos-prev{display:flex;gap:8px;overflow-x:auto;margin:8px 0;}
+.fotos-prev .fp{position:relative;flex:0 0 auto;}
+.fotos-prev img{height:120px;border-radius:8px;border:1px solid var(--filo);display:block;}
+.fotos-prev button{position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:13px;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:13px;cursor:pointer;}
 
 /* ══ Diseño para móvil (19-11-2026). La pantalla del almacén mantiene su diseño. ══ */
 body{font-size:15px;padding-bottom:calc(72px + env(safe-area-inset-bottom,0px));}
@@ -262,11 +266,11 @@ body.pantalla header#cab{position:static;}
 
   <section id="tab-nuevo" style="display:none;">
     <div id="paso1">
-      <p class="nota">Haz una foto a la nota del pedido, pega el texto o díctalo. La app lo pasa a artículos de AmbarX y lo revisas antes de guardar.</p>
+      <p class="nota">Elige fotos de la nota o pantallazos de WhatsApp (puedes elegir varios), pega el texto o díctalo. La app lo pasa a artículos de AmbarX y lo revisas antes de guardar.</p>
       <textarea id="inTexto" placeholder="Ej: Floristería Rocío — 2 freedom 60, 6 ramos clavel blanco fancy, 3 nardos grandes"></textarea>
-      <img id="fotoPrev" class="foto-prev" style="display:none;">
+      <div id="fotoPrev" class="fotos-prev"></div>
       <div class="fila-btn">
-        <label class="btn" style="margin:0;text-transform:none;letter-spacing:0;font-size:inherit;color:var(--navy);display:flex;align-items:center;justify-content:center;">📷 Foto<input type="file" id="inFoto" accept="image/*" capture="environment" onchange="elegirFoto(this)" style="display:none;"></label>
+        <label class="btn" style="margin:0;text-transform:none;letter-spacing:0;font-size:inherit;color:var(--navy);display:flex;align-items:center;justify-content:center;">🖼 Fotos o pantallazos<input type="file" id="inFoto" accept="image/*" multiple onchange="elegirFoto(this)" style="display:none;"></label>
         <button class="btn" id="btnDictar" onclick="dictar()">🎤 Dictar</button>
       </div>
       <button class="btn primario ancho" id="btnInterpretar" onclick="interpretar()">Interpretar pedido</button>
@@ -783,19 +787,28 @@ function vincularCajas(id){
 }
 
 /* ══ NUEVO PEDIDO: foto / texto / dictado → Claude ══ */
-var _foto = null; // {media_type, data}
+var _fotos = []; // [{media_type, data, url}] — fotos de notas o pantallazos de WhatsApp
 function elegirFoto(inp){
-  var f=inp.files[0]; if(!f) return;
-  var img=new Image(), rd=new FileReader();
-  rd.onload=function(e){ img.onload=function(){
-      var max=1600, w=img.width, h=img.height, k=Math.min(1, max/Math.max(w,h));
-      var cv=document.createElement('canvas'); cv.width=Math.round(w*k); cv.height=Math.round(h*k);
-      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
-      var url=cv.toDataURL('image/jpeg',0.85);
-      _foto={media_type:'image/jpeg', data:url.split(',')[1]};
-      var pv=document.getElementById('fotoPrev'); pv.src=url; pv.style.display='block';
-    }; img.src=e.target.result; };
-  rd.readAsDataURL(f);
+  var fs=[].slice.call(inp.files||[]); if(!fs.length) return;
+  fs.slice(0, 8-_fotos.length).forEach(function(f){
+    var img=new Image(), rd=new FileReader();
+    rd.onload=function(e){ img.onload=function(){
+        // Pantallazos largos: se limita el lado corto a 1200 px y el largo a 2600 px para que se lea bien
+        var w=img.width, hh=img.height, k=Math.min(1, 1200/Math.min(w,hh), 2600/Math.max(w,hh));
+        var cv=document.createElement('canvas'); cv.width=Math.round(w*k); cv.height=Math.round(hh*k);
+        cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+        var url=cv.toDataURL('image/jpeg',0.85);
+        _fotos.push({media_type:'image/jpeg', data:url.split(',')[1], url:url}); pintarFotos();
+      }; img.src=e.target.result; };
+    rd.readAsDataURL(f);
+  });
+  if(fs.length>8-_fotos.length) toast('Máximo 8 imágenes por pedido');
+  inp.value='';
+}
+function quitarFoto(i){ _fotos.splice(i,1); pintarFotos(); }
+function pintarFotos(){
+  document.getElementById('fotoPrev').innerHTML=_fotos.map(function(f,i){
+    return '<div class="fp"><img src="'+f.url+'"><button onclick="quitarFoto('+i+')" aria-label="Quitar imagen">✕</button></div>'; }).join('');
 }
 function dictar(){
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -834,13 +847,13 @@ function promptSistema(){
 }
 function interpretar(){
   var texto=document.getElementById('inTexto').value.trim();
-  if(!_foto && !texto){ toast('Haz una foto, pega el texto o díctalo'); return; }
+  if(!_fotos.length && !texto){ toast('Elige fotos o pantallazos, pega el texto o díctalo'); return; }
   var key=leerApiKey();
   if(!key){ document.querySelector('details').open=true; toast('Falta la API key de Claude'); return; }
   if(!Object.keys(_articulos).length){ toast('Aún no ha cargado el catálogo — espera un momento'); return; }
   var contenido=[];
-  if(_foto) contenido.push({type:'image', source:{type:'base64', media_type:_foto.media_type, data:_foto.data}});
-  contenido.push({type:'text', text: (texto?'Texto del pedido:\n'+texto+'\n\n':'')+'Hoy es '+fechaISO()+'. Pasa este pedido a JSON según las reglas.'});
+  _fotos.forEach(function(f){ contenido.push({type:'image', source:{type:'base64', media_type:f.media_type, data:f.data}}); });
+  contenido.push({type:'text', text: (texto?'Texto del pedido:\n'+texto+'\n\n':'')+(_fotos.length>1?'Las '+_fotos.length+' imágenes son pantallazos o fotos seguidos del MISMO pedido: júntalos en un solo pedido.\n':'')+'Hoy es '+fechaISO()+'. Pasa este pedido a JSON según las reglas.'});
   var b=document.getElementById('btnInterpretar'); b.disabled=true; document.getElementById('cargando').classList.add('activo');
   var ctl=new AbortController(); var tm=setTimeout(function(){ctl.abort();},90000);
   fetch('https://api.anthropic.com/v1/messages',{method:'POST', signal:ctl.signal,
@@ -866,7 +879,7 @@ function abrirRevision(j, textoOriginal){
     candidatos: (cli.candidatos||[]).filter(function(c){return _clientes[c];}),
     fecha: j.fecha || fechaISO(),
     nota: [j.nota, j.telefono?('Tel. '+j.telefono):''].filter(Boolean).join(' · '),
-    origen: _foto?'foto':'texto', textoOriginal: textoOriginal||'',
+    origen: _fotos.length?'foto':'texto', textoOriginal: textoOriginal||'',
     lineas: (j.lineas||[]).map(function(l){
       var cod = l.codigo && art(l.codigo) ? String(l.codigo) : null;
       return { texto:l.texto||'', codigo:cod, cantidad:+l.cantidad||0, alternativas:(l.alternativas||[]).map(String).filter(art), opciones:(l.opciones||[]).map(String).filter(art), duda:l.duda||'', nota:l.nota||'', ia:{codigo:cod, cantidad:+l.cantidad||0} };
@@ -976,8 +989,8 @@ function guardarPedido(){
   if(!r.id){ datos.creado=ahoraISO(); datos.estado='abierto'; }
   refPedidos.child(id).update(datos).then(fin).catch(function(e){ toast('⚠ No se guardó: '+e.message); });
   function fin(){
-    toast('Pedido guardado'); _rev=null; _foto=null;
-    document.getElementById('inTexto').value=''; document.getElementById('inFoto').value=''; document.getElementById('fotoPrev').style.display='none';
+    toast('Pedido guardado'); _rev=null; _fotos=[]; pintarFotos();
+    document.getElementById('inTexto').value=''; document.getElementById('inFoto').value=''; _fotos=[]; pintarFotos();
     volverPaso1(); verTab(r.fecha>fechaISO() ? 'futuros' : 'abiertos');
     if(sugerencias.length) setTimeout(function(){ ofrecerReglas(sugerencias); }, 400);
   }
