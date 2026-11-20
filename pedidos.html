@@ -851,8 +851,23 @@ function dictar(){
   r.onerror=function(e){ toast('Dictado: '+e.error); };
   r.start();
 }
-function leerApiKey(){ try{ return localStorage.getItem(CLAVE_API)||''; }catch(e){ return ''; } }
-function guardarApiKey(){ var v=document.getElementById('inApiKey').value.trim(); if(!v||/^•+$/.test(v)) return; try{ localStorage.setItem(CLAVE_API,v); toast('API key guardada'); }catch(e){ toast('No se pudo guardar'); } }
+// La API key se guarda en el móvil y también en tu cuenta (Firebase, en una rama solo tuya),
+// para que no se pierda si el navegador borra los datos al recargar.
+var _apiKeyNube = '';
+function refApiKey(){ var u=firebase.auth().currentUser; return u ? db.ref('buscaflor/privado/'+u.uid+'/apiKey') : null; }
+function leerApiKey(){ var k=''; try{ k=localStorage.getItem(CLAVE_API)||''; }catch(e){} return k || _apiKeyNube || ''; }
+function guardarApiKey(){
+  var v=document.getElementById('inApiKey').value.trim(); if(!v||/^•+$/.test(v)) return;
+  try{ localStorage.setItem(CLAVE_API,v); }catch(e){}
+  var r=refApiKey();
+  (r ? r.set(v) : Promise.resolve()).then(function(){ _apiKeyNube=v; toast('API key guardada en tu cuenta'); document.getElementById('inApiKey').value='••••••••'; },
+    function(e){ toast('Guardada solo en este móvil: '+e.message); });
+}
+function cargarApiKeyNube(){
+  var r=refApiKey(); if(!r) return;
+  r.on('value', function(s){ _apiKeyNube=s.val()||''; try{ if(_apiKeyNube && !localStorage.getItem(CLAVE_API)) localStorage.setItem(CLAVE_API,_apiKeyNube); }catch(e){}
+    var i=document.getElementById('inApiKey'); if(i && document.activeElement!==i) i.value = leerApiKey() ? '••••••••' : ''; });
+}
 
 // Parte fija del prompt (instrucciones, catálogo y clientes): va con caché para pagarla al 10 % en lecturas seguidas
 function promptFijo(){
@@ -1604,6 +1619,7 @@ escuchar(refContactos,'contactos',function(v){_contactos=v;});
 escuchar(refConfig,'config',function(v){_config=v;});
 escuchar(refProvArt,'provArt',function(v){_provArt=v;});
 escuchar(refPet,'pet',function(v){_pet=v;});
+cargarApiKeyNube();
 verTab(window.innerWidth>=900 ? 'pantalla' : 'abiertos');
 </script>
 <div id="bfLogin" style="display:none;position:fixed;inset:0;z-index:99999;background:#f4f4f4;align-items:center;justify-content:center;font-family:Arial,sans-serif">
