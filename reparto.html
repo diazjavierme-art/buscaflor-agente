@@ -456,9 +456,9 @@ function caja(){
 }
 function verRepartidores(){
   var r=reps();
-  var h='<h3>Repartidores</h3><div class="nota">El número es el «Comercial» de AmbarX. Cada repartidor entra con su móvil y un PIN de 6 cifras, y solo ve sus entregas. Los transportistas externos no necesitan acceso (usa la hoja de ruta).</div>'+
+  var h='<h3>Repartidores</h3><div class="nota">El número es el «Comercial» de AmbarX. Cada repartidor entra con su móvil y un PIN de 6 cifras, y solo ve sus entregas. Los transportistas externos pueden tener acceso o usar la hoja de ruta en papel.</div>'+
     Object.keys(r).sort(function(a,b){return a-b;}).map(function(c){ var x=r[c]; return '<div class="card" style="border-left-color:var(--navy)"><b class="mono">'+esc(c)+'</b> · '+esc(x.nombre)+(x.externo?' <span class="tag">externo</span>':'')+(x.nave?' <span class="tag">nave</span>':'')+
-      '<div class="nota">'+(x.email?'Entra con '+esc(x.movil||x.email):'Sin acceso')+'</div>'+(!x.externo&&!x.nave?'<button class="btn peq" onclick="editarRep(\''+c+'\')">'+(x.email?'Cambiar acceso':'Dar acceso')+'</button>':'')+'</div>'; }).join('')+
+      '<div class="nota">'+(x.email?'Entra con '+esc(x.movil||x.email):'Sin acceso')+'</div>'+(!x.nave?'<button class="btn peq" onclick="editarRep(\''+c+'\')">'+(x.email?'Cambiar acceso':'Dar acceso')+'</button>':'')+'</div>'; }).join('')+
     '<div class="fila-btn"><button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
   velo(h);
 }
