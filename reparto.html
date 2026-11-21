@@ -2,9 +2,16 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#1F344C">
 <title>Buscaflor · Reparto</title>
+<link rel="manifest" href="reparto.webmanifest">
+<link rel="icon" href="icons/reparto-192.png">
+<link rel="apple-touch-icon" href="icons/reparto-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Reparto">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
@@ -14,8 +21,8 @@
 <style>
 :root{--navy:#1F344C;--navy-suave:#EEF1F4;--papel:#fff;--fondo:#F7F8F9;--tinta:#1B2229;--gris:#6E7680;--filo:#E3E6E9;--verde:#2F7D5C;--rojo:#C0463A;--oro:#C79A3E;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{font-family:'IBM Plex Sans',sans-serif;background:var(--fondo);color:var(--tinta);min-height:100vh;max-width:620px;margin:0 auto;font-size:14px;padding-bottom:70px;}
-header{background:var(--papel);padding:12px 14px;border-bottom:3px solid var(--navy);position:sticky;top:0;z-index:5;}
+body{padding-bottom:calc(70px + env(safe-area-inset-bottom));font-family:'IBM Plex Sans',sans-serif;background:var(--fondo);color:var(--tinta);min-height:100vh;max-width:620px;margin:0 auto;font-size:14px;padding-bottom:70px;}
+header{background:var(--papel);padding:calc(12px + env(safe-area-inset-top)) 14px 12px;border-bottom:3px solid var(--navy);position:sticky;top:0;z-index:5;}
 header .fila{display:flex;align-items:center;justify-content:space-between;gap:8px;}
 header h1{font-size:16px;color:var(--navy);font-weight:600;}
 .fecha{display:flex;align-items:center;gap:6px;margin-top:8px;}
@@ -67,7 +74,7 @@ th:first-child,td:first-child{text-align:left;} td.txt{font-family:'IBM Plex San
 #cajaFirma{width:100%;height:150px;border:2px dashed var(--gris);border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;color:var(--gris);font-weight:600;font-size:15px;overflow:hidden;}
 #cajaFirma img{max-width:100%;max-height:100%;}
 .pad{position:fixed;inset:0;background:#fff;z-index:40;display:flex;flex-direction:column;}
-.pad .cab{padding:10px 14px;border-bottom:1px solid var(--filo);font-size:13px;color:var(--gris);}
+.pad .cab{padding:calc(10px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid var(--filo);font-size:13px;color:var(--gris);}
 .pad .cab b{color:var(--navy);font-size:15px;}
 .pad .area{flex:1 1 0;min-height:0;position:relative;}
 .pad canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block;background:#fff;}
@@ -80,6 +87,10 @@ th:first-child,td:first-child{text-align:left;} td.txt{font-family:'IBM Plex San
 .toast{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:50;max-width:90vw;}
 .vacio{text-align:center;color:var(--gris);padding:30px 10px;}
 .mono{font-family:'IBM Plex Mono',monospace;}
+.instalar{display:none;margin:0 0 12px;padding:10px 12px;border:1px solid var(--navy);border-radius:10px;background:var(--navy-suave);font-size:13px;align-items:center;gap:10px;}
+.instalar img{width:40px;height:40px;border-radius:9px;flex:none;}
+.instalar .t{flex:1;}
+.instalar button{flex:none;}
 </style>
 </head>
 <body>
@@ -87,6 +98,7 @@ th:first-child,td:first-child{text-align:left;} td.txt{font-family:'IBM Plex San
   <div class="fila"><h1 id="titulo">Reparto</h1><button class="btn peq" id="bMenu">⋯</button></div>
   <div class="fecha"><button id="fAnt">‹</button><div class="dia" id="fDia"></div><button id="fSig">›</button><button id="fHoy" style="width:auto;padding:0 10px;font-size:13px">Hoy</button></div>
 </header>
+<div id="bInstalar" class="instalar" style="margin:12px 12px 0"></div>
 <main id="app"><div class="vacio">Cargando…</div></main>
 
 <div id="bfLogin" style="display:none;position:fixed;inset:0;z-index:99999;background:#f4f4f4;align-items:center;justify-content:center;font-family:Arial,sans-serif">
@@ -95,6 +107,7 @@ th:first-child,td:first-child{text-align:left;} td.txt{font-family:'IBM Plex San
     <div style="color:#666;font-size:13px;margin-bottom:16px">Inicia sesión para entrar</div>
     <input id="bfEmail" type="text" inputmode="email" autocomplete="username" placeholder="móvil (o email en la oficina)" required style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;font-size:15px">
     <input id="bfPass" type="password" autocomplete="current-password" placeholder="PIN (o contraseña)" required style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;font-size:15px">
+    <div id="bInstalarLogin" style="font-size:12px;color:#555;margin-bottom:10px"></div>
     <div id="bfLoginMsg" style="color:#c0392b;font-size:13px;min-height:18px;margin-bottom:8px"></div>
     <button type="submit" style="width:100%;padding:10px;font-size:15px;background:#222;color:#fff;border:0;border-radius:4px;cursor:pointer">Entrar</button>
   </form>
@@ -469,6 +482,7 @@ function menu(){
   var u=firebase.auth().currentUser||{};
   var h='<h3>'+esc(esOficina()?'Oficina':nombreRep(S.miCom))+'</h3><div class="nota">'+esc(u.email||'')+'</div><div class="fila-btn" style="flex-direction:column">'+
     (esOficina()?'<button class="btn" onclick="caja()">Caja del día por repartidor</button><button class="btn" onclick="verRepartidores()">Repartidores y accesos</button><a class="btn" style="text-align:center;text-decoration:none" href="pedidos.html">Ir a la app de pedidos</a>':'<button class="btn" onclick="pedirLectura();cerrarVelo()">↻ Pedir lectura de AmbarX</button>')+
+    (esApp()?'':'<button class="btn" onclick="try{localStorage.removeItem(\'bf_rep_noinst\')}catch(e){};cerrarVelo();pintarInstalar()">📲 Instalar como app</button>')+
     '<button class="btn peligro" onclick="firebase.auth().signOut()">Cerrar sesión</button><button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
   velo(h);
 }
@@ -515,6 +529,29 @@ function quitarRep(c){
   if(!confirm('¿Quitar el acceso a '+reps()[c].nombre+'? Dejará de ver sus entregas.')) return;
   db.ref('buscaflor/configPedidos/repartidores/'+c).update({ email: null, movil: null }).then(function(){ toast('Acceso quitado'); verRepartidores(); });
 }
+
+// ---------- app instalable ----------
+var promptInstalar=null;
+function esApp(){ return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+function esIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
+function pintarInstalar(){
+  var b=document.getElementById('bInstalar'), l=document.getElementById('bInstalarLogin');
+  var ocultar=esApp() || (function(){ try{ return localStorage.getItem('bf_rep_noinst')==='1'; }catch(e){ return false; } })();
+  if (ocultar){ b.style.display='none'; if(l) l.innerHTML=''; return; }
+  var txt, btn='';
+  if (promptInstalar){ txt='<b>Instala la app de Reparto</b><br>Tendrás el icono en el móvil y se abre a pantalla completa.'; btn='<button class="btn primario peq" onclick="instalar()">Instalar</button>'; }
+  else if (esIOS()){ txt='<b>Ponla como app:</b> pulsa <b>Compartir</b> <span style="font-size:15px">⎋</span> y luego <b>«Añadir a pantalla de inicio»</b>.'; }
+  else { txt='<b>Ponla como app:</b> en el menú ⋮ del navegador, pulsa <b>«Instalar app»</b> o <b>«Añadir a pantalla de inicio»</b>.'; }
+  b.innerHTML='<img src="icons/reparto-192.png" alt=""><div class="t">'+txt+'</div>'+btn+'<button class="btn peq" onclick="noInstalar()" aria-label="Cerrar">✕</button>';
+  b.style.display='flex';
+  if(l) l.innerHTML = promptInstalar ? '<a href="#" onclick="instalar();return false">📲 Instalar la app en este móvil</a>' : (esIOS()?'📲 Para tenerla como app: Compartir › «Añadir a pantalla de inicio»':'');
+}
+function instalar(){ if(!promptInstalar) return; promptInstalar.prompt(); promptInstalar.userChoice.then(function(){ promptInstalar=null; pintarInstalar(); }); }
+function noInstalar(){ try{ localStorage.setItem('bf_rep_noinst','1'); }catch(e){} pintarInstalar(); }
+window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); promptInstalar=e; pintarInstalar(); });
+window.addEventListener('appinstalled', function(){ promptInstalar=null; pintarInstalar(); toast('App instalada'); });
+if ('serviceWorker' in navigator) { window.addEventListener('load', function(){ navigator.serviceWorker.register('sw-reparto.js', { scope: './reparto' }).catch(function(){}); }); }
+setTimeout(pintarInstalar, 300);
 
 // ---------- arranque ----------
 document.getElementById('fAnt').onclick=function(){ moverDia(-1); };

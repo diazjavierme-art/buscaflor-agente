@@ -1,0 +1,17 @@
+{
+  "name": "Buscaflor Reparto",
+  "short_name": "Reparto",
+  "description": "Entregas, firmas y cobros de los repartidores de Rosas de Buscaflor",
+  "lang": "es",
+  "start_url": "reparto.html?app=1",
+  "scope": "./reparto",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F7F8F9",
+  "theme_color": "#1F344C",
+  "icons": [
+    { "src": "icons/reparto-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/reparto-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/reparto-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
