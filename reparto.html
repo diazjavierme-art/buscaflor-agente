@@ -106,7 +106,7 @@ th:first-child,td:first-child{text-align:left;} td.txt{font-family:'IBM Plex San
     <div style="font-size:18px;font-weight:bold;margin-bottom:4px">Buscaflor · Reparto</div>
     <div style="color:#666;font-size:13px;margin-bottom:16px">Inicia sesión para entrar</div>
     <input id="bfEmail" type="text" inputmode="email" autocomplete="username" placeholder="móvil (o email en la oficina)" required style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;font-size:15px">
-    <input id="bfPass" type="password" autocomplete="current-password" placeholder="PIN (o contraseña)" required style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;font-size:15px">
+    <input id="bfPass" type="password" autocomplete="current-password" placeholder="PIN (repartidores: déjalo vacío)" style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;font-size:15px">
     <div id="bInstalarLogin" style="font-size:12px;color:#555;margin-bottom:10px"></div>
     <div id="bfLoginMsg" style="color:#c0392b;font-size:13px;min-height:18px;margin-bottom:8px"></div>
     <button type="submit" style="width:100%;padding:10px;font-size:15px;background:#222;color:#fff;border:0;border-radius:4px;cursor:pointer">Entrar</button>
@@ -145,6 +145,8 @@ var refs = [];
 
 var DOM_REP='@reparto.rosasdebuscaflor.com';
 function soloMovil(t){ var n=String(t||'').replace(/[\s.\-()]/g,'').replace(/^(\+34|0034)/,''); return /^[67]\d{8}$/.test(n) ? n : null; }
+// Mientras dura la prueba los repartidores pueden entrar solo con el móvil (sin PIN)
+function claveSinPin(m){ return 'bf-rep-'+m+'-sinpin'; }
 function emailDeLogin(t){ var m=soloMovil(t); return m ? m+DOM_REP : String(t||'').trim(); }
 function hoyISO(d){ d = d || new Date(); return d.getFullYear() + '-' + p2(d.getMonth()+1) + '-' + p2(d.getDate()); }
 function p2(n){ return String(n).padStart(2,'0'); }
@@ -499,7 +501,7 @@ function verRepartidores(){
   var r=reps();
   var h='<h3>Repartidores</h3><div class="nota">El número es el «Comercial» de AmbarX. Cada repartidor entra con su móvil y un PIN de 6 cifras, y solo ve sus entregas. Los transportistas externos pueden tener acceso o usar la hoja de ruta en papel.</div>'+
     Object.keys(r).sort(function(a,b){return a-b;}).map(function(c){ var x=r[c]; return '<div class="card" style="border-left-color:var(--navy)"><b class="mono">'+esc(c)+'</b> · '+esc(x.nombre)+(x.externo?' <span class="tag">externo</span>':'')+(x.nave?' <span class="tag">nave</span>':'')+
-      '<div class="nota">'+(x.email?'Entra con '+esc(x.movil||x.email):'Sin acceso')+'</div>'+(!x.nave?'<button class="btn peq" onclick="editarRep(\''+c+'\')">'+(x.email?'Cambiar acceso':'Dar acceso')+'</button>':'')+'</div>'; }).join('')+
+      '<div class="nota">'+(x.email?'Entra con '+esc(x.movil||x.email)+(x.sinPin?' (sin PIN)':' + PIN'):'Sin acceso')+'</div>'+(!x.nave?'<button class="btn peq" onclick="editarRep(\''+c+'\')">'+(x.email?'Cambiar acceso':'Dar acceso')+'</button>':'')+'</div>'; }).join('')+
     '<div class="fila-btn"><button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
   velo(h);
 }
@@ -507,23 +509,24 @@ function editarRep(c){
   var x=reps()[c];
   velo('<h3>Acceso de '+esc(x.nombre)+'</h3>'+(x.email?'<div class="nota">Ahora entra con '+esc(x.movil||x.email)+'</div>':'')+
     '<label>Móvil del repartidor</label><input id="rMov" type="tel" inputmode="numeric" placeholder="600123456" value="'+esc(x.movil||'')+'">'+
-    '<label>PIN de 6 cifras</label><input id="rPin" type="tel" inputmode="numeric" maxlength="6" placeholder="Ej.: 482913" autocomplete="off">'+
-    '<div class="nota">Apúntaselo al repartidor: entra en la app con su móvil y este PIN, una sola vez. No uses 123456 ni su fecha de nacimiento.</div>'+
+    '<label>PIN de 6 cifras (opcional)</label><input id="rPin" type="tel" inputmode="numeric" maxlength="6" placeholder="Déjalo vacío para entrar solo con el móvil" autocomplete="off">'+
+    '<div class="nota">Sin PIN, el repartidor entra solo con su número de móvil (para la prueba). Con PIN, tendrá que escribirlo la primera vez.</div>'+
     '<div class="fila-btn"><button class="btn primario" onclick="guardarRep(\''+c+'\')">Dar acceso</button><button class="btn" onclick="verRepartidores()">Volver</button></div>'+
     (x.email?'<div class="fila-btn"><button class="btn peligro" onclick="quitarRep(\''+c+'\')">Quitar acceso</button></div>':''));
 }
 function guardarRep(c){
   var mov=soloMovil(document.getElementById('rMov').value), pin=document.getElementById('rPin').value.trim();
   if(!mov){ toast('Pon un móvil español de 9 cifras'); return; }
-  if(!/^\d{6}$/.test(pin)){ toast('El PIN tiene que ser de 6 cifras'); return; }
-  if(/^(\d)\1{5}$|^123456$|^654321$/.test(pin)){ toast('Ese PIN es demasiado fácil'); return; }
+  if(pin && !/^\d{6}$/.test(pin)){ toast('El PIN tiene que ser de 6 cifras (o déjalo vacío)'); return; }
+  if(pin && /^(\d)\1{5}$|^123456$|^654321$/.test(pin)){ toast('Ese PIN es demasiado fácil'); return; }
+  var clave = pin || claveSinPin(mov), yaTenia=false;
   var em=mov+DOM_REP;
   // Crea la cuenta con una segunda conexión para no cerrar la sesión de la oficina
   var app2 = firebase.apps.find(function(a){ return a.name==='alta'; }) || firebase.initializeApp(CFG,'alta');
-  app2.auth().createUserWithEmailAndPassword(em, pin).then(function(){ return app2.auth().signOut(); })
-    .catch(function(e){ if(e.code==='auth/email-already-in-use') throw new Error('Ese móvil ya tiene acceso. Para cambiarle el PIN, quítale el acceso en Firebase o dale otro móvil.'); throw e; })
-    .then(function(){ return db.ref('buscaflor/configPedidos/repartidores/'+c).update({ email: em, movil: mov, nombre: reps()[c].nombre }); })
-    .then(function(){ toast('Acceso creado: '+mov); verRepartidores(); }, function(e){ toast(e.message||String(e)); });
+  app2.auth().createUserWithEmailAndPassword(em, clave).then(function(){ return app2.auth().signOut(); })
+    .catch(function(e){ if(e.code==='auth/email-already-in-use'){ yaTenia=true; return; } throw e; })
+    .then(function(){ return db.ref('buscaflor/configPedidos/repartidores/'+c).update({ email: em, movil: mov, sinPin: !pin, nombre: reps()[c].nombre }); })
+    .then(function(){ toast(yaTenia?'Ese móvil ya tenía cuenta: entra como la primera vez (con su PIN si se lo pusiste)':'Acceso creado: '+mov); verRepartidores(); }, function(e){ toast(e.message||String(e)); });
 }
 function quitarRep(c){
   if(!confirm('¿Quitar el acceso a '+reps()[c].nombre+'? Dejará de ver sus entregas.')) return;
@@ -576,8 +579,10 @@ firebase.auth().onAuthStateChanged(function(u){
 });
 document.getElementById('bfLoginForm').onsubmit=function(e){
   e.preventDefault(); var m=document.getElementById('bfLoginMsg'); m.textContent='Entrando…';
-  firebase.auth().signInWithEmailAndPassword(emailDeLogin(document.getElementById('bfEmail').value), document.getElementById('bfPass').value)
-    .then(function(){ m.textContent=''; }, function(err){ var c=err&&err.code||''; m.textContent=/invalid|wrong-password|user-not-found/.test(c)?'Móvil o PIN incorrectos':c==='auth/too-many-requests'?'Demasiados intentos; espera un poco':'Error: '+(err.message||c); });
+  (function(){ var v=document.getElementById('bfEmail').value, pw=document.getElementById('bfPass').value, mv=soloMovil(v);
+    if(!pw && !mv) return Promise.reject({code:'falta-clave'});
+    return firebase.auth().signInWithEmailAndPassword(emailDeLogin(v), pw || claveSinPin(mv)); })()
+    .then(function(){ m.textContent=''; }, function(err){ var c=err&&err.code||''; m.textContent=c==='falta-clave'?'Escribe la contraseña':/invalid|wrong-password|user-not-found/.test(c)?'Ese móvil no tiene acceso (o el PIN no es correcto). Pide acceso en la oficina.':c==='auth/too-many-requests'?'Demasiados intentos; espera un poco':'Error: '+(err.message||c); });
 };
 </script>
 </body>
