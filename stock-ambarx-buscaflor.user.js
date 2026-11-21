@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.5.0
+// @version      0.5.1
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX.
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -221,11 +221,17 @@
   // Abre /AmbarX/movil › Firmar, carga el documento y estampa la firma (la misma pantalla que usa la app de Querry)
   async function firmarEnAmbarx(doc, tipo, num, firma, obs) {
     const W = doc.defaultView;
-    const bF = await hastaQue(() => boton(doc, /^Firmar$/), 30000); if (!bF) throw new Error('No se abre el menú móvil de AmbarX');
+    const bF = await hastaQue(() => boton(doc, /^Firmar$/), 30000); if (!bF) throw new Error(/\/movil/.test(doc.defaultView.location.pathname) ? 'No se abre el menú móvil de AmbarX' : 'AmbarX no deja abrir su pantalla móvil con este usuario (redirige a ' + doc.defaultView.location.pathname + ')');
     bF.click();
     const cb = await hastaQue(() => { const c = hondo(doc, 'vaadin-combo-box')[0]; return c && (c.filteredItems || []).length ? c : null; }, 20000); if (!cb) throw new Error('No se abre «Firmar documento»');
     const clave = tipo === 'factura' ? '2' : '1';
-    if (cb.value !== clave) { const it = cb.filteredItems.find(i => i.key === clave); if (it) cb.selectedItem = it; }
+    if (cb.value !== clave) {
+      const it = (cb.filteredItems || cb.items || []).find(i => i.key === clave);
+      if (it) cb.selectedItem = it;
+      await espera(800);
+      if (cb.value !== clave) { cb.value = clave; cb.dispatchEvent(new W.CustomEvent('change', { bubbles: true })); }
+      if (cb.value !== clave) { cb.opened = true; await espera(800); const op = hondo(doc, 'vaadin-combo-box-item').find(x => /Factura venta|Albar[aá]n venta/.test(x.textContent) && (clave === '2' ? /Factura/.test(x.textContent) : /Albar/.test(x.textContent))); if (op) op.click(); }
+    }
     if (!await hastaQue(() => cb.value === clave, 5000)) throw new Error('No se puede elegir el tipo de documento');
     await espera(400);
     const tf = hondo(doc, 'vaadin-text-field')[0]; tf.value = num; tf.dispatchEvent(new W.CustomEvent('change', { bubbles: true })); await espera(600);
