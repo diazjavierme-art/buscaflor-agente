@@ -240,7 +240,7 @@ function tarjeta(d){
 function estadoAmbarx(e){
   if(!e || e.estado!=='entregado' || !e.firma) return '';
   var a=e.ambarx||{}, t='';
-  t += a.firma==='firmado'||a.firma==='yaFirmado' ? '<span class="tag ok">Firmado en AmbarX</span>' : a.firma==='error' ? '<span class="tag mal">Firma: error en AmbarX</span>' : '<span class="tag">Firma → AmbarX…</span>';
+  t += a.firma==='firmado'||a.firma==='yaFirmado' ? '<span class="tag ok">Firmado en AmbarX</span>'+(a.pdf==='ok'?'<span class="tag ok">PDF listo</span>':'') : a.firma==='error' ? '<span class="tag mal">Firma: error en AmbarX</span>' : '<span class="tag">Firma → AmbarX…</span>';
   if(e.enviarEmail) t += a.email==='enviado' ? '<span class="tag ok">Email enviado</span>' : a.email==='sinEmail' ? '<span class="tag mal">Sin email en AmbarX</span>' : a.email==='error' ? '<span class="tag mal">Email: error</span>' : '<span class="tag">Email pendiente</span>';
   return t;
 }
@@ -310,7 +310,7 @@ function abrir(k){
       (esOficina() && e.ambarx && (e.ambarx.firma==='error'||e.ambarx.email==='error') ? '<div class="fila-btn"><button class="btn peq" onclick="reintentarAmbarx(\''+k+'\')">Reintentar en AmbarX</button></div>':'');
   }
   h+='<div class="fila-btn">'+(!e && !esOficina()?'<button class="btn primario" onclick="entregar(\''+k+'\')">✍️ Entregar y firmar</button>':'')+
-    (e && e.estado!=='incidencia'?'<button class="btn" onclick="pdfEntrega(\''+k+'\')">PDF firmado</button>':'')+
+    (e && e.estado!=='incidencia'?'<button class="btn" onclick="pdfOficial(\''+k+'\')">📄 '+(d.tipo==='factura'?'Factura':'Albarán')+' firmado (AmbarX)</button>':'')+
     (e?'<button class="btn peligro" onclick="deshacer(\''+k+'\')">Deshacer entrega</button>':'')+
     (esOficina()?'<button class="btn" onclick="reasignar(\''+k+'\')">Cambiar repartidor</button><button class="btn" onclick="editarDir(\''+k+'\')">Dirección de entrega</button>':'')+
     '<button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
@@ -434,7 +434,7 @@ function guardarEntrega(){
 function ofrecerPdf(k, e0){
   var d=S.docs[k];
   var e=e0||S.ent[k]||{};
-  velo('<h3>Entrega guardada ✔</h3><div class="nota">'+esc(d.cliente)+' · '+esc(d.num)+'</div>'+(e.firma?'<div class="alerta ok">La firma se pasa sola al '+(d.tipo==='factura'?'documento':'albarán')+' de AmbarX'+(e.enviarEmail?' y AmbarX se lo envía al cliente por email':'')+' en un par de minutos.</div>':'')+'<div class="fila-btn"><button class="btn" onclick="pdfEntrega(\''+k+'\')">Mandar copia por WhatsApp</button></div><div class="fila-btn"><button class="btn" onclick="cerrarVelo()">Seguir con el reparto</button></div>');
+  velo('<h3>Entrega guardada ✔</h3><div class="nota">'+esc(d.cliente)+' · '+esc(d.num)+'</div>'+(e.firma?'<div class="alerta ok">La firma se pasa sola al '+(d.tipo==='factura'?'documento':'albarán')+' de AmbarX'+(e.enviarEmail?' y AmbarX se lo envía al cliente por email':'')+' en un par de minutos.</div>':'')+'<div class="nota">Cuando salga «Firmado en AmbarX» podrás mandar el '+(d.tipo==='factura'?'documento':'albarán')+' oficial por WhatsApp desde la entrega (botón 📄).</div><div class="fila-btn"><button class="btn" onclick="cerrarVelo()">Seguir con el reparto</button></div>');
 }
 function noEntregado(){
   var m=prompt('¿Por qué no se ha entregado? (cerrado, no está, rechaza…)'); if(m===null) return;
@@ -449,6 +449,19 @@ function compartirPdf(doc, nombre, titulo){
   var blob=new Blob([doc.output('arraybuffer')],{type:'application/pdf'});
   try{ var file=new File([blob],nombre,{type:'application/pdf'}); if(navigator.canShare&&navigator.canShare({files:[file]})) return navigator.share({files:[file],title:titulo}).catch(function(){}); }catch(e){}
   var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=nombre; document.body.appendChild(a); a.click(); setTimeout(function(){a.remove();},500);
+}
+// PDF oficial de AmbarX (lo deja el servidor en reparto/<fecha>/pdfs/<nº> después de firmar)
+function pdfOficial(k){
+  var d=S.docs[k], e=S.ent[k]||{}, a=e.ambarx||{};
+  db.ref('buscaflor/reparto/'+S.fecha+'/pdfs/'+k).once('value').then(function(s){
+    var v=s.val();
+    if(!v){ toast(a.pdf==='ok'?'No encuentro el PDF':'El PDF de AmbarX estará en un par de minutos, cuando se firme en AmbarX'); return; }
+    var bin=atob(v.split(',')[1]), u=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+    var nombre=(d.tipo==='factura'?'FV-':'AV-')+String(d.num).replace('-','')+'.pdf';
+    var blob=new Blob([u],{type:'application/pdf'});
+    try{ var file=new File([blob],nombre,{type:'application/pdf'}); if(navigator.canShare&&navigator.canShare({files:[file]})) return navigator.share({files:[file],title:nombre}).catch(function(){}); }catch(err){}
+    var url=URL.createObjectURL(blob); var w=window.open(url,'_blank'); if(!w){ var l=document.createElement('a'); l.href=url; l.download=nombre; document.body.appendChild(l); l.click(); setTimeout(function(){l.remove();},500); }
+  });
 }
 function pdfEntrega(k){
   var d=S.docs[k], e=S.ent[k]||{}, doc=nuevoPdf(); if(!doc) return;

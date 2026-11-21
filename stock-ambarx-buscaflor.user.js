@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.3.0
+// @version      0.4.0
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX.
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -273,11 +273,32 @@
     return { email: 'enviado', para };
   }
 
+  // PDF oficial de AmbarX (formato aBuscaflor Normal, con la firma): Imprimir › Aceptar abre la vista previa con el PDF
+  async function pdfOficial(doc) {
+    const W = doc.defaultView;
+    const imp = await hastaQue(() => hondo(doc, 'vaadin-button').find(b => { const i = b.querySelector('vaadin-icon'); return i && i.getAttribute('icon') === 'vaadin:print'; }), 40000);
+    if (!imp) throw new Error('No encuentro «Imprimir» en el documento');
+    await espera(800); imp.click();
+    const ok = await hastaQue(() => /Desea imprimir/.test(textoDe(doc)) && boton(doc, /^Aceptar$/), 20000);
+    if (!ok) throw new Error('No sale la ventana de imprimir');
+    // que no lo mande también por email
+    hondo(doc, 'vaadin-checkbox').forEach(cb => { if (/Enviar por Email/i.test(cb.label || cb.textContent || '') && cb.checked) { const i = cb.querySelector('input') || (cb.shadowRoot && cb.shadowRoot.querySelector('input')); (i || cb).click(); } });
+    await espera(500);
+    const antes = new Set(hondo(doc, 'a[href*="dynamic/resource"]').map(a => a.href));
+    ok.click();
+    const a = await hastaQue(() => hondo(doc, 'a[href*="dynamic/resource"]').find(x => /\.pdf/i.test(x.href) && !antes.has(x.href)), 40000, 800);
+    if (!a) throw new Error('AmbarX no ha generado el PDF');
+    const buf = await fetch(a.href, { credentials: 'include' }).then(r => r.arrayBuffer());
+    let bin = ''; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 8192) bin += String.fromCharCode.apply(null, u.subarray(i, i + 8192));
+    if (!/^%PDF/.test(bin.slice(0, 5))) throw new Error('El PDF de AmbarX ha salido vacío');
+    return 'data:application/pdf;base64,' + W.btoa(bin);
+  }
+
   async function pasarEntregas() {
     if (ocupado) return;
     const f = ahoraISO().slice(0, 10);
     const ent = (await fb('GET', RUTA_REP + '/' + f + '/entregas')) || {};
-    const pend = Object.keys(ent).filter(k => { const e = ent[k], a = e.ambarx || {}; return e.estado === 'entregado' && (a.intentos || 0) < 3 && ((e.firma && !a.firma) || (e.enviarEmail && a.firma && a.firma !== 'error' && !a.email)); });
+    const pend = Object.keys(ent).filter(k => { const e = ent[k], a = e.ambarx || {}; return e.estado === 'entregado' && (a.intentos || 0) < 3 && ((e.firma && !a.firma) || (a.firma && a.firma !== 'error' && !a.pdf) || (e.enviarEmail && a.firma && a.firma !== 'error' && !a.email)); });
     if (!pend.length || !cogerCerrojo()) return;
     ocupado = true; ultimoErr = ''; pintar();
     try {
@@ -292,7 +313,13 @@
             a.firma = await conMarco(doc => firmarEnAmbarx(doc, tipo, num, e.firma, obs), 'movil');
             a.firmaHora = ahoraISO();
           }
-          if (e.enviarEmail && a.firma && !a.email) {
+          if (a.firma && a.firma !== 'error' && !a.pdf) {
+            fase = 'PDF de ' + num + '…'; pintar();
+            const pdf = await conMarco(doc => pdfOficial(doc), (tipo === 'factura' ? 'ventas/facturas' : 'ventas/albaranes') + '/editar/' + encodeURIComponent(num));
+            await fb('PUT', RUTA_REP + '/' + f + '/pdfs/' + k, pdf);
+            a.pdf = 'ok'; a.pdfHora = ahoraISO();
+          }
+          if (e.enviarEmail && a.firma && a.firma !== 'error' && !a.email) {
             fase = 'Enviando ' + num + ' por email…'; pintar();
             const r = await conMarco(doc => emailDesdeAmbarx(doc), (tipo === 'factura' ? 'ventas/facturas' : 'ventas/albaranes') + '/editar/' + encodeURIComponent(num));
             a.email = r.email; a.para = r.para; a.emailHora = ahoraISO();
