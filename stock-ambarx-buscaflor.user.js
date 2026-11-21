@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.4.1
+// @version      0.5.0
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX.
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -294,11 +294,48 @@
     return 'data:application/pdf;base64,' + W.btoa(bin);
   }
 
+  // Cobro en AmbarX (botón € del documento › Gestión de cobros): efectivo = EF, tarjeta = TP
+  const FORMA_AMBARX = { efectivo: 'EF', tarjeta: 'TP' };
+  async function cobrarEnAmbarx(doc, codigo, importe) {
+    const W = doc.defaultView;
+    const eur = await hastaQue(() => hondo(doc, 'vaadin-button').find(b => { const i = b.querySelector('vaadin-icon'); return i && i.getAttribute('icon') === 'vaadin:euro'; }), 40000);
+    if (!eur) throw new Error('No encuentro «Cobrar» en el documento');
+    await espera(800); eur.click();
+    const caja = await hastaQue(() => { const fc = hondo(doc, 'vaadin-date-picker').find(e => e.label === 'Fecha cobro'); let c = fc; while (c && !(c.innerText || '').includes('Importe a cobrar')) c = c.parentElement; return c; }, 20000);
+    if (!caja) throw new Error('No se abre la ventana de cobro');
+    await espera(800);
+    const estado = () => { const m = (caja.innerText || '').match(/([\d.,]+)\s*\/\s*([\d.,]+)\s*€/); return m ? [numEs(m[1]), numEs(m[2])] : null; };
+    const e0 = estado();
+    let dlg = caja; while (dlg && !(dlg.innerText || '').includes('Gestión de cobros')) dlg = dlg.parentElement;
+    const cancelar = () => { const b = [...(dlg || doc).querySelectorAll('vaadin-button')].find(x => /^Cancelar$/.test(x.textContent.trim())); if (b) b.click(); };
+    if (e0 && e0[1] > 0 && e0[0] >= e0[1] - 0.005) { cancelar(); return 'yaCobrado'; }
+    const tfs = [...caja.querySelectorAll('vaadin-text-field')];
+    const fp = tfs[1];
+    if (!fp) { cancelar(); throw new Error('No encuentro «Forma de pago» en la ventana de cobro'); }
+    fp.focus(); fp.value = codigo; fp.dispatchEvent(new W.CustomEvent('change', { bubbles: true }));
+    const inp = fp.inputElement || fp.querySelector('input'); if (inp) { inp.dispatchEvent(new W.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); inp.blur(); }
+    const okForma = await hastaQue(() => [...caja.querySelectorAll('vaadin-custom-field')].some(x => String(x.value || '').indexOf(codigo + ' - ') === 0), 8000);
+    if (!okForma) { cancelar(); throw new Error('AmbarX no reconoce la forma de pago ' + codigo); }
+    const imp = tfs.find(t => t.label === 'Importe contado');
+    imp.value = String(importe.toFixed(2)).replace('.', ','); imp.dispatchEvent(new W.CustomEvent('change', { bubbles: true }));
+    await espera(1200);
+    const e1 = estado();
+    if (!e1 || Math.abs(e1[0] - importe) > 0.01) { cancelar(); throw new Error('El importe no ha entrado bien en AmbarX'); }
+    const cobrar = [...(dlg || doc).querySelectorAll('vaadin-button')].find(x => /^Cobrar$/.test(x.textContent.trim()));
+    if (!cobrar) { cancelar(); throw new Error('No encuentro el botón «Cobrar»'); }
+    cobrar.click();
+    const fin = await hastaQue(() => !hondo(doc, 'vaadin-date-picker').some(e => e.label === 'Fecha cobro'), 20000);
+    if (!fin) throw new Error('AmbarX no ha cerrado la ventana de cobro');
+    await espera(1500);
+    return 'cobrado';
+  }
+
   async function pasarEntregas() {
     if (ocupado) return;
     const f = ahoraISO().slice(0, 10);
     const ent = (await fb('GET', RUTA_REP + '/' + f + '/entregas')) || {};
-    const pend = Object.keys(ent).filter(k => { const e = ent[k], a = e.ambarx || {}; return e.estado === 'entregado' && (a.intentos || 0) < 3 && ((e.firma && !a.firma) || (a.firma && a.firma !== 'error' && !a.pdf) || (e.emailManual === true && e.enviarEmail && a.firma && a.firma !== 'error' && !a.email)); });
+    const pend = Object.keys(ent).filter(k => { const e = ent[k], a = e.ambarx || {}; const c = e.cobro || {}; const debeCobrar = FORMA_AMBARX[c.forma] && (+c.importe || 0) > 0;
+      return e.estado === 'entregado' && (a.intentos || 0) < 3 && ((debeCobrar && !a.cobro) || (e.firma && !a.firma) || (a.firma && a.firma !== 'error' && !a.pdf) || (e.emailManual === true && e.enviarEmail && a.firma && a.firma !== 'error' && !a.email)); });
     if (!pend.length || !cogerCerrojo()) return;
     ocupado = true; ultimoErr = ''; pintar();
     try {
@@ -312,6 +349,12 @@
             const obs = ['App reparto', e.recibe ? 'Recibe: ' + e.recibe : '', e.cobro ? 'Cobro: ' + (e.cobro.forma || '') + (e.cobro.importe ? ' ' + String(e.cobro.importe).replace('.', ',') + ' €' : '') : '', e.nota || ''].filter(Boolean).join(' · ');
             a.firma = await conMarco(doc => firmarEnAmbarx(doc, tipo, num, e.firma, obs), 'movil');
             a.firmaHora = ahoraISO();
+          }
+          const co = e.cobro || {};
+          if (FORMA_AMBARX[co.forma] && (+co.importe || 0) > 0 && !a.cobro) {
+            fase = 'Cobro de ' + num + ' en AmbarX…'; pintar();
+            a.cobro = await conMarco(doc => cobrarEnAmbarx(doc, FORMA_AMBARX[co.forma], +co.importe), (tipo === 'factura' ? 'ventas/facturas' : 'ventas/albaranes') + '/editar/' + encodeURIComponent(num));
+            a.cobroHora = ahoraISO();
           }
           if (a.firma && a.firma !== 'error' && !a.pdf) {
             fase = 'PDF de ' + num + '…'; pintar();
@@ -328,7 +371,7 @@
           a.error = null;
         } catch (err) {
           a.intentos = (a.intentos || 0) + 1; a.error = String(err.message || err);
-          if (a.intentos >= 3) { if (!a.firma) a.firma = 'error'; else if (!a.email) a.email = 'error'; }
+          if (a.intentos >= 3) { if (!a.firma && e.firma) a.firma = 'error'; else if (!a.cobro && FORMA_AMBARX[(e.cobro || {}).forma]) a.cobro = 'error'; else if (!a.pdf) a.pdf = 'error'; }
           console.error('[bf-reparto] ' + num, err);
         }
         await fb('PUT', RUTA_REP + '/' + f + '/entregas/' + k + '/ambarx', a);

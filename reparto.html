@@ -238,9 +238,11 @@ function tarjeta(d){
     '</div>';
 }
 function estadoAmbarx(e){
-  if(!e || e.estado!=='entregado' || !e.firma) return '';
+  if(!e || e.estado!=='entregado') return '';
   var a=e.ambarx||{}, t='';
-  t += a.firma==='firmado'||a.firma==='yaFirmado' ? '<span class="tag ok">Firmado en AmbarX</span>'+(a.pdf==='ok'?'<span class="tag ok">PDF listo</span>':'') : a.firma==='error' ? '<span class="tag mal">Firma: error en AmbarX</span>' : '<span class="tag">Firma → AmbarX…</span>';
+  if(e.firma) t += a.firma==='firmado'||a.firma==='yaFirmado' ? '<span class="tag ok">Firmado en AmbarX</span>'+(a.pdf==='ok'?'<span class="tag ok">PDF listo</span>':'') : a.firma==='error' ? '<span class="tag mal">Firma: error en AmbarX</span>' : '<span class="tag">Firma → AmbarX…</span>';
+  var fc=(e.cobro||{}).forma;
+  if((fc==='efectivo'||fc==='tarjeta') && (+(e.cobro||{}).importe||0)>0) t += a.cobro==='cobrado'||a.cobro==='yaCobrado' ? '<span class="tag ok">Cobrado en AmbarX</span>' : a.cobro==='error' ? '<span class="tag mal">Cobro: error en AmbarX</span>' : '<span class="tag">Cobro → AmbarX…</span>';
   if(e.enviarEmail) t += a.email==='enviado' ? '<span class="tag ok">Email enviado</span>' : a.email==='sinEmail' ? '<span class="tag mal">Sin email en AmbarX</span>' : a.email==='error' ? '<span class="tag mal">Email: error</span>' : '<span class="tag">Email pendiente</span>';
   return t;
 }
@@ -307,7 +309,7 @@ function abrir(k){
     h+='<label>Entrega</label><div class="nota">'+(e.estado==='incidencia'?'<b style="color:var(--rojo)">No entregado</b> · '+esc(e.motivo||''):'Entregado a las '+esc((e.hora||'').slice(11,16))+(e.recibe?' · recibe '+esc(e.recibe):'')+' · '+esc(textoCobro(e.cobro)))+(e.nota?'<br>Nota: '+esc(e.nota):'')+'<br>Por '+esc(e.por||'')+'</div>'+
       (e.firma?'<img class="firma-img" src="'+e.firma+'">':'')+
       '<div style="margin-top:6px">'+estadoAmbarx(e)+'</div>'+((e.ambarx||{}).para&&(e.ambarx.para.length)?'<div class="nota">Enviado a '+esc(e.ambarx.para.join(', '))+'</div>':'')+((e.ambarx||{}).error?'<div class="nota" style="color:var(--rojo)">'+esc(e.ambarx.error)+'</div>':'')+
-      (esOficina() && e.ambarx && (e.ambarx.firma==='error'||e.ambarx.email==='error') ? '<div class="fila-btn"><button class="btn peq" onclick="reintentarAmbarx(\''+k+'\')">Reintentar en AmbarX</button></div>':'');
+      (esOficina() && e.ambarx && (e.ambarx.firma==='error'||e.ambarx.email==='error'||e.ambarx.cobro==='error'||e.ambarx.pdf==='error') ? '<div class="fila-btn"><button class="btn peq" onclick="reintentarAmbarx(\''+k+'\')">Reintentar en AmbarX</button></div>':'');
   }
   h+='<div class="fila-btn">'+(!e && !esOficina()?'<button class="btn primario" onclick="entregar(\''+k+'\')">✍️ Entregar y firmar</button>':'')+
     (e && e.estado!=='incidencia'?'<button class="btn" onclick="pdfOficial(\''+k+'\')">📄 '+(d.tipo==='factura'?'Factura':'Albarán')+' firmado (AmbarX)</button>':'')+
@@ -318,7 +320,7 @@ function abrir(k){
 }
 
 function reintentarAmbarx(k){
-  var a=Object.assign({}, (S.ent[k]||{}).ambarx||{}); if(a.firma==='error') delete a.firma; if(a.email==='error') delete a.email; a.intentos=0; a.error=null;
+  var a=Object.assign({}, (S.ent[k]||{}).ambarx||{}); if(a.firma==='error') delete a.firma; if(a.email==='error') delete a.email; if(a.cobro==='error') delete a.cobro; if(a.pdf==='error') delete a.pdf; a.intentos=0; a.error=null;
   db.ref('buscaflor/reparto/'+S.fecha+'/entregas/'+k+'/ambarx').set(a).then(function(){ cerrarVelo(); toast('Se volverá a intentar en menos de un minuto'); });
 }
 function editarDir(k){
