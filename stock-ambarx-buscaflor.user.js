@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.4.0
+// @version      0.4.1
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX.
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -298,7 +298,7 @@
     if (ocupado) return;
     const f = ahoraISO().slice(0, 10);
     const ent = (await fb('GET', RUTA_REP + '/' + f + '/entregas')) || {};
-    const pend = Object.keys(ent).filter(k => { const e = ent[k], a = e.ambarx || {}; return e.estado === 'entregado' && (a.intentos || 0) < 3 && ((e.firma && !a.firma) || (a.firma && a.firma !== 'error' && !a.pdf) || (e.enviarEmail && a.firma && a.firma !== 'error' && !a.email)); });
+    const pend = Object.keys(ent).filter(k => { const e = ent[k], a = e.ambarx || {}; return e.estado === 'entregado' && (a.intentos || 0) < 3 && ((e.firma && !a.firma) || (a.firma && a.firma !== 'error' && !a.pdf) || (e.emailManual === true && e.enviarEmail && a.firma && a.firma !== 'error' && !a.email)); });
     if (!pend.length || !cogerCerrojo()) return;
     ocupado = true; ultimoErr = ''; pintar();
     try {
@@ -319,7 +319,8 @@
             await fb('PUT', RUTA_REP + '/' + f + '/pdfs/' + k, pdf);
             a.pdf = 'ok'; a.pdfHora = ahoraISO();
           }
-          if (e.enviarEmail && a.firma && a.firma !== 'error' && !a.email) {
+          // El email lo manda AmbarX solo al firmar (igual que con la app de Querry): aquí solo si se pide expresamente
+          if (e.enviarEmail === true && e.emailManual === true && a.firma && a.firma !== 'error' && !a.email) {
             fase = 'Enviando ' + num + ' por email…'; pintar();
             const r = await conMarco(doc => emailDesdeAmbarx(doc), (tipo === 'factura' ? 'ventas/facturas' : 'ventas/albaranes') + '/editar/' + encodeURIComponent(num));
             a.email = r.email; a.para = r.para; a.emailHora = ahoraISO();

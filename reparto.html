@@ -365,7 +365,7 @@ function entregar(k){
       [['efectivo','💶 Efectivo'],['tarjeta','💳 Tarjeta'],['transferencia','🏦 Transferencia'],['pendiente','No cobra']].map(function(x){ return '<button data-f="'+x[0]+'">'+x[1]+'</button>'; }).join('')+'</div>'+
     '<div id="cajaImp" style="display:none"><label>Importe cobrado</label><input id="imp" type="number" inputmode="decimal" step="0.01" value="'+(+d.total||0).toFixed(2)+'"></div>'+
     '<label>Firma del cliente</label><div id="cajaFirma" onclick="abrirPad()">✍️ Toca aquí para que firme el cliente</div>'+
-    '<label class="interr"><input type="checkbox" id="chkEmail" '+((d.emails||[]).length||!d.v?'checked':'')+'><span style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--tinta);font-weight:500">Enviar el '+(d.tipo==='factura'?'documento':'albarán')+' firmado por email'+((d.emails||[]).length?' a <b>'+esc(d.emails.join(', '))+'</b>':d.v?' <b style="color:var(--rojo)">(el cliente no tiene email en AmbarX)</b>':' a los correos del cliente en AmbarX')+'</span></label>'+
+    '<div class="nota" style="margin-top:6px">Al firmar, AmbarX guarda la firma en el '+(d.tipo==='factura'?'documento':'albarán')+' y se lo envía al cliente por email, como con la app de antes.</div>'+
     '<label>Nombre de quien recibe (opcional)</label><input id="recibe" autocomplete="off">'+
     '<label>Nota (opcional)</label><input id="notaE" autocomplete="off" placeholder="Ej.: dejado en la trastienda">'+
     '<div class="fila-btn"><button class="btn verde" onclick="guardarEntrega()">✔ Guardar entrega</button></div>'+
@@ -421,9 +421,8 @@ function guardarEntrega(){
   var d=S.docs[F.k];
   if(!F.forma){ toast('Marca cómo cobra (o «No cobra»)'); return; }
   if(!F.firma){ if(!confirm('No hay firma. ¿Guardar la entrega sin firma?')) return; }
-  var conEmail=!!(document.getElementById('chkEmail')||{}).checked;
   var imp = F.forma==='pendiente' ? 0 : +(document.getElementById('imp').value||0);
-  var e={ estado:'entregado', hora:ahora(), firma: F.firma||null, enviarEmail: conEmail && !!F.firma, tipo:d.tipo, recibe:document.getElementById('recibe').value.trim(), nota:document.getElementById('notaE').value.trim(),
+  var e={ estado:'entregado', hora:ahora(), firma: F.firma||null, tipo:d.tipo, recibe:document.getElementById('recibe').value.trim(), nota:document.getElementById('notaE').value.trim(),
     cobro:{ forma:F.forma, importe:imp }, por:nombreYo(), comercial:comDe(d), num:d.num, total:+d.total||0 };
   db.ref('buscaflor/reparto/'+S.fecha+'/entregas/'+F.k).set(e).then(function(){
     var k=F.k; cerrarVelo(); toast('Entrega guardada');
@@ -434,7 +433,7 @@ function guardarEntrega(){
 function ofrecerPdf(k, e0){
   var d=S.docs[k];
   var e=e0||S.ent[k]||{};
-  velo('<h3>Entrega guardada ✔</h3><div class="nota">'+esc(d.cliente)+' · '+esc(d.num)+'</div>'+(e.firma?'<div class="alerta ok">La firma se pasa sola al '+(d.tipo==='factura'?'documento':'albarán')+' de AmbarX'+(e.enviarEmail?' y AmbarX se lo envía al cliente por email':'')+' en un par de minutos.</div>':'')+'<div class="nota">Cuando salga «Firmado en AmbarX» podrás mandar el '+(d.tipo==='factura'?'documento':'albarán')+' oficial por WhatsApp desde la entrega (botón 📄).</div><div class="fila-btn"><button class="btn" onclick="cerrarVelo()">Seguir con el reparto</button></div>');
+  velo('<h3>Entrega guardada ✔</h3><div class="nota">'+esc(d.cliente)+' · '+esc(d.num)+'</div>'+(e.firma?'<div class="alerta ok">En un par de minutos la firma queda guardada en el '+(d.tipo==='factura'?'documento':'albarán')+' de AmbarX y AmbarX se lo envía al cliente por email.</div>':'')+'<div class="nota">Cuando salga «Firmado en AmbarX» podrás mandar el '+(d.tipo==='factura'?'documento':'albarán')+' oficial por WhatsApp desde la entrega (botón 📄).</div><div class="fila-btn"><button class="btn" onclick="cerrarVelo()">Seguir con el reparto</button></div>');
 }
 function noEntregado(){
   var m=prompt('¿Por qué no se ha entregado? (cerrado, no está, rechaza…)'); if(m===null) return;
