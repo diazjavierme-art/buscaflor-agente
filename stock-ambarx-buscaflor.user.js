@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.5.2
+// @version      0.6.0
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX.
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
 // @grant        none
+// @require      https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js
 // @updateURL    https://raw.githubusercontent.com/diazjavierme-art/buscaflor-agente/main/stock-ambarx-buscaflor.user.js
 // @downloadURL  https://raw.githubusercontent.com/diazjavierme-art/buscaflor-agente/main/stock-ambarx-buscaflor.user.js
 // ==/UserScript==
@@ -300,6 +301,75 @@
     return 'data:application/pdf;base64,' + W.btoa(bin);
   }
 
+  // ---------------- Firma sin AmbarX móvil: PDF oficial + firma en el recuadro «Firma» → adjunto del documento ----------------
+  const b64aBytes = d => { const s = atob(String(d).split(',').pop()); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
+  const bytesAb64 = u => { let bin = ''; for (let i = 0; i < u.length; i += 8192) bin += String.fromCharCode.apply(null, u.subarray(i, i + 8192)); return 'data:application/pdf;base64,' + btoa(bin); };
+
+  // Recuadro «Firma» del formato aBuscaflor (A4, puntos PDF desde abajo): albarán 415-575 × 45-90; factura, bajo la palabra «Firma»
+  async function estamparFirma(pdfDataUrl, firma, tipo) {
+    const P = window.PDFLib; if (!P) throw new Error('Falta la librería de PDF (actualiza el script)');
+    const pdf = await P.PDFDocument.load(b64aBytes(pdfDataUrl));
+    const img = /image\/png/.test(String(firma).slice(0, 30)) ? await pdf.embedPng(b64aBytes(firma)) : await pdf.embedJpg(b64aBytes(firma));
+    const pgs = pdf.getPages(), pg = pgs[pgs.length - 1], H = pg.getSize().height;
+    const c = tipo === 'factura' ? { x: 410, y: H - 805, w: 165, h: 48 } : { x: 415, y: H - 797, w: 160, h: 45 };
+    const m = 3, k = Math.min((c.w - 2 * m) / img.width, (c.h - 2 * m) / img.height), w = img.width * k, h = img.height * k;
+    pg.drawRectangle({ x: c.x + 1, y: c.y + 1, width: c.w - 2, height: c.h - 2, color: P.rgb(1, 1, 1) });
+    pg.drawImage(img, { x: c.x + (c.w - w) / 2, y: c.y + (c.h - h) / 2, width: w, height: h });
+    return await pdf.save();
+  }
+
+  // Sube un fichero con el vaadin-upload que aparece al abrir una ventana (adjuntos o email)
+  async function subirConUpload(doc, up, bytes, nombre) {
+    const W = doc.defaultView;
+    if (!up || typeof up._addFiles !== 'function') throw new Error('AmbarX no deja subir el fichero');
+    up._addFiles([new W.File([bytes], nombre, { type: 'application/pdf' })]);
+    const r = await hastaQue(() => { const f = (up.files || []).find(x => x.name === nombre); return f && (f.complete || f.error) ? f : null; }, 40000, 500);
+    if (!r || !r.complete) throw new Error('No se ha podido subir ' + nombre + (r && r.error ? ': ' + r.error : ''));
+  }
+
+  async function adjuntarEnAmbarx(doc, bytes, nombre) {
+    const clip = await hastaQue(() => hondo(doc, 'vaadin-button').find(b => { const i = b.querySelector('vaadin-icon'); return i && i.getAttribute('icon') === 'vaadin:paperclip'; }), 40000);
+    if (!clip) throw new Error('No encuentro «Adjuntos» en el documento');
+    await espera(800);
+    const antes = new Set(hondo(doc, 'vaadin-upload'));
+    clip.click();
+    const up = await hastaQue(() => hondo(doc, 'vaadin-upload').find(u => !antes.has(u)), 15000);
+    if (!up) throw new Error('No se abre la ventana de adjuntos');
+    await espera(800);
+    await subirConUpload(doc, up, bytes, nombre);
+    const visto = await hastaQue(() => textoDe(doc).includes(nombre.replace(/\.pdf$/i, '')), 15000);
+    if (!visto) throw new Error('El adjunto no aparece en la lista de AmbarX');
+    return 'ok';
+  }
+
+  // «Enviar por email» del documento, cambiando el PDF sin firmar por el firmado
+  async function emailConPdf(doc, bytes, nombre) {
+    const env = await hastaQue(() => hondo(doc, 'vaadin-button').find(b => { const i = b.querySelector('vaadin-icon'); return i && i.getAttribute('icon') === 'vaadin:envelope'; }), 40000);
+    if (!env) throw new Error('No encuentro «Enviar por email» en el documento');
+    await espera(800); env.click();
+    const sig = await hastaQue(() => boton(doc, /^Siguiente$/), 20000); if (!sig) throw new Error('No sale la ventana de formato del email');
+    const antesUp = new Set(hondo(doc, 'vaadin-upload'));
+    await espera(500); sig.click();
+    const enviar = await hastaQue(() => /Enviar email/.test(textoDe(doc)) && boton(doc, /^Enviar$/), 30000);
+    if (!enviar) throw new Error('No se abre la ventana «Enviar email»');
+    await espera(1500);
+    const txt = hondo(doc, '*').map(e => e.childElementCount === 0 ? (e.textContent || '') : '').join(' ');
+    const para = [...new Set((txt.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).map(x => x.toLowerCase()).filter(x => !/rosasdebuscaflor|diazjavierme/i.test(x)))];
+    if (!para.length) return { email: 'sinEmail', para: [] };
+    const up = hondo(doc, 'vaadin-upload').find(u => !antesUp.has(u)) || hondo(doc, 'vaadin-upload').pop();
+    // quitar el PDF sin firmar que adjunta AmbarX
+    for (const fi of hondo(doc, 'vaadin-upload-file')) {
+      if (!up.contains(fi) && !(up.shadowRoot && up.shadowRoot.contains(fi))) continue;
+      const rm = fi.shadowRoot && fi.shadowRoot.querySelector('[part="remove-button"]'); if (rm) { rm.click(); await espera(600); }
+    }
+    await subirConUpload(doc, up, bytes, nombre);
+    await espera(800);
+    enviar.click();
+    const fin = await hastaQue(() => { const t = textoDe(doc); if (/error al enviar|no se ha podido enviar/i.test(t)) return 'error'; return !/Enviar email/.test(t) ? 'ok' : null; }, 60000, 1000);
+    if (fin !== 'ok') throw new Error(fin === 'error' ? 'AmbarX da error al enviar el email' : 'AmbarX no confirma el envío del email');
+    return { email: 'enviado', para };
+  }
+
   // Cobro en AmbarX (botón € del documento › Gestión de cobros): efectivo = EF, tarjeta = TP
   const FORMA_AMBARX = { efectivo: 'EF', tarjeta: 'TP' };
   async function cobrarEnAmbarx(doc, codigo, importe) {
@@ -342,13 +412,13 @@
     const ent = (await fb('GET', RUTA_REP + '/' + f + '/entregas')) || {};
     // Cada paso (firma, cobro, PDF) va por su lado: si uno falla, los demás se hacen igual (3 intentos cada uno)
     const pasos = e => { const a = e.ambarx || {}, c = e.cobro || {}, n = a.n || {};
-      const firmaHecha = a.firma === 'firmado' || a.firma === 'yaFirmado';
       return {
         firma: !!e.firma && !a.firma && (n.firma || 0) < 3,
         cobro: !!FORMA_AMBARX[c.forma] && (+c.importe || 0) > 0 && !a.cobro && (n.cobro || 0) < 3,
-        pdf: !a.pdf && (n.pdf || 0) < 3 && (firmaHecha || a.firma === 'error' || !e.firma)
+        email: a.firma === 'adjunto' && !a.email && (n.email || 0) < 3,
+        pdf: !a.pdf && (n.pdf || 0) < 3 && (a.firma === 'error' || !e.firma)
       }; };
-    const pend = Object.keys(ent).filter(k => { const e = ent[k]; if (e.estado !== 'entregado') return false; const p = pasos(e); return p.firma || p.cobro || p.pdf; });
+    const pend = Object.keys(ent).filter(k => { const e = ent[k]; if (e.estado !== 'entregado') return false; const p = pasos(e); return p.firma || p.cobro || p.email || p.pdf; });
     if (!pend.length || !cogerCerrojo()) return;
     ocupado = true; ultimoErr = ''; pintar();
     try {
@@ -367,11 +437,16 @@
           }
         };
         let p = pasos(Object.assign({}, e, { ambarx: a }));
+        const nombrePdf = (tipo === 'factura' ? 'FV-' : 'AV-') + String(num).replace('-', '') + '_firmado.pdf';
         if (p.firma) await paso('firma', async () => {
-          fase = 'Firmando ' + num + ' en AmbarX…'; pintar();
-          const obs = ['App reparto', e.recibe ? 'Recibe: ' + e.recibe : '', e.cobro ? 'Cobro: ' + (e.cobro.forma || '') + (e.cobro.importe ? ' ' + String(e.cobro.importe).replace('.', ',') + ' €' : '') : '', e.nota || ''].filter(Boolean).join(' · ');
-          a.firma = await conMarco(doc => firmarEnAmbarx(doc, tipo, num, e.firma, obs), 'movil');
-          a.firmaHora = ahoraISO();
+          fase = 'Firmando ' + num + '…'; pintar();
+          const oficial = await conMarco(doc => pdfOficial(doc), ruta);
+          const firmado = await estamparFirma(oficial, e.firma, tipo);
+          await fb('PUT', RUTA_REP + '/' + f + '/pdfs/' + k, bytesAb64(firmado));
+          a.pdf = 'ok'; a.pdfHora = ahoraISO();
+          fase = 'Guardando ' + num + ' firmado en AmbarX…'; pintar();
+          await conMarco(doc => adjuntarEnAmbarx(doc, firmado, nombrePdf), ruta);
+          a.firma = 'adjunto'; a.firmaHora = ahoraISO(); a.nombrePdf = nombrePdf;
         });
         p = pasos(Object.assign({}, e, { ambarx: a }));
         if (p.cobro) await paso('cobro', async () => {
@@ -379,6 +454,14 @@
           fase = 'Cobro de ' + num + ' en AmbarX…'; pintar();
           a.cobro = await conMarco(doc => cobrarEnAmbarx(doc, FORMA_AMBARX[co.forma], +co.importe), ruta);
           a.cobroHora = ahoraISO();
+        });
+        p = pasos(Object.assign({}, e, { ambarx: a }));
+        if (p.email) await paso('email', async () => {
+          fase = 'Enviando ' + num + ' firmado por email…'; pintar();
+          const pdf = await fb('GET', RUTA_REP + '/' + f + '/pdfs/' + k);
+          if (!pdf) throw new Error('No encuentro el PDF firmado');
+          const r = await conMarco(doc => emailConPdf(doc, b64aBytes(pdf), nombrePdf), ruta);
+          a.email = r.email; a.para = r.para; a.emailHora = ahoraISO();
         });
         p = pasos(Object.assign({}, e, { ambarx: a }));
         if (p.pdf) await paso('pdf', async () => {
