@@ -320,7 +320,7 @@ function abrir(k){
 }
 
 function reintentarAmbarx(k){
-  var a=Object.assign({}, (S.ent[k]||{}).ambarx||{}); if(a.firma==='error') delete a.firma; if(a.email==='error') delete a.email; if(a.cobro==='error') delete a.cobro; if(a.pdf==='error') delete a.pdf; a.intentos=0; a.error=null;
+  var a=Object.assign({}, (S.ent[k]||{}).ambarx||{}); if(a.firma==='error') delete a.firma; if(a.email==='error') delete a.email; if(a.cobro==='error') delete a.cobro; if(a.pdf==='error') delete a.pdf; a.n={}; a.errores={}; a.intentos=0; a.error=null;
   db.ref('buscaflor/reparto/'+S.fecha+'/entregas/'+k+'/ambarx').set(a).then(function(){ cerrarVelo(); toast('Se volverá a intentar en menos de un minuto'); });
 }
 function editarDir(k){

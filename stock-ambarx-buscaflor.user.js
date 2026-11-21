@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.5.1
+// @version      0.5.2
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX.
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -340,52 +340,61 @@
     if (ocupado) return;
     const f = ahoraISO().slice(0, 10);
     const ent = (await fb('GET', RUTA_REP + '/' + f + '/entregas')) || {};
-    const pend = Object.keys(ent).filter(k => { const e = ent[k], a = e.ambarx || {}; const c = e.cobro || {}; const debeCobrar = FORMA_AMBARX[c.forma] && (+c.importe || 0) > 0;
-      return e.estado === 'entregado' && (a.intentos || 0) < 3 && ((debeCobrar && !a.cobro) || (e.firma && !a.firma) || (a.firma && a.firma !== 'error' && !a.pdf) || (e.emailManual === true && e.enviarEmail && a.firma && a.firma !== 'error' && !a.email)); });
+    // Cada paso (firma, cobro, PDF) va por su lado: si uno falla, los demás se hacen igual (3 intentos cada uno)
+    const pasos = e => { const a = e.ambarx || {}, c = e.cobro || {}, n = a.n || {};
+      const firmaHecha = a.firma === 'firmado' || a.firma === 'yaFirmado';
+      return {
+        firma: !!e.firma && !a.firma && (n.firma || 0) < 3,
+        cobro: !!FORMA_AMBARX[c.forma] && (+c.importe || 0) > 0 && !a.cobro && (n.cobro || 0) < 3,
+        pdf: !a.pdf && (n.pdf || 0) < 3 && (firmaHecha || a.firma === 'error' || !e.firma)
+      }; };
+    const pend = Object.keys(ent).filter(k => { const e = ent[k]; if (e.estado !== 'entregado') return false; const p = pasos(e); return p.firma || p.cobro || p.pdf; });
     if (!pend.length || !cogerCerrojo()) return;
     ocupado = true; ultimoErr = ''; pintar();
     try {
       const docs = (await fb('GET', RUTA_REP + '/' + f + '/docs')) || {};
       for (const k of pend) {
         const e = ent[k], d = docs[k] || {}, a = Object.assign({}, e.ambarx || {});
+        a.n = Object.assign({}, a.n || {}); a.errores = Object.assign({}, a.errores || {});
         const tipo = e.tipo || d.tipo || 'albaran', num = e.num || d.num || k;
-        try {
-          if (e.firma && !a.firma) {
-            fase = 'Firmando ' + num + ' en AmbarX…'; pintar();
-            const obs = ['App reparto', e.recibe ? 'Recibe: ' + e.recibe : '', e.cobro ? 'Cobro: ' + (e.cobro.forma || '') + (e.cobro.importe ? ' ' + String(e.cobro.importe).replace('.', ',') + ' €' : '') : '', e.nota || ''].filter(Boolean).join(' · ');
-            a.firma = await conMarco(doc => firmarEnAmbarx(doc, tipo, num, e.firma, obs), 'movil');
-            a.firmaHora = ahoraISO();
+        const ruta = (tipo === 'factura' ? 'ventas/facturas' : 'ventas/albaranes') + '/editar/' + encodeURIComponent(num);
+        const paso = async (nombre, fn) => {
+          try { await fn(); delete a.errores[nombre]; }
+          catch (err) {
+            a.n[nombre] = (a.n[nombre] || 0) + 1; a.errores[nombre] = String(err.message || err);
+            if (a.n[nombre] >= 3) a[nombre] = 'error';
+            console.error('[bf-reparto] ' + num + ' ' + nombre, err);
           }
+        };
+        let p = pasos(Object.assign({}, e, { ambarx: a }));
+        if (p.firma) await paso('firma', async () => {
+          fase = 'Firmando ' + num + ' en AmbarX…'; pintar();
+          const obs = ['App reparto', e.recibe ? 'Recibe: ' + e.recibe : '', e.cobro ? 'Cobro: ' + (e.cobro.forma || '') + (e.cobro.importe ? ' ' + String(e.cobro.importe).replace('.', ',') + ' €' : '') : '', e.nota || ''].filter(Boolean).join(' · ');
+          a.firma = await conMarco(doc => firmarEnAmbarx(doc, tipo, num, e.firma, obs), 'movil');
+          a.firmaHora = ahoraISO();
+        });
+        p = pasos(Object.assign({}, e, { ambarx: a }));
+        if (p.cobro) await paso('cobro', async () => {
           const co = e.cobro || {};
-          if (FORMA_AMBARX[co.forma] && (+co.importe || 0) > 0 && !a.cobro) {
-            fase = 'Cobro de ' + num + ' en AmbarX…'; pintar();
-            a.cobro = await conMarco(doc => cobrarEnAmbarx(doc, FORMA_AMBARX[co.forma], +co.importe), (tipo === 'factura' ? 'ventas/facturas' : 'ventas/albaranes') + '/editar/' + encodeURIComponent(num));
-            a.cobroHora = ahoraISO();
-          }
-          if (a.firma && a.firma !== 'error' && !a.pdf) {
-            fase = 'PDF de ' + num + '…'; pintar();
-            const pdf = await conMarco(doc => pdfOficial(doc), (tipo === 'factura' ? 'ventas/facturas' : 'ventas/albaranes') + '/editar/' + encodeURIComponent(num));
-            await fb('PUT', RUTA_REP + '/' + f + '/pdfs/' + k, pdf);
-            a.pdf = 'ok'; a.pdfHora = ahoraISO();
-          }
-          // El email lo manda AmbarX solo al firmar (igual que con la app de Querry): aquí solo si se pide expresamente
-          if (e.enviarEmail === true && e.emailManual === true && a.firma && a.firma !== 'error' && !a.email) {
-            fase = 'Enviando ' + num + ' por email…'; pintar();
-            const r = await conMarco(doc => emailDesdeAmbarx(doc), (tipo === 'factura' ? 'ventas/facturas' : 'ventas/albaranes') + '/editar/' + encodeURIComponent(num));
-            a.email = r.email; a.para = r.para; a.emailHora = ahoraISO();
-          }
-          a.error = null;
-        } catch (err) {
-          a.intentos = (a.intentos || 0) + 1; a.error = String(err.message || err);
-          if (a.intentos >= 3) { if (!a.firma && e.firma) a.firma = 'error'; else if (!a.cobro && FORMA_AMBARX[(e.cobro || {}).forma]) a.cobro = 'error'; else if (!a.pdf) a.pdf = 'error'; }
-          console.error('[bf-reparto] ' + num, err);
-        }
+          fase = 'Cobro de ' + num + ' en AmbarX…'; pintar();
+          a.cobro = await conMarco(doc => cobrarEnAmbarx(doc, FORMA_AMBARX[co.forma], +co.importe), ruta);
+          a.cobroHora = ahoraISO();
+        });
+        p = pasos(Object.assign({}, e, { ambarx: a }));
+        if (p.pdf) await paso('pdf', async () => {
+          fase = 'PDF de ' + num + '…'; pintar();
+          const pdf = await conMarco(doc => pdfOficial(doc), ruta);
+          await fb('PUT', RUTA_REP + '/' + f + '/pdfs/' + k, pdf);
+          a.pdf = 'ok'; a.pdfHora = ahoraISO();
+        });
+        a.error = Object.values(a.errores).join(' · ') || null;
         await fb('PUT', RUTA_REP + '/' + f + '/entregas/' + k + '/ambarx', a);
       }
       ultimo = { hora: ahoraISO(), n: pend.length, que: 'entregas a AmbarX' };
     } catch (e) { ultimoErr = 'Entregas: ' + String(e.message || e); }
     finally { ocupado = false; fase = ''; soltarCerrojo(); pintar(); }
   }
+
   let ultimoAutoRep = 0;
 
   // ---------------- Hacer la subida ----------------
