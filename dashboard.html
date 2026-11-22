@@ -114,7 +114,7 @@ th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
     <div class="tiles" id="tAcu"></div>
     <div class="grid2">
       <div class="card"><h3>Venta de flor por mes (€)</h3><div class="sub">Venta del informe de AmbarX.</div><div class="chart" id="cVentaMes"></div></div>
-      <div class="card"><h3>Margen bruto por mes (%)</h3><div class="sub">Los meses sueltos bailan por el stock; el dato fiable es el acumulado. Línea: objetivo.</div><div class="chart" id="cMargenMes"></div></div>
+      <div class="card"><h3>Margen bruto por mes (%)</h3><div class="sub">Venta AmbarX menos flor puesta en Madrid y flor nacional, <b>sin el transporte a clientes</b> (por eso es más alto que el acumulado). Los meses sueltos bailan por el stock y por cuándo llega la factura de Vallinoto: el dato fiable es el acumulado.</div><div class="chart" id="cMargenMes"></div></div>
     </div>
     <div class="card"><h3>Margen bruto y estructura (acumulado)</h3><div class="scroll" id="tPyG"></div></div>
     <div class="card"><h3>Última semana controlada</h3><div class="sub" id="semEtq"></div><div class="scroll" id="tSemana"></div></div>
@@ -122,7 +122,7 @@ th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
 
   <!-- RATIOS -->
   <section id="s-ratios">
-    <div><h2>Ratios financieros y de gestión</h2><div class="sub">De las cuentas anuales (Modelo 200 2019-2024 y cierre 2025). Verde: mejora frente al año anterior; rojo: empeora.</div></div>
+    <div><h2>Ratios financieros y de gestión</h2><div class="sub">De las cuentas anuales (Modelo 200 2019-2024 y cierre 2025). Verde: mejora frente al año anterior; rojo: empeora (en crecimiento de ventas: verde si crece, rojo si cae).</div></div>
     <div class="tiles" id="tRatios"></div>
     <div class="card scroll" id="tablaRatios"></div>
     <div class="card"><h3>Notas</h3><div id="notas"></div></div>
@@ -135,7 +135,7 @@ th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
       <div class="card"><h3>Cifra de negocios (€)</h3><div class="chart" id="cVentasAnio"></div></div>
       <div class="card"><h3>Resultado antes de impuestos (€)</h3><div class="chart" id="cBAI"></div></div>
       <div class="card"><h3>Margen bruto (%)</h3><div class="chart" id="cMBAnio"></div></div>
-      <div class="card"><h3>Días de cobro</h3><div class="sub">Línea: objetivo.</div><div class="chart" id="cDias"></div></div>
+      <div class="card"><h3>Días de cobro</h3><div class="sub">Saldo de clientes ÷ ventas con IVA × 365.</div><div class="chart" id="cDias"></div></div>
     </div>
     <div class="card scroll" id="tablaCifras"></div>
   </section>
@@ -144,8 +144,8 @@ th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
   <section id="s-clientes">
     <div><h2>Clientes</h2></div>
     <div class="tiles" id="tCli"></div>
-    <div class="card"><h3>Clientes vigilados por margen bajo</h3><div class="sub">Margen % del año y de la última semana controlada.</div><div class="scroll" id="tVig"></div></div>
-    <div class="card"><h3>Top clientes del reparto (últimos 30 días)</h3><div class="scroll" id="tTopCli"></div></div>
+    <div class="card"><h3>Clientes vigilados por margen bajo</h3><div class="sub" id="vigEtq"></div><div class="scroll" id="tVig"></div></div>
+    <div class="card"><h3>Clientes del reparto</h3><div class="sub" id="topEtq"></div><div class="scroll" id="tTopCli"></div></div>
   </section>
 </main>
 
@@ -244,7 +244,7 @@ function fmtR(v,u){ return u==='%'?pct(v):u==='€'?eur(v):u==='d'?num(v)+' d':n
 /* ---------- pintar ---------- */
 function pintar(){
   var dash=D.dash||{};
-  document.getElementById('upd').textContent = 'Datos financieros: '+(dash.actualizado?dash.actualizado.slice(0,10).split('-').reverse().join('/'):'—')+' · Operativa en vivo';
+  document.getElementById('upd').textContent = 'Cifras financieras actualizadas el '+(dash.actualizado?dash.actualizado.slice(0,10).split('-').reverse().join('/'):'—')+' · operativa en vivo';
 
   /* HOY */
   var st=D.stock||{}, items=st.items||{}, refs=Object.keys(items).length, uds=Object.values(items).reduce(function(s,x){return s+(+x.q||0);},0);
@@ -255,21 +255,21 @@ function pintar(){
   var hoy=hoyISO(), hace7=hoyISO(new Date(Date.now()-7*864e5)), hace30=hoyISO(new Date(Date.now()-30*864e5));
   var cajas7=0, cajasHoy=0;
   Object.keys(D.etiq||{}).forEach(function(k){ var d=D.etiq[k], f=String(d.abierto||'').slice(0,10), n=arr(d.cajas).length; if(f>=hace7) cajas7+=n; if(f===hoy) cajasHoy+=n; });
-  var repDias=Object.keys(D.reparto||{}).sort(), ventaDia={}, cliVenta={}, docsN=0;
+  var repDias=Object.keys(D.reparto||{}).sort(), ventaDia={}, cliVenta={}, docsN=0, repDesde=null, repHasta=null;
   repDias.forEach(function(f){ var docs=(D.reparto[f]||{}).docs||{}; var tot=0;
-    Object.values(docs).forEach(function(doc){ docsN++; var t=arr(doc.lineas).reduce(function(s,l){ return s+(+l.t||((+l.p||0)*(+l.u||0)))*(1-(+l.dto||0)/100); },0); tot+=t;
-      if(f>=hace30){ var k=doc.cliente||doc.cliCod||'?'; cliVenta[k]=(cliVenta[k]||0)+t; } });
+    Object.values(docs).forEach(function(doc){ docsN++; var t=arr(doc.lineas).reduce(function(s,l){ return s+(l.t!=null?(+l.t||0):(+l.p||0)*(+l.u||0)*(1-(+l.dto||0)/100)); },0); tot+=t;
+      if(f>=hace30){ if(/^VENTA CONTADO|^CLIENTE CONTADO|^CLIENTE DE CONTADO/i.test(doc.cliente||'')) return; var k=doc.cliente||doc.cliCod||'?'; cliVenta[k]=(cliVenta[k]||0)+t; repDesde=repDesde&&repDesde<f?repDesde:f; repHasta=repHasta&&repHasta>f?repHasta:f; } });
     ventaDia[f]=tot; });
   var vHoy=ventaDia[hoy]||0, v7=repDias.filter(function(f){return f>=hace7;}).reduce(function(s,f){return s+ventaDia[f];},0);
   var vs=Object.keys(D.vuelos||{}).map(function(g){ return Object.assign({guia:g},D.vuelos[g]); }).sort(function(a,b){ return String(b.semana).localeCompare(String(a.semana))||b.guia.localeCompare(a.guia); });
-  var conAviso=vs.filter(function(v){ return arr(v.avisos).some(function(a){return a.nivel==='bad';}) || ['bloqueado','incompleto','pendiente'].indexOf(v.ambarx)>=0 || (v.inventario&&v.inventario.estado!=='DEFINITIVO'); });
+  var conAviso=vs.filter(function(v){ if(v.ambarx==='anterior') return false; return arr(v.avisos).some(function(a){return a.nivel==='bad';}) || ['bloqueado','incompleto','pendiente'].indexOf(v.ambarx)>=0 || (v.inventario&&v.inventario.estado!=='DEFINITIVO'); });
   var semUlt = vs.length? vs[0].semana : null, vSem=vs.filter(function(v){return v.semana===semUlt;});
   var fobSem=vSem.reduce(function(s,v){ return s+arr(v.facturas).reduce(function(a,f){return a+(+f.usd||0);},0); },0), cajasSem=vSem.reduce(function(s,v){return s+(+v.cajas||0);},0);
   document.getElementById('tOper').innerHTML =
     tile('Venta reparto hoy', eur(vHoy), 'Últimos 7 días: '+eur(v7)) +
     tile('Pedidos abiertos', num(abiertos.length), num(peds.length)+' pedidos en la app') +
-    tile('Cajas preparadas hoy', num(cajasHoy), 'Últimos 7 días: '+num(cajas7)) +
-    tile('Stock AmbarX', num(refs)+' art.', num(uds)+' unidades'+(conPvp?' · '+eur(valStock)+' a PVP ('+conPvp+' art. con PVP)':''),
+    tile('Cajas etiquetadas hoy', num(cajasHoy), 'Últimos 7 días: '+num(cajas7)) +
+    tile('Stock AmbarX', num(refs)+' art.', num(uds)+' unidades',
       horasStock==null?chip('bad','sin dato'):horasStock>24?chip('warn','de hace '+Math.round(horasStock)+' h'):chip('ok','de las '+hStock.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}))) +
     tile('Vuelos '+(semUlt||''), num(vSem.length), num(cajasSem)+' cajas · FOB '+num(fobSem)+' $'+(cajasSem?' · '+num(fobSem/cajasSem,1)+' $/caja':'')) +
     tile('Vuelos con algo pendiente', num(conAviso.length), conAviso.slice(0,3).map(function(v){return v.guia.slice(-4);}).join(', '), conAviso.length?chip('warn','revisar'):chip('ok','todo en orden'));
@@ -281,7 +281,7 @@ function pintar(){
     }).join('')+'</table>' : '<div class="vacio">Sin vuelos.</div>';
 
   /* AÑO */
-  var acu=dash.acumulado||{}, mens=dash.mensual||{}, obj=dash.objetivos||{}, objMB=obj.margenBrutoPct||20;
+  var acu=dash.acumulado||{}, mens=dash.mensual||{}, obj=dash.objetivos||{}, objMB=obj.margenBrutoPct;
   var vA=acu.ventaAmbarx!=null?acu.ventaAmbarx:(acu.venta? acu.venta/1.1 : null);
   var mA=acu.margenAmbarx!=null?acu.margenAmbarx:null, pA=acu.margenAmbarxPct!=null?acu.margenAmbarxPct:(vA&&mA!=null?mA/vA*100:null);
   var vT=acu.ventaTotal!=null?acu.ventaTotal:acu.venta, mT=acu.margenTotal!=null?acu.margenTotal:acu.margenBruto, pT=acu.margenTotalPct!=null?acu.margenTotalPct:acu.margenPct;
@@ -289,7 +289,7 @@ function pintar(){
   document.getElementById('acuEtq').textContent = (acu.etiqueta||'')+' · Margen bruto = venta − coste de la flor puesta en el cliente (incluye palet y transporte a Sevilla y Chipiona).';
   document.getElementById('tAcu').innerHTML =
     tile('Venta AmbarX', eur(vA), acu.etiqueta||'') +
-    tile('Margen bruto (venta AmbarX)', pct(pA), eur(mA)+' · coste flor '+eur(acu.costeFlor), pA>=objMB?chip('ok','sobre objetivo '+pct(objMB,0)):chip('warn','bajo objetivo '+pct(objMB,0))) +
+    tile('Margen bruto (venta AmbarX)', pct(pA), eur(mA)+' · coste flor '+eur(acu.costeFlor), objMB==null?'':(pA>=objMB?chip('ok','sobre objetivo '+pct(objMB,0)):chip('warn','bajo objetivo '+pct(objMB,0)))) +
     tile('Con venta sin IVA (+10 %)', pct(pT), 'Venta '+eur(vT)+' · margen '+eur(mT), chip('warn','estimado')) +
     tile('Estructura y resultado', contr?eur((mT||0)+(acu.otrosIngresos||0)-estr):'—', contr?'':'Faltan partidas de estructura', contr?'':chip('bad','sin contrastar'));
   var mk=Object.keys(mens).sort();
@@ -304,9 +304,9 @@ function pintar(){
     fila('Otros ingresos',acu.otrosIngresos,acu.otrosIngresos)+fila('Gastos (Excel de gastos)',-acu.gastos,-acu.gastos)+fila('Nave (imputada)',-acu.nave,-acu.nave)+fila('Personal (solo repartidor)',-acu.personal,-acu.personal)+
     '<tr><td colspan="5" class="sub">'+esc(acu.estructuraNota||'')+'</td></tr></table>';
   var sem=dash.semana||{};
-  document.getElementById('semEtq').textContent = sem.desde? 'Del '+sem.desde.split('-').reverse().join('/')+' al '+sem.hasta.split('-').reverse().join('/')+(sem.parcial?' (parcial)':'')+' · venta '+eur(sem.venta)+' · margen '+pct(sem.pct)+' · rosa 60 bajo tarifa: '+eur(sem.rosaBajo)+' · clavel bajo tarifa: '+num(sem.clavelBajoTallos)+' tallos' : '';
+  document.getElementById('semEtq').textContent = sem.desde? (Math.round((Date.now()-new Date(sem.hasta))/864e5)>10?'DE HACE '+Math.round((Date.now()-new Date(sem.hasta))/864e5)+' DÍAS · ':'')+'Del '+sem.desde.split('-').reverse().join('/')+' al '+sem.hasta.split('-').reverse().join('/')+(sem.parcial?' (parcial)':'')+' · venta '+eur(sem.venta)+' · margen '+pct(sem.pct)+' · rosa 60 bajo tarifa: '+eur(sem.rosaBajo)+' · clavel bajo tarifa: '+num(sem.clavelBajoTallos)+' tallos' : '';
   var fam=sem.familias||{};
-  document.getElementById('tSemana').innerHTML = Object.keys(fam).length? '<table><tr><th>Familia</th><th>Venta</th><th>% venta</th><th>Margen %</th></tr>'+Object.keys(fam).sort(function(a,b){return fam[b].venta-fam[a].venta;}).map(function(k){ return '<tr><td>'+esc(k)+'</td><td>'+eur(fam[k].venta)+'</td><td>'+pct(fam[k].venta/sem.venta*100)+'</td><td class="'+(fam[k].pct<objMB?'neg':'')+'">'+pct(fam[k].pct)+'</td></tr>'; }).join('')+'</table>' : '<div class="vacio">Sin semana.</div>';
+  document.getElementById('tSemana').innerHTML = Object.keys(fam).length? '<table><tr><th>Familia</th><th>Venta</th><th>% venta</th><th>Margen %</th></tr>'+Object.keys(fam).sort(function(a,b){return fam[b].venta-fam[a].venta;}).map(function(k){ return '<tr><td>'+esc(k)+'</td><td>'+eur(fam[k].venta)+'</td><td>'+pct(fam[k].venta/sem.venta*100)+'</td><td class="'+(objMB!=null&&fam[k].pct<objMB?'neg':'')+'">'+pct(fam[k].pct)+'</td></tr>'; }).join('')+'</table>' : '<div class="vacio">Sin semana.</div>';
 
   /* RATIOS */
   var an=dash.anual||{}, ys=Object.keys(an).sort(), R={};
@@ -317,10 +317,10 @@ function pintar(){
     document.getElementById('tRatios').innerHTML =
       tile('Margen bruto '+ul, pct(R[ul].mb), '', cmp('mb',1)) + tile('EBITDA / ventas '+ul, pct(R[ul].ebitda), eur(R[ul].ebitdaE), cmp('ebitda',1)) +
       tile('ROE '+ul, pct(R[ul].roe), '', cmp('roe',1)) + tile('ROA '+ul, pct(R[ul].roa), '', cmp('roa',1)) +
-      tile('Días de cobro '+ul, num(R[ul].dias)+' d', 'Objetivo '+(obj.diasCobro||45)+' d', R[ul].dias<=(obj.diasCobro||45)?chip('ok','en objetivo'):chip('warn','por encima')) +
+      tile('Días de cobro '+ul, num(R[ul].dias)+' d', 'Clientes ÷ ventas con IVA', cmp('dias',-1)) +
       tile('Autonomía '+ul, pct(R[ul].auto), 'Fondos propios / activo', cmp('auto',1));
     document.getElementById('tablaRatios').innerHTML='<table><tr><th>Ratio</th>'+ys.map(function(y){return '<th>'+y+'</th>';}).join('')+'</tr>'+DEF_R.map(function(d){
-      return '<tr><td>'+d[1]+'</td>'+ys.map(function(y,i){ var v=R[y][d[0]], p=i?R[ys[i-1]][d[0]]:null, cl=(p==null||v==null)?'':((v-p)*d[3]>0?'pos':(v-p)*d[3]<0?'neg':''); return '<td class="'+cl+'">'+fmtR(v,d[2])+'</td>'; }).join('')+'</tr>';
+      return '<tr><td>'+d[1]+'</td>'+ys.map(function(y,i){ var v=R[y][d[0]], p=i?R[ys[i-1]][d[0]]:null, cl=d[0]==='crec'?(v==null?'':v>=0?'pos':'neg'):((p==null||v==null)?'':((v-p)*d[3]>0?'pos':(v-p)*d[3]<0?'neg':'')); return '<td class="'+cl+'">'+fmtR(v,d[2])+'</td>'; }).join('')+'</tr>';
     }).join('')+'</table>';
   }
   document.getElementById('notas').innerHTML = arr(dash.notas).map(function(n){return '<div class="nota">'+esc(n)+'</div>';}).join('') || '<div class="vacio">Sin notas.</div>';
@@ -328,8 +328,8 @@ function pintar(){
   /* HISTÓRICO */
   barras('cVentasAnio', ys.map(function(y){return {l:y, v:an[y].ventas, extra:R[y].crec==null?'':'Crecimiento '+pct(R[y].crec)};}), {fmt:eur, fmtEje:function(v){return num(v/1000)+'k';}, titulo:'Cifra de negocios'});
   barras('cBAI', ys.map(function(y){return {l:y, v:an[y].resultadoAntesImpuestos, extra:pct(R[y].bai)+' sobre ventas'};}), {fmt:eur, fmtEje:function(v){return num(v/1000)+'k';}, titulo:'Resultado antes de impuestos'});
-  barras('cMBAnio', ys.map(function(y){return {l:y, v:Math.round(R[y].mb*10)/10};}), {fmt:pct, fmtEje:function(v){return num(v)+'%';}, ref:obj.margenBrutoPct||20, titulo:'Margen bruto'});
-  barras('cDias', ys.map(function(y){return {l:y, v:Math.round(R[y].dias)};}), {fmt:function(v){return num(v)+' días';}, ref:obj.diasCobro||45, titulo:'Días de cobro'});
+  barras('cMBAnio', ys.map(function(y){return {l:y, v:Math.round(R[y].mb*10)/10};}), {fmt:pct, fmtEje:function(v){return num(v)+'%';}, ref:obj.margenBrutoPct, titulo:'Margen bruto'});
+  barras('cDias', ys.map(function(y){return {l:y, v:Math.round(R[y].dias)};}), {fmt:function(v){return num(v)+' días';}, ref:obj.diasCobro, titulo:'Días de cobro'});
   var CIF=[['ventas','Cifra de negocios'],['aprovisionamientos','Aprovisionamientos',-1],['otrosIngresos','Otros ingresos'],['personal','Personal',-1],['otrosGastos','Otros gastos explotación',-1],['amortizacion','Amortización',-1],['resultadoExplotacion','Resultado de explotación'],['resultadoAntesImpuestos','Resultado antes de impuestos'],['resultadoEjercicio','Resultado del ejercicio'],['totalActivo','Total activo'],['activoCorriente','Activo corriente'],['clientes','Clientes'],['efectivo','Efectivo'],['patrimonioNeto','Patrimonio neto'],['pasivoCorriente','Pasivo corriente']];
   document.getElementById('tablaCifras').innerHTML='<h3>Cifras principales (€)</h3><table><tr><th>Concepto</th>'+ys.map(function(y){return '<th>'+y+'</th>';}).join('')+'</tr>'+CIF.map(function(c){ return '<tr><td>'+c[1]+'</td>'+ys.map(function(y){ var v=an[y][c[0]]*(c[2]||1); return '<td class="'+(v<0?'neg':'')+'">'+num(v)+'</td>'; }).join('')+'</tr>'; }).join('')+'</table>';
 
@@ -338,11 +338,16 @@ function pintar(){
   var top=Object.keys(cliVenta).sort(function(a,b){return cliVenta[b]-cliVenta[a];}), totTop=top.reduce(function(s,k){return s+cliVenta[k];},0);
   var top5=top.slice(0,5).reduce(function(s,k){return s+cliVenta[k];},0);
   var dias=an[ul]?R[ul].dias:null;
-  document.getElementById('tCli').innerHTML = tile('Clientes en AmbarX', num(nCli)) + tile('Clientes con reparto (30 d)', num(act30), docsN+' documentos') +
-    tile('Concentración top 5', totTop?pct(top5/totTop*100):'—', 'de la venta del reparto (30 d)') + tile('Días de cobro '+(ul||''), num(dias)+' d', 'Clientes / ventas con IVA');
+  var fd=function(f){ return f? f.slice(8)+'/'+f.slice(5,7) : ''; }, nDias=repDesde? Math.round((new Date(repHasta)-new Date(repDesde))/864e5)+1 : 0;
+  var periodo = repDesde? 'del '+fd(repDesde)+' al '+fd(repHasta)+' ('+nDias+' día'+(nDias>1?'s':'')+' con reparto)' : 'sin datos';
+  document.getElementById('topEtq').innerHTML = 'Albaranes y facturas que sube el script de AmbarX (se suben desde el 20/11), '+periodo+'. Sin las ventas de contado. '+(nDias<20?'<b>Aún hay pocos días: no sirve para sacar conclusiones.</b>':'');
+  document.getElementById('tCli').innerHTML = tile('Clientes en AmbarX', num(nCli)) + tile('Clientes con reparto', num(act30), periodo) +
+    tile('Concentración 5 primeros', totTop&&nDias>=20?pct(top5/totTop*100):'—', nDias>=20?'de la venta del reparto':'cuando haya 20 días de reparto') + tile('Días de cobro '+(ul||''), num(dias)+' d', 'Clientes ÷ ventas con IVA (cuentas '+(ul||'')+')');
   var vig=arr(dash.vigilados).sort(function(a,b){return a.anual-b.anual;});
-  document.getElementById('tVig').innerHTML = vig.length? '<table><tr><th>Cliente</th><th>Año</th><th>Última semana</th></tr>'+vig.map(function(c){ return '<tr><td>'+esc(c.cliente)+'</td><td class="'+(c.anual<(obj.margenBrutoPct||20)?'neg':'')+'">'+pct(c.anual)+'</td><td>'+(c.semana==null?'—':pct(c.semana))+'</td></tr>'; }).join('')+'</table>' : '<div class="vacio">Sin datos.</div>';
-  document.getElementById('tTopCli').innerHTML = top.length? '<table><tr><th>Cliente</th><th>Venta</th><th>% del total</th></tr>'+top.slice(0,10).map(function(k){ return '<tr><td>'+esc(k)+'</td><td>'+eur(cliVenta[k])+'</td><td>'+pct(cliVenta[k]/totTop*100)+'</td></tr>'; }).join('')+'</table>' : '<div class="vacio">El reparto empezó a subirse el 20-11; se irá llenando.</div>';
+  var semD=sem.desde? Math.round((Date.now()-new Date(sem.hasta))/864e5) : null;
+  document.getElementById('vigEtq').innerHTML = 'Año: margen de 2026 calculado en octubre con el método anterior (sin transporte a clientes). Semana: '+(sem.desde?'del '+fd(sem.desde)+' al '+fd(sem.hasta)+(sem.parcial?' (parcial)':''):'—')+(semD>10?' · <b>de hace '+semD+' días: el control semanal la actualiza cada lunes.</b>':'');
+  document.getElementById('tVig').innerHTML = vig.length? '<table><tr><th>Cliente</th><th>Año</th><th>Semana</th>'+(vig.some(function(c){return c.mes!=null;})?'<th>Mes</th>':'')+'</tr>'+vig.map(function(c){ return '<tr><td>'+esc(c.cliente)+'</td><td class="'+(c.anual<0?'neg':'')+'">'+pct(c.anual)+'</td><td>'+(c.semana==null?'—':pct(c.semana))+'</td>'+(vig.some(function(x){return x.mes!=null;})?'<td>'+(c.mes==null?'—':pct(c.mes))+'</td>':'')+'</tr>'; }).join('')+'</table>' : '<div class="vacio">Sin datos.</div>';
+  document.getElementById('tTopCli').innerHTML = top.length? '<table><tr><th>Cliente</th><th>Venta</th><th>% del total</th></tr>'+top.slice(0,10).map(function(k){ return '<tr><td>'+esc(k)+'</td><td>'+eur(cliVenta[k])+'</td><td>'+pct(cliVenta[k]/totTop*100)+'</td></tr>'; }).join('')+'</table>' : '<div class="vacio">Sin reparto todavía.</div>';
 }
 
 /* ---------- datos en vivo ---------- */
