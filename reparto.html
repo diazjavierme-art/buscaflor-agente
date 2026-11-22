@@ -199,6 +199,7 @@ function escuchar(){
     r.on('value',function(s){ S[x[1]] = s.val() || (x[1]==='leido'?'':{}); pintar(); }, function(e){ pintarError(e); });
   });
   var rp=db.ref('buscaflor/peticiones/reparto'); refs.push(rp); rp.on('value',function(s){ S.pet=s.val(); pintar(); });
+  var ra=db.ref('buscaflor/peticiones/agenteStock'); refs.push(ra); ra.on('value',function(s){ S.ag=s.val()||{}; pintar(); });
 }
 function pintarError(e){ document.getElementById('app').innerHTML='<div class="alerta mal">No se pueden leer los datos: '+esc(e&&e.message||e)+'</div>'; }
 
@@ -262,7 +263,10 @@ function pintarOficina(app, docs){
   docs.forEach(function(d){ var c=comDe(d); (grupos[c]=grupos[c]||[]).push(d); });
   var pet=S.pet||{};
   var estadoPet = pet.estado==='pedido'&&pet.fecha===S.fecha ? 'Pedido a AmbarX, esperando al servidor…' : pet.estado==='enCurso' ? 'El servidor está leyendo AmbarX…' : pet.estado==='error' ? 'Error: '+esc(pet.error) : '';
-  var h='<div class="fila-btn"><button class="btn primario" onclick="pedirLectura()">↻ Leer albaranes y facturas de AmbarX</button></div>'+
+  var ag=S.ag||{}, minAg=ag.visto?(Date.now()-new Date(ag.visto).getTime())/60000:1e9;
+  var aviso = minAg>3 ? 'El ordenador de AmbarX no responde'+(ag.visto?' desde las '+esc(String(ag.visto).slice(11,16)):'')+': las firmas y cobros no pasan a AmbarX. Tiene que estar encendido con Chrome y AmbarX abierto.'
+            : (ag.ambarx==='login'||ag.ambarx==='caducada') ? 'AmbarX pide la contraseña en el ordenador de la oficina: hasta que alguien entre, las firmas y cobros no pasan a AmbarX.' : '';
+  var h=(aviso?'<div class="alerta mal">⚠ '+aviso+'</div>':'')+'<div class="fila-btn"><button class="btn primario" onclick="pedirLectura()">↻ Leer albaranes y facturas de AmbarX</button></div>'+
     '<div class="nota">'+(S.leido?'Leído de AmbarX a las '+esc(S.leido.slice(11,16)):'Sin leer todavía para este día')+(estadoPet?' · <b>'+estadoPet+'</b>':'')+'</div>';
   var t=totalesDe(docs);
   h+='<div class="resumen"><div><b>'+t.hechas+'/'+t.n+'</b><span>entregados</span></div><div><b>'+num(t.efectivo)+'</b><span>€ efectivo</span></div><div><b>'+num(t.tarjeta)+'</b><span>€ tarjeta</span></div></div>';

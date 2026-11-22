@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.7.1
+// @version      0.7.2
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX.
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -587,10 +587,28 @@
   }
 
   // Mira cada 15 s si alguien ha pedido actualizar desde la app
+  // ---------------- Sesión de AmbarX: que no caduque y avisar si pide contraseña ----------------
+  // La contraseña de AmbarX nunca la escribe el script: si la sesión se pierde, avisa y la pone Javier.
+  const BASE_AMBARX = location.pathname.split('/AmbarX/')[0] + '/AmbarX/';
+  let estadoAmbarx = 'ok';
+  const estaEnLogin = () => /\/login/i.test(location.pathname) || hondo(document, 'vaadin-login-form, vaadin-login-overlay').length > 0;
+  async function mantenerAmbarx() {
+    if (estaEnLogin()) { estadoAmbarx = 'login'; return; }
+    try {
+      const r = await fetch(BASE_AMBARX, { credentials: 'include', cache: 'no-store' });
+      if ((r.redirected && /login/i.test(r.url)) || r.status === 401 || r.status === 403) { estadoAmbarx = 'caducada'; if (!ocupado) location.href = BASE_AMBARX; }
+      else estadoAmbarx = 'ok';
+    } catch (e) { estadoAmbarx = 'sinRespuesta'; }
+  }
+  setInterval(mantenerAmbarx, 4 * 60000);
+  setTimeout(mantenerAmbarx, 20000);
+
   async function vigilar() {
     if (!sesion || ocupado) return;
     try {
-      await fb('PUT', RUTA_AGENTE, { visto: ahoraISO(), equipo: location.host });
+      if (estaEnLogin()) estadoAmbarx = 'login';
+      await fb('PUT', RUTA_AGENTE, { visto: ahoraISO(), equipo: location.host, ambarx: estadoAmbarx, version: (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '' });
+      if (estadoAmbarx !== 'ok' && estadoAmbarx !== 'sinRespuesta') return; // sin sesión en AmbarX no se puede hacer nada
       const p = await fb('GET', RUTA_PET);
       if (p && p.pedido && p.estado === 'pedido' && (!p.atendido || p.pedido > p.atendido)) { await subirStock(p.pedido); return; }
       const r = await fb('GET', RUTA_PET_REP);

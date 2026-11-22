@@ -639,7 +639,7 @@ function textoPeticion(){
   else if(p.estado==='enCurso') t='⏳ Generando el informe en AmbarX…';
   else if(p.estado==='error') t='⚠ No se pudo actualizar a las '+h(p.hecho)+': '+(p.error||'error');
   else if(p.estado==='hecho') t='✓ Actualizado a las '+h(p.hecho)+' ('+(p.registros||'?')+' artículos).';
-  t += (t?' ':'')+(vivo?'Ordenador de AmbarX conectado.':(ag.visto?'Ordenador de AmbarX visto por última vez a las '+h(ag.visto)+'.':''));
+  t += (t?' ':'')+(vivo?((ag.ambarx==='login'||ag.ambarx==='caducada')?'⚠ AmbarX pide la contraseña en el ordenador de la oficina: hay que entrar para que funcione.':'Ordenador de AmbarX conectado.'):(ag.visto?'Ordenador de AmbarX visto por última vez a las '+h(ag.visto)+'.':''));
   return t;
 }
 function menuStock(){
