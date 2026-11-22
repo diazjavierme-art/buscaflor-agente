@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.6.5
+// @version      0.6.6
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX.
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -349,7 +349,8 @@
     await espera(500);
     const f0 = (up.files || []).find(x => x.name === nombre);
     if (f0 && !f0.uploading && !f0.complete && typeof up.uploadFiles === 'function') up.uploadFiles(); // la ventana de adjuntos no sube sola (no-auto)
-    const r = await hastaQue(() => { const f = (up.files || []).find(x => x.name === nombre); return f && (f.complete || f.error) ? f : null; }, 40000, 500);
+    // AmbarX vacía la lista del vaadin-upload al terminar y deja el texto «<nombre>: 100%»
+    const r = await hastaQue(() => { const f = (up.files || []).find(x => x.name === nombre); if (f && (f.complete || f.error)) return f; return textoDe(doc).includes(nombre + ': 100%') ? { complete: true } : null; }, 40000, 500);
     if (!r || !r.complete) {
       const f = (up.files || []).find(x => x.name === nombre);
       const info = f ? ' (estado: ' + [f.status, f.error, f.progress != null ? f.progress + '%' : '', f.held ? 'retenido' : ''].filter(Boolean).join(', ') + '; target: ' + (up.target || '-') + ', noAuto: ' + !!up.noAuto + ', maxSize: ' + up.maxFileSize + ', accept: ' + (up.accept || '-') + ')' : ' (el fichero no entra en la lista: accept=' + (up.accept || '-') + ', maxFiles=' + up.maxFiles + ')';
