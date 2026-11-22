@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.7.0
+// @version      0.7.1
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX.
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -278,7 +278,7 @@
     const txt = hondo(doc, '*').map(e => e.childElementCount === 0 ? (e.textContent || '') : '').join(' ');
     const vistos = (txt.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).map(x => x.toLowerCase());
     const para = (esperados || []).map(x => String(x).toLowerCase()).filter(x => vistos.includes(x));
-    if (!para.length) { const x = boton(doc, /^Cancelar$|^Cerrar$/); if (x) x.click(); return { email: 'sinEmail', para: [] }; }
+    if (!para.length) { cerrarDialogo(doc); return { email: 'sinEmail', para: [] }; }
     enviar.click();
     const fin = await hastaQue(() => { const t = textoDe(doc); if (/error al enviar|no se ha podido enviar/i.test(t)) return 'error'; return !/Enviar email/.test(t) ? 'ok' : null; }, 60000, 1000);
     if (fin !== 'ok') throw new Error(fin === 'error' ? 'AmbarX da error al enviar el email' : 'AmbarX no confirma el envío del email');
@@ -378,6 +378,9 @@
   }
 
   // «Enviar por email» del documento, cambiando el PDF sin firmar por el firmado
+  // Cierra la ventana «Enviar email» sin enviar (no tiene botón Cancelar, solo la X)
+  function cerrarDialogo(doc) { const x = boton(doc, /^Cancelar$|^Cerrar$/); if (x) { x.click(); return; } hondo(doc, 'vaadin-dialog').forEach(d => { if (d.opened) d.opened = false; }); }
+
   async function emailConPdf(doc, bytes, nombre, esperados) {
     const env = await hastaQue(() => hondo(doc, 'vaadin-button').find(b => { const i = b.querySelector('vaadin-icon'); return i && i.getAttribute('icon') === 'vaadin:envelope'; }), 40000);
     if (!env) throw new Error('No encuentro «Enviar por email» en el documento');
@@ -391,15 +394,24 @@
     const txt = hondo(doc, '*').map(e => e.childElementCount === 0 ? (e.textContent || '') : '').join(' ');
     const vistos = (txt.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).map(x => x.toLowerCase());
     const para = (esperados || []).map(x => String(x).toLowerCase()).filter(x => vistos.includes(x));
-    if (!para.length) { const x = boton(doc, /^Cancelar$|^Cerrar$/); if (x) x.click(); return { email: 'sinEmail', para: [] }; }
+    if (!para.length) { cerrarDialogo(doc); return { email: 'sinEmail', para: [] }; }
     const up = hondo(doc, 'vaadin-upload').find(u => !antesUp.has(u)) || hondo(doc, 'vaadin-upload').pop();
-    // quitar el PDF sin firmar que adjunta AmbarX
-    for (const fi of hondo(doc, 'vaadin-upload-file')) {
-      if (!up.contains(fi) && !(up.shadowRoot && up.shadowRoot.contains(fi))) continue;
-      const rm = fi.shadowRoot && fi.shadowRoot.querySelector('[part="remove-button"]'); if (rm) { rm.click(); await espera(600); }
+    // Quitar el PDF sin firmar que adjunta AmbarX: hay que esperar a que aparezca (tarda unos segundos en generarlo)
+    const ajenos = () => (up.files || []).filter(x => x.name !== nombre);
+    await hastaQue(() => ajenos().length, 15000, 500);
+    for (let i = 0; i < 3 && ajenos().length; i++) {
+      for (const fi of hondo(up, 'vaadin-upload-file')) {
+        if ((fi.fileName || (fi.file && fi.file.name)) === nombre) continue;
+        const rm = fi.shadowRoot && fi.shadowRoot.querySelector('[part="remove-button"]'); if (rm) { rm.click(); await espera(700); }
+      }
+      if (ajenos().length) { up.files = (up.files || []).filter(x => x.name === nombre); await espera(700); }
     }
+    if (ajenos().length) { cerrarDialogo(doc); throw new Error('No se ha podido quitar el PDF sin firmar del email'); }
     await subirConUpload(doc, up, bytes, nombre);
     await espera(800);
+    // Comprobación final: solo debe ir el PDF firmado, una vez
+    const nombres = (up.files || []).map(x => x.name);
+    if (nombres.length !== 1 || nombres[0] !== nombre) { cerrarDialogo(doc); throw new Error('El email no lleva solo el PDF firmado (' + nombres.join(', ') + ')'); }
     enviar.click();
     const fin = await hastaQue(() => { const t = textoDe(doc); if (/error al enviar|no se ha podido enviar/i.test(t)) return 'error'; return !/Enviar email/.test(t) ? 'ok' : null; }, 60000, 1000);
     if (fin !== 'ok') throw new Error(fin === 'error' ? 'AmbarX da error al enviar el email' : 'AmbarX no confirma el envío del email');
