@@ -258,7 +258,7 @@ function pintar(){
   var repDias=Object.keys(D.reparto||{}).sort(), ventaDia={}, cliVenta={}, docsN=0, repDesde=null, repHasta=null;
   repDias.forEach(function(f){ var docs=(D.reparto[f]||{}).docs||{}; var tot=0;
     Object.values(docs).forEach(function(doc){ docsN++; var t=arr(doc.lineas).reduce(function(s,l){ return s+(l.t!=null?(+l.t||0):(+l.p||0)*(+l.u||0)*(1-(+l.dto||0)/100)); },0); tot+=t;
-      if(f>=hace30){ if(/^VENTA CONTADO|^CLIENTE CONTADO|^CLIENTE DE CONTADO/i.test(doc.cliente||'')) return; var k=doc.cliente||doc.cliCod||'?'; cliVenta[k]=(cliVenta[k]||0)+t; repDesde=repDesde&&repDesde<f?repDesde:f; repHasta=repHasta&&repHasta>f?repHasta:f; } });
+      if(f>=hace30){ var k=doc.cliente||doc.cliCod||'?'; cliVenta[k]=(cliVenta[k]||0)+t; repDesde=repDesde&&repDesde<f?repDesde:f; repHasta=repHasta&&repHasta>f?repHasta:f; } });
     ventaDia[f]=tot; });
   var vHoy=ventaDia[hoy]||0, v7=repDias.filter(function(f){return f>=hace7;}).reduce(function(s,f){return s+ventaDia[f];},0);
   var vs=Object.keys(D.vuelos||{}).map(function(g){ return Object.assign({guia:g},D.vuelos[g]); }).sort(function(a,b){ return String(b.semana).localeCompare(String(a.semana))||b.guia.localeCompare(a.guia); });
@@ -340,7 +340,7 @@ function pintar(){
   var dias=an[ul]?R[ul].dias:null;
   var fd=function(f){ return f? f.slice(8)+'/'+f.slice(5,7) : ''; }, nDias=repDesde? Math.round((new Date(repHasta)-new Date(repDesde))/864e5)+1 : 0;
   var periodo = repDesde? 'del '+fd(repDesde)+' al '+fd(repHasta)+' ('+nDias+' día'+(nDias>1?'s':'')+' con reparto)' : 'sin datos';
-  document.getElementById('topEtq').innerHTML = 'Albaranes y facturas que sube el script de AmbarX (se suben desde el 20/11), '+periodo+'. Sin las ventas de contado. '+(nDias<20?'<b>Aún hay pocos días: no sirve para sacar conclusiones.</b>':'');
+  document.getElementById('topEtq').innerHTML = 'Albaranes y facturas que sube el script de AmbarX (se suben desde el 20/11), '+periodo+'. '+(nDias<20?'<b>Aún hay pocos días: no sirve para sacar conclusiones.</b>':'');
   document.getElementById('tCli').innerHTML = tile('Clientes en AmbarX', num(nCli)) + tile('Clientes con reparto', num(act30), periodo) +
     tile('Concentración 5 primeros', totTop&&nDias>=20?pct(top5/totTop*100):'—', nDias>=20?'de la venta del reparto':'cuando haya 20 días de reparto') + tile('Días de cobro '+(ul||''), num(dias)+' d', 'Clientes ÷ ventas con IVA (cuentas '+(ul||'')+')');
   var vig=arr(dash.vigilados).sort(function(a,b){return a.anual-b.anual;});
