@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.6.0
+// @version      0.6.1
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX.
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -305,9 +305,26 @@
   const b64aBytes = d => { const s = atob(String(d).split(',').pop()); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
   const bytesAb64 = u => { let bin = ''; for (let i = 0; i < u.length; i += 8192) bin += String.fromCharCode.apply(null, u.subarray(i, i + 8192)); return 'data:application/pdf;base64,' + btoa(bin); };
 
+  // pdf-lib: si el @require no la ha dejado en window (AmbarX puede tener un cargador AMD), se carga con una etiqueta <script>
+  async function cargarPdfLib() {
+    if (window.PDFLib && window.PDFLib.PDFDocument) return window.PDFLib;
+    const amd = window.define;
+    try {
+      window.define = undefined;
+      await new Promise((ok, ko) => {
+        const sc = document.createElement('script');
+        sc.src = 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+        sc.onload = ok; sc.onerror = () => ko(new Error('No se pudo cargar la librería de PDF (sin internet en el servidor)'));
+        document.head.appendChild(sc);
+      });
+    } finally { window.define = amd; }
+    if (!window.PDFLib || !window.PDFLib.PDFDocument) throw new Error('Falta la librería de PDF');
+    return window.PDFLib;
+  }
+
   // Recuadro «Firma» del formato aBuscaflor (A4, puntos PDF desde abajo): albarán 415-575 × 45-90; factura, bajo la palabra «Firma»
   async function estamparFirma(pdfDataUrl, firma, tipo) {
-    const P = window.PDFLib; if (!P) throw new Error('Falta la librería de PDF (actualiza el script)');
+    const P = await cargarPdfLib();
     const pdf = await P.PDFDocument.load(b64aBytes(pdfDataUrl));
     const img = /image\/png/.test(String(firma).slice(0, 30)) ? await pdf.embedPng(b64aBytes(firma)) : await pdf.embedJpg(b64aBytes(firma));
     const pgs = pdf.getPages(), pg = pgs[pgs.length - 1], H = pg.getSize().height;
@@ -420,6 +437,7 @@
       }; };
     const pend = Object.keys(ent).filter(k => { const e = ent[k]; if (e.estado !== 'entregado') return false; const p = pasos(e); return p.firma || p.cobro || p.email || p.pdf; });
     if (!pend.length || !cogerCerrojo()) return;
+    if (!(await cerrojoComun())) { soltarCerrojo(); return; }
     ocupado = true; ultimoErr = ''; pintar();
     try {
       const docs = (await fb('GET', RUTA_REP + '/' + f + '/docs')) || {};
@@ -485,7 +503,19 @@
   function cogerCerrojo() {
     try { const l = JSON.parse(localStorage.getItem(LS_LOCK) || 'null'); if (l && Date.now() - l.t < 900000) return false; localStorage.setItem(LS_LOCK, JSON.stringify({ t: Date.now() })); return true; } catch (e) { return true; }
   }
-  function soltarCerrojo() { try { localStorage.removeItem(LS_LOCK); } catch (e) {} }
+  function soltarCerrojo() { try { localStorage.removeItem(LS_LOCK); } catch (e) {} if (tengoComun) { tengoComun = false; fb('PUT', 'buscaflor/peticiones/cerrojoAmbarx', null).catch(() => {}); } }
+  // Un solo proceso a la vez aunque haya AmbarX abierto con dos direcciones (cada dirección tiene su propio localStorage)
+  const YO = Math.random().toString(36).slice(2); let tengoComun = false;
+  async function cerrojoComun() {
+    try {
+      const l = await fb('GET', 'buscaflor/peticiones/cerrojoAmbarx');
+      if (l && l.yo !== YO && Date.now() - (l.t || 0) < 900000) return false;
+      await fb('PUT', 'buscaflor/peticiones/cerrojoAmbarx', { yo: YO, t: Date.now(), equipo: location.host });
+      await new Promise(r => setTimeout(r, 1500));
+      const l2 = await fb('GET', 'buscaflor/peticiones/cerrojoAmbarx');
+      tengoComun = !!l2 && l2.yo === YO; return tengoComun;
+    } catch (e) { return true; }
+  }
 
   async function subirStock(pedidoISO) {
     if (ocupado || !cogerCerrojo()) return;
