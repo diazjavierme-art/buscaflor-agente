@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.6.6
+// @version      0.7.0
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX.
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -228,18 +228,18 @@
     const cb = await hastaQue(() => { const c = hondo(doc, 'vaadin-combo-box')[0]; return c && (c.filteredItems || []).length ? c : null; }, 20000); if (!cb) throw new Error('No se abre «Firmar documento»');
     const clave = tipo === 'factura' ? '2' : '1';
     if (cb.value !== clave) {
-      const it = (cb.filteredItems || cb.items || []).find(i => i.key === clave);
-      if (it) cb.selectedItem = it;
+      // Se elige como lo haría una persona (abrir la lista y pulsar), para que el servidor de AmbarX se entere
+      cb.opened = true;
+      const op = await hastaQue(() => hondo(doc, 'vaadin-combo-box-item').find(x => clave === '2' ? /Factura venta/.test(x.textContent) : /Albar[aá]n venta/.test(x.textContent)), 5000);
+      if (op) op.click();
       await espera(800);
-      if (cb.value !== clave) { cb.value = clave; cb.dispatchEvent(new W.CustomEvent('change', { bubbles: true })); }
-      if (cb.value !== clave) { cb.opened = true; await espera(800); const op = hondo(doc, 'vaadin-combo-box-item').find(x => /Factura venta|Albar[aá]n venta/.test(x.textContent) && (clave === '2' ? /Factura/.test(x.textContent) : /Albar/.test(x.textContent))); if (op) op.click(); }
     }
     if (!await hastaQue(() => cb.value === clave, 5000)) throw new Error('No se puede elegir el tipo de documento');
     await espera(400);
     const tf = hondo(doc, 'vaadin-text-field')[0]; tf.value = num; tf.dispatchEvent(new W.CustomEvent('change', { bubbles: true })); await espera(600);
     const cargar = async () => { boton(doc, /^Cargar$/).click(); return hastaQue(() => { const t = textoDe(doc); if (/ya est[aá] firmado/i.test(t)) return 'ya'; if (new RegExp('Documento:[^\\n]*' + num.replace('-', '\\-')).test(t) && boton(doc, /^Firmar documento$/)) return 'ok'; if (/no existe|no encontrado|no se ha encontrado/i.test(t)) return 'no'; return null; }, 20000); };
     const r = await cargar();
-    if (r === 'ya') return 'yaFirmado';
+    if (r === 'ya') return { r: 'yaFirmado', email: 'noConsta' };
     if (r !== 'ok') throw new Error(r === 'no' ? 'AmbarX no encuentra el documento ' + num : 'AmbarX no carga el documento ' + num);
     boton(doc, /^Firmar documento$/).click();
     const sp = await hastaQue(() => { const x = hondo(doc, 'signature-pad')[0]; return x && x._pad && x._canvas && x._canvas.width ? x : null; }, 15000);
@@ -255,15 +255,18 @@
     if (ta && obs) { ta.value = obs.slice(0, 250); ta.dispatchEvent(new W.CustomEvent('change', { bubbles: true })); await espera(400); }
     boton(doc, /^Aceptar$/).click();
     await hastaQue(() => !hondo(doc, 'signature-pad').length, 20000);
-    await espera(1500);
+    // Al aceptar, AmbarX firma y, si el cliente tiene email, se lo manda él mismo
+    await hastaQue(() => /firmado correctamente/i.test(textoDe(doc)), 15000);
+    const em = await hastaQue(() => { const t = textoDe(doc); if (/Email enviado correctamente/i.test(t)) return 'enviado'; if (/error[^\n]*email|email[^\n]*error|no se ha podido enviar/i.test(t)) return 'error'; return null; }, 12000, 500);
+    await espera(1000);
     // Comprobación: al volver a cargarlo, AmbarX debe decir que ya está firmado
     const bc = boton(doc, /^Cargar$/);
-    if (bc) { bc.click(); const ok = await hastaQue(() => /ya est[aá] firmado/i.test(textoDe(doc)), 12000); if (!ok) throw new Error('AmbarX no confirma la firma (se volverá a comprobar)'); }
-    return 'firmado';
+    if (bc) { bc.click(); const ok = await hastaQue(() => /ya est[aá] firmado/i.test(textoDe(doc)), 12000); if (!ok) throw new Error('AmbarX no confirma la firma'); }
+    return { r: 'firmado', email: em || 'noConsta' };
   }
 
   // Abre el documento y lo envía por email con el formato habitual y los correos del cliente
-  async function emailDesdeAmbarx(doc) {
+  async function emailDesdeAmbarx(doc, esperados) {
     const env = await hastaQue(() => hondo(doc, 'vaadin-button').find(b => { const i = b.querySelector('vaadin-icon'); return i && i.getAttribute('icon') === 'vaadin:envelope'; }), 40000);
     if (!env) throw new Error('No encuentro «Enviar por email» en el documento');
     await espera(800); env.click();
@@ -273,7 +276,8 @@
     if (!enviar) throw new Error('No se abre la ventana «Enviar email»');
     await espera(1200);
     const txt = hondo(doc, '*').map(e => e.childElementCount === 0 ? (e.textContent || '') : '').join(' ');
-    const para = [...new Set((txt.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).map(x => x.toLowerCase()).filter(x => !/rosasdebuscaflor/i.test(x)))];
+    const vistos = (txt.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).map(x => x.toLowerCase());
+    const para = (esperados || []).map(x => String(x).toLowerCase()).filter(x => vistos.includes(x));
     if (!para.length) { const x = boton(doc, /^Cancelar$|^Cerrar$/); if (x) x.click(); return { email: 'sinEmail', para: [] }; }
     enviar.click();
     const fin = await hastaQue(() => { const t = textoDe(doc); if (/error al enviar|no se ha podido enviar/i.test(t)) return 'error'; return !/Enviar email/.test(t) ? 'ok' : null; }, 60000, 1000);
@@ -374,7 +378,7 @@
   }
 
   // «Enviar por email» del documento, cambiando el PDF sin firmar por el firmado
-  async function emailConPdf(doc, bytes, nombre) {
+  async function emailConPdf(doc, bytes, nombre, esperados) {
     const env = await hastaQue(() => hondo(doc, 'vaadin-button').find(b => { const i = b.querySelector('vaadin-icon'); return i && i.getAttribute('icon') === 'vaadin:envelope'; }), 40000);
     if (!env) throw new Error('No encuentro «Enviar por email» en el documento');
     await espera(800); env.click();
@@ -385,8 +389,9 @@
     if (!enviar) throw new Error('No se abre la ventana «Enviar email»');
     await espera(1500);
     const txt = hondo(doc, '*').map(e => e.childElementCount === 0 ? (e.textContent || '') : '').join(' ');
-    const para = [...new Set((txt.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).map(x => x.toLowerCase()).filter(x => !/rosasdebuscaflor|diazjavierme/i.test(x)))];
-    if (!para.length) return { email: 'sinEmail', para: [] };
+    const vistos = (txt.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).map(x => x.toLowerCase());
+    const para = (esperados || []).map(x => String(x).toLowerCase()).filter(x => vistos.includes(x));
+    if (!para.length) { const x = boton(doc, /^Cancelar$|^Cerrar$/); if (x) x.click(); return { email: 'sinEmail', para: [] }; }
     const up = hondo(doc, 'vaadin-upload').find(u => !antesUp.has(u)) || hondo(doc, 'vaadin-upload').pop();
     // quitar el PDF sin firmar que adjunta AmbarX
     for (const fi of hondo(doc, 'vaadin-upload-file')) {
@@ -450,7 +455,7 @@
         firma: !!e.firma && !a.firma && (n.firma || 0) < 3,
         cobro: !!FORMA_AMBARX[c.forma] && (+c.importe || 0) > 0 && !a.cobro && (n.cobro || 0) < 3,
         email: a.firma === 'adjunto' && !a.email && (n.email || 0) < 3,
-        pdf: !a.pdf && (n.pdf || 0) < 3 && (a.firma === 'error' || !e.firma)
+        pdf: !a.pdf && (n.pdf || 0) < 3 && (a.firma === 'firmado' || a.firma === 'error' || !e.firma)
       }; };
     const pend = Object.keys(ent).filter(k => { const e = ent[k]; if (e.estado !== 'entregado') return false; const p = pasos(e); return p.firma || p.cobro || p.email || p.pdf; });
     if (!pend.length || !cogerCerrojo()) return;
@@ -473,8 +478,23 @@
         };
         let p = pasos(Object.assign({}, e, { ambarx: a }));
         const nombrePdf = (tipo === 'factura' ? 'FV-' : 'AV-') + String(num).replace('-', '') + '_firmado.pdf';
+        const correos = (d.emails || []).filter(Boolean);
         if (p.firma) await paso('firma', async () => {
-          fase = 'Firmando ' + num + '…'; pintar();
+          if ((a.n.firma || 0) < 2) {
+            // Vía principal: la pantalla de firma de AmbarX (deja «Firmado», mete la firma en su PDF y manda el email)
+            fase = 'Firmando ' + num + ' en AmbarX…'; pintar();
+            const h = String(e.hora || '');
+            const obs = 'Entregado ' + h.slice(8, 10) + '/' + h.slice(5, 7) + ' ' + h.slice(11, 16) + (e.por ? ' por ' + e.por : '') + (e.recibe ? ' · Recibe: ' + e.recibe : '') +
+              (FORMA_AMBARX[(e.cobro || {}).forma] ? ' · Cobro: ' + e.cobro.forma + ' ' + String((+e.cobro.importe || 0).toFixed(2)).replace('.', ',') + ' €' : '') + (e.nota ? ' · ' + e.nota : '');
+            const r = await conMarco(doc => firmarEnAmbarx(doc, tipo, num, e.firma, obs), 'movil');
+            a.firma = 'firmado'; a.firmaHora = ahoraISO(); a.firmaAmbarx = r.r;
+            if (!correos.length) a.email = 'sinEmail';
+            else { a.email = r.email; a.para = correos; }   // 'enviado' · 'error' · 'noConsta' (no se reenvía para no duplicar)
+            a.emailHora = ahoraISO();
+            return;
+          }
+          // Último intento: PDF firmado como adjunto (por si la pantalla móvil no está disponible)
+          fase = 'Firmando ' + num + ' (adjunto)…'; pintar();
           const oficial = await conMarco(doc => pdfOficial(doc), ruta);
           const firmado = await estamparFirma(oficial, e.firma, tipo);
           await fb('PUT', RUTA_REP + '/' + f + '/pdfs/' + k, bytesAb64(firmado));
@@ -495,7 +515,7 @@
           fase = 'Enviando ' + num + ' firmado por email…'; pintar();
           const pdf = await fb('GET', RUTA_REP + '/' + f + '/pdfs/' + k);
           if (!pdf) throw new Error('No encuentro el PDF firmado');
-          const r = await conMarco(doc => emailConPdf(doc, b64aBytes(pdf), nombrePdf), ruta);
+          const r = await conMarco(doc => emailConPdf(doc, b64aBytes(pdf), nombrePdf, correos), ruta);
           a.email = r.email; a.para = r.para; a.emailHora = ahoraISO();
         });
         p = pasos(Object.assign({}, e, { ambarx: a }));
