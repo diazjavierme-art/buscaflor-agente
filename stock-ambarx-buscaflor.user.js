@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.6.2
+// @version      0.6.3
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX.
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -22,6 +22,7 @@
   const RUTA_AGENTE = 'buscaflor/peticiones/agenteStock'; // {visto, equipo}
   const RUTA_STOCK = 'buscaflor/stockAmbarx';
   const LS_AUTH = 'bf_stock_auth';                  // solo el token de refresco, nunca la contraseña
+  const YO = Math.random().toString(36).slice(2);
   const LS_LOCK = 'bf_stock_lock';                  // evita que dos pestañas de AmbarX lo hagan a la vez
   const CADA = 15000;                               // cada cuánto mira si hay peticiones
   const RUTA_PET_REP = 'buscaflor/peticiones/reparto'; // {pedido, fecha, por, estado, hecho, docs, error}
@@ -508,15 +509,18 @@
   // ---------------- Hacer la subida ----------------
   let ocupado = false, ultimo = null, ultimoErr = '', fase = '';
   function cogerCerrojo() {
-    try { const l = JSON.parse(localStorage.getItem(LS_LOCK) || 'null'); if (l && Date.now() - l.t < 900000) return false; localStorage.setItem(LS_LOCK, JSON.stringify({ t: Date.now() })); return true; } catch (e) { return true; }
+    try { const l = JSON.parse(localStorage.getItem(LS_LOCK) || 'null'); if (l && l.yo !== YO && Date.now() - l.t < 120000) return false; localStorage.setItem(LS_LOCK, JSON.stringify({ t: Date.now(), yo: YO })); return true; } catch (e) { return true; }
   }
   function soltarCerrojo() { try { localStorage.removeItem(LS_LOCK); } catch (e) {} if (tengoComun) { tengoComun = false; fb('PUT', 'buscaflor/peticiones/cerrojoAmbarx', null).catch(() => {}); } }
   // Un solo proceso a la vez aunque haya AmbarX abierto con dos direcciones (cada dirección tiene su propio localStorage)
-  const YO = Math.random().toString(36).slice(2); let tengoComun = false;
+  let tengoComun = false;
+  // Mientras trabaja, renueva los cerrojos cada 30 s; si la pestaña se cierra o recarga, caducan en 2 minutos
+  setInterval(() => { if (!ocupado) return; try { localStorage.setItem(LS_LOCK, JSON.stringify({ t: Date.now(), yo: YO })); } catch (e) {} if (tengoComun) fb('PUT', 'buscaflor/peticiones/cerrojoAmbarx', { yo: YO, t: Date.now(), equipo: location.host }).catch(() => {}); }, 30000);
+  window.addEventListener('beforeunload', () => { if (ocupado) soltarCerrojo(); });
   async function cerrojoComun() {
     try {
       const l = await fb('GET', 'buscaflor/peticiones/cerrojoAmbarx');
-      if (l && l.yo !== YO && Date.now() - (l.t || 0) < 900000) return false;
+      if (l && l.yo !== YO && Date.now() - (l.t || 0) < 120000) return false;
       await fb('PUT', 'buscaflor/peticiones/cerrojoAmbarx', { yo: YO, t: Date.now(), equipo: location.host });
       await new Promise(r => setTimeout(r, 1500));
       const l2 = await fb('GET', 'buscaflor/peticiones/cerrojoAmbarx');
