@@ -110,13 +110,13 @@ th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
 
   <!-- AÑO EN CURSO -->
   <section id="s-anio">
-    <div><h2>Resultado 2026</h2><div class="sub" id="acuEtq"></div></div>
+    <div><h2>Margen 2026</h2><div class="sub" id="acuEtq"></div></div>
     <div class="tiles" id="tAcu"></div>
     <div class="grid2">
       <div class="card"><h3>Venta de flor por mes (€)</h3><div class="sub">Venta del informe de AmbarX.</div><div class="chart" id="cVentaMes"></div></div>
       <div class="card"><h3>Margen bruto por mes (%)</h3><div class="sub">Los meses sueltos bailan por el stock; el dato fiable es el acumulado. Línea: objetivo.</div><div class="chart" id="cMargenMes"></div></div>
     </div>
-    <div class="card"><h3>Cuenta de resultados acumulada</h3><div class="scroll" id="tPyG"></div></div>
+    <div class="card"><h3>Margen bruto y estructura (acumulado)</h3><div class="scroll" id="tPyG"></div></div>
     <div class="card"><h3>Última semana controlada</h3><div class="sub" id="semEtq"></div><div class="scroll" id="tSemana"></div></div>
   </section>
 
@@ -281,22 +281,32 @@ function pintar(){
     }).join('')+'</table>' : '<div class="vacio">Sin vuelos.</div>';
 
   /* AÑO */
-  var acu=dash.acumulado||{}, mens=dash.mensual||{}, obj=dash.objetivos||{};
-  document.getElementById('acuEtq').textContent = (acu.etiqueta||'')+(acu.nota?' · '+acu.nota:'');
+  var acu=dash.acumulado||{}, mens=dash.mensual||{}, obj=dash.objetivos||{}, objMB=obj.margenBrutoPct||20;
+  var vA=acu.ventaAmbarx!=null?acu.ventaAmbarx:(acu.venta? acu.venta/1.1 : null);
+  var mA=acu.margenAmbarx!=null?acu.margenAmbarx:null, pA=acu.margenAmbarxPct!=null?acu.margenAmbarxPct:(vA&&mA!=null?mA/vA*100:null);
+  var vT=acu.ventaTotal!=null?acu.ventaTotal:acu.venta, mT=acu.margenTotal!=null?acu.margenTotal:acu.margenBruto, pT=acu.margenTotalPct!=null?acu.margenTotalPct:acu.margenPct;
+  var estr=(acu.gastos||0)+(acu.nave||0)+(acu.personal||0), contr=acu.estructuraContrastada===true;
+  document.getElementById('acuEtq').textContent = (acu.etiqueta||'')+' · Margen bruto = venta − coste de la flor puesta en Sevilla.';
   document.getElementById('tAcu').innerHTML =
-    tile('Venta de flor', eur(acu.venta), acu.etiqueta||'') +
-    tile('Margen bruto', eur(acu.margenBruto), pct(acu.margenPct)+' sobre venta', acu.margenPct>=(obj.margenBrutoPct||20)?chip('ok','sobre objetivo '+pct(obj.margenBrutoPct||20,0)):chip('warn','bajo objetivo '+pct(obj.margenBrutoPct||20,0))) +
-    tile('Gastos de estructura', eur((acu.gastos||0)+(acu.nave||0)+(acu.personal||0)), pct(((acu.gastos||0)+(acu.nave||0)+(acu.personal||0))/acu.venta*100)+' sobre venta') +
-    tile('Resultado', eur(acu.resultado), pct(acu.resultadoPct)+' sobre venta');
+    tile('Venta AmbarX', eur(vA), acu.etiqueta||'') +
+    tile('Margen bruto (venta AmbarX)', pct(pA), eur(mA)+' · coste flor '+eur(acu.costeFlor), pA>=objMB?chip('ok','sobre objetivo '+pct(objMB,0)):chip('warn','bajo objetivo '+pct(objMB,0))) +
+    tile('Con venta sin IVA (+10 %)', pct(pT), 'Venta '+eur(vT)+' · margen '+eur(mT), chip('warn','estimado')) +
+    tile('Estructura y resultado', contr?eur((mT||0)+(acu.otrosIngresos||0)-estr):'—', contr?'':'Faltan partidas de estructura', contr?'':chip('bad','sin contrastar'));
   var mk=Object.keys(mens).sort();
   barras('cVentaMes', mk.map(function(k){ return {l:MESES[+k.slice(5)-1], t:MESES[+k.slice(5)-1]+' '+k.slice(0,4), v:mens[k].venta, extra:'Margen '+eur(mens[k].margen)}; }), {fmt:eur, fmtEje:function(v){return num(v/1000)+'k';}, titulo:'Venta por mes'});
-  barras('cMargenMes', mk.map(function(k){ return {l:MESES[+k.slice(5)-1], t:MESES[+k.slice(5)-1]+' '+k.slice(0,4), v:mens[k].pct}; }), {fmt:pct, fmtEje:function(v){return num(v)+'%';}, ref:obj.margenBrutoPct||20, titulo:'Margen por mes'});
-  var filasPyG=[['Venta de flor',acu.venta],['Margen bruto',acu.margenBruto],['Otros ingresos',acu.otrosIngresos],['Gastos generales',-acu.gastos],['Nave (imputada)',-acu.nave],['Personal',-acu.personal],['Resultado',acu.resultado]];
-  document.getElementById('tPyG').innerHTML='<table><tr><th>Concepto</th><th>€</th><th>% venta</th></tr>'+filasPyG.map(function(f,i){ return '<tr'+(i===filasPyG.length-1?' style="font-weight:700"':'')+'><td>'+f[0]+'</td><td class="'+(f[1]<0?'neg':'')+'">'+eur(f[1])+'</td><td>'+pct(f[1]/acu.venta*100)+'</td></tr>'; }).join('')+'</table>';
+  barras('cMargenMes', mk.map(function(k){ return {l:MESES[+k.slice(5)-1], t:MESES[+k.slice(5)-1]+' '+k.slice(0,4), v:mens[k].pct}; }), {fmt:pct, fmtEje:function(v){return num(v)+'%';}, ref:objMB, titulo:'Margen por mes'});
+  var fila=function(t,a,b,cls){ return '<tr'+(cls?' style="'+cls+'"':'')+'><td>'+t+'</td><td class="'+(a<0?'neg':'')+'">'+(a==null?'—':eur(a))+'</td><td>'+(a==null||!vA?'—':pct(a/vA*100))+'</td><td class="'+(b<0?'neg':'')+'">'+(b==null?'—':eur(b))+'</td><td>'+(b==null||!vT?'—':pct(b/vT*100))+'</td></tr>'; };
+  document.getElementById('tPyG').innerHTML='<table><tr><th>Concepto</th><th>Venta AmbarX</th><th>%</th><th>Con venta sin IVA</th><th>%</th></tr>'+
+    fila('Venta de flor',vA,vT)+fila('Coste de la flor',acu.costeFlor!=null?-acu.costeFlor:null,acu.costeFlor!=null?-acu.costeFlor:null)+
+    fila('<b>Margen bruto</b>',mA,mT,'font-weight:700')+
+    '<tr><td colspan="5" class="sub">Coste de la flor: '+esc(acu.costeIncluye||'')+'. '+(acu.costeFalta?'<span class="neg">Falta: '+esc(acu.costeFalta)+'</span>':'')+'</td></tr>'+
+    '<tr><td colspan="5"><b>Costes de estructura</b> '+(contr?chip('ok','contrastados'):chip('bad','sin contrastar'))+'</td></tr>'+
+    fila('Otros ingresos',acu.otrosIngresos,acu.otrosIngresos)+fila('Gastos (Excel de gastos)',-acu.gastos,-acu.gastos)+fila('Nave (imputada)',-acu.nave,-acu.nave)+fila('Personal (solo repartidor)',-acu.personal,-acu.personal)+
+    '<tr><td colspan="5" class="sub">'+esc(acu.estructuraNota||'')+'</td></tr></table>';
   var sem=dash.semana||{};
   document.getElementById('semEtq').textContent = sem.desde? 'Del '+sem.desde.split('-').reverse().join('/')+' al '+sem.hasta.split('-').reverse().join('/')+(sem.parcial?' (parcial)':'')+' · venta '+eur(sem.venta)+' · margen '+pct(sem.pct)+' · rosa 60 bajo tarifa: '+eur(sem.rosaBajo)+' · clavel bajo tarifa: '+num(sem.clavelBajoTallos)+' tallos' : '';
   var fam=sem.familias||{};
-  document.getElementById('tSemana').innerHTML = Object.keys(fam).length? '<table><tr><th>Familia</th><th>Venta</th><th>% venta</th><th>Margen %</th></tr>'+Object.keys(fam).sort(function(a,b){return fam[b].venta-fam[a].venta;}).map(function(k){ return '<tr><td>'+esc(k)+'</td><td>'+eur(fam[k].venta)+'</td><td>'+pct(fam[k].venta/sem.venta*100)+'</td><td class="'+(fam[k].pct<(obj.margenBrutoPct||20)?'neg':'')+'">'+pct(fam[k].pct)+'</td></tr>'; }).join('')+'</table>' : '<div class="vacio">Sin semana.</div>';
+  document.getElementById('tSemana').innerHTML = Object.keys(fam).length? '<table><tr><th>Familia</th><th>Venta</th><th>% venta</th><th>Margen %</th></tr>'+Object.keys(fam).sort(function(a,b){return fam[b].venta-fam[a].venta;}).map(function(k){ return '<tr><td>'+esc(k)+'</td><td>'+eur(fam[k].venta)+'</td><td>'+pct(fam[k].venta/sem.venta*100)+'</td><td class="'+(fam[k].pct<objMB?'neg':'')+'">'+pct(fam[k].pct)+'</td></tr>'; }).join('')+'</table>' : '<div class="vacio">Sin semana.</div>';
 
   /* RATIOS */
   var an=dash.anual||{}, ys=Object.keys(an).sort(), R={};
