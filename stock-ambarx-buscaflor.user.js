@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.6.4
+// @version      0.6.5
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX.
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -406,6 +406,9 @@
     const W = doc.defaultView;
     const eur = await hastaQue(() => hondo(doc, 'vaadin-button').find(b => { const i = b.querySelector('vaadin-icon'); return i && i.getAttribute('icon') === 'vaadin:euro'; }), 40000);
     if (!eur) throw new Error('No encuentro «Cobrar» en el documento');
+    // Si AmbarX ya lo da por cobrado (p. ej. ventas de contado), no se abre la ventana: no hay nada que hacer
+    const yaC = (textoDe(doc) || '').match(/Cobro\s*Cobrado\s*([\d.,]+)\s*\/\s*([\d.,]+)\s*€/);
+    if (yaC && numEs(yaC[2]) > 0 && numEs(yaC[1]) >= numEs(yaC[2]) - 0.005) return 'yaCobrado';
     await espera(800); eur.click();
     const caja = await hastaQue(() => { const fc = hondo(doc, 'vaadin-date-picker').find(e => e.label === 'Fecha cobro'); let c = fc; while (c && !(c.innerText || '').includes('Importe a cobrar')) c = c.parentElement; return c; }, 20000);
     if (!caja) throw new Error('No se abre la ventana de cobro');
