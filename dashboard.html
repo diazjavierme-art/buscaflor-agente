@@ -286,7 +286,7 @@ function pintar(){
   var mA=acu.margenAmbarx!=null?acu.margenAmbarx:null, pA=acu.margenAmbarxPct!=null?acu.margenAmbarxPct:(vA&&mA!=null?mA/vA*100:null);
   var vT=acu.ventaTotal!=null?acu.ventaTotal:acu.venta, mT=acu.margenTotal!=null?acu.margenTotal:acu.margenBruto, pT=acu.margenTotalPct!=null?acu.margenTotalPct:acu.margenPct;
   var estr=(acu.gastos||0)+(acu.nave||0)+(acu.personal||0), contr=acu.estructuraContrastada===true;
-  document.getElementById('acuEtq').textContent = (acu.etiqueta||'')+' · Margen bruto = venta − coste de la flor puesta en Sevilla.';
+  document.getElementById('acuEtq').textContent = (acu.etiqueta||'')+' · Margen bruto = venta − coste de la flor puesta en el cliente (incluye palet y transporte a Sevilla y Chipiona).';
   document.getElementById('tAcu').innerHTML =
     tile('Venta AmbarX', eur(vA), acu.etiqueta||'') +
     tile('Margen bruto (venta AmbarX)', pct(pA), eur(mA)+' · coste flor '+eur(acu.costeFlor), pA>=objMB?chip('ok','sobre objetivo '+pct(objMB,0)):chip('warn','bajo objetivo '+pct(objMB,0))) +
@@ -297,10 +297,10 @@ function pintar(){
   barras('cMargenMes', mk.map(function(k){ return {l:MESES[+k.slice(5)-1], t:MESES[+k.slice(5)-1]+' '+k.slice(0,4), v:mens[k].pct}; }), {fmt:pct, fmtEje:function(v){return num(v)+'%';}, ref:objMB, titulo:'Margen por mes'});
   var fila=function(t,a,b,cls){ return '<tr'+(cls?' style="'+cls+'"':'')+'><td>'+t+'</td><td class="'+(a<0?'neg':'')+'">'+(a==null?'—':eur(a))+'</td><td>'+(a==null||!vA?'—':pct(a/vA*100))+'</td><td class="'+(b<0?'neg':'')+'">'+(b==null?'—':eur(b))+'</td><td>'+(b==null||!vT?'—':pct(b/vT*100))+'</td></tr>'; };
   document.getElementById('tPyG').innerHTML='<table><tr><th>Concepto</th><th>Venta AmbarX</th><th>%</th><th>Con venta sin IVA</th><th>%</th></tr>'+
-    fila('Venta de flor',vA,vT)+fila('Coste de la flor',acu.costeFlor!=null?-acu.costeFlor:null,acu.costeFlor!=null?-acu.costeFlor:null)+
+    fila('Venta de flor',vA,vT)+(acu.costeFlorMadrid!=null?fila('Flor puesta en Madrid (FOB + flete + Vallinoto) y flor nacional',acu.costeFlorMadrid!=null?-acu.costeFlorMadrid:null,acu.costeFlorMadrid!=null?-acu.costeFlorMadrid:null)+fila('Palet Madrid → Alcalá',acu.paletMadrid!=null?-acu.paletMadrid:null,acu.paletMadrid!=null?-acu.paletMadrid:null)+fila('Transporte a clientes de Sevilla',acu.transporteSevilla!=null?-acu.transporteSevilla:null,acu.transporteSevilla!=null?-acu.transporteSevilla:null)+fila('Transporte a clientes de Chipiona',acu.transporteChipiona!=null?-acu.transporteChipiona:null,acu.transporteChipiona!=null?-acu.transporteChipiona:null)+fila('Coste total de la flor puesta en el cliente',acu.costeFlor!=null?-acu.costeFlor:null,acu.costeFlor!=null?-acu.costeFlor:null,'font-weight:600'):fila('Coste de la flor',acu.costeFlor!=null?-acu.costeFlor:null,acu.costeFlor!=null?-acu.costeFlor:null))+
     fila('<b>Margen bruto</b>',mA,mT,'font-weight:700')+
     '<tr><td colspan="5" class="sub">Coste de la flor: '+esc(acu.costeIncluye||'')+'. '+(acu.costeFalta?'<span class="neg">Falta: '+esc(acu.costeFalta)+'</span>':'')+'</td></tr>'+
-    '<tr><td colspan="5"><b>Costes de estructura</b> '+(contr?chip('ok','contrastados'):chip('bad','sin contrastar'))+'</td></tr>'+
+    (dash.tarifasTransporte?'<tr><td colspan="5" class="sub">Tarifa media Cecotrans: Sevilla '+eur(dash.tarifasTransporte.sevilla.eurEntrega,2)+'/entrega ('+eur(dash.tarifasTransporte.sevilla.eurRuta,2)+'/ruta) · Chipiona '+eur(dash.tarifasTransporte.chipiona.eurEntrega,2)+'/entrega ('+eur(dash.tarifasTransporte.chipiona.eurRuta,2)+'/ruta).</td></tr>':'')+'<tr><td colspan="5"><b>Costes de estructura</b> '+(contr?chip('ok','contrastados'):chip('bad','sin contrastar'))+'</td></tr>'+
     fila('Otros ingresos',acu.otrosIngresos,acu.otrosIngresos)+fila('Gastos (Excel de gastos)',-acu.gastos,-acu.gastos)+fila('Nave (imputada)',-acu.nave,-acu.nave)+fila('Personal (solo repartidor)',-acu.personal,-acu.personal)+
     '<tr><td colspan="5" class="sub">'+esc(acu.estructuraNota||'')+'</td></tr></table>';
   var sem=dash.semana||{};
