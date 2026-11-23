@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.7.2
-// @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX.
+// @version      0.8.0
+// @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
 // @grant        none
@@ -586,6 +586,114 @@
     } finally { ocupado = false; fase = ''; soltarCerrojo(); pintar(); }
   }
 
+
+  // ---------------- Catálogo diario: clientes y artículos de AmbarX → app ----------------
+  // AmbarX manda. Solo añade y actualiza: nunca borra nada en Firebase.
+  const RUTA_CAT = 'buscaflor/peticiones/catalogo';   // {hecho, clientes, articulos, error, pedido}
+  const CAT_DESDE = 6 * 60 + 10;                      // a partir de las 6:10, una vez al día
+  const limpio = t => String(t == null ? '' : t).replace(/\s+/g, ' ').trim();
+  const sinRaros = t => limpio(t).replace(/[.#$\/\[\]]/g, '-');   // regla fija: sin . # $ / [ ] en variedad y medida
+  // Lee una lista de AmbarX (vaadin-grid) entera y devuelve filas {cabecera: texto} + los enlaces de cada fila
+  async function leerTabla(doc) {
+    const g = await hastaQue(() => { const x = hondo(doc, 'vaadin-grid')[0]; return x && x.size > 0 && itemsDe(x).length >= x.size ? x : null; }, 60000);
+    if (!g) throw new Error('No se abre la lista en AmbarX');
+    await espera(800);
+    const it = itemsDe(g);
+    const cols = [...g.querySelectorAll('vaadin-grid-column, vaadin-grid-sort-column')];
+    const txtCelda = td => { const sl = td && td.querySelector('slot'); const c = sl && sl.assignedNodes()[0]; return c ? limpio(c.textContent) : ''; };
+    const cab = [...g.shadowRoot.querySelectorAll('thead tr:last-child th')].map(th => ({ col: cols.indexOf(th._column), t: txtCelda(th) })).filter(h => h.t);
+    const filas = [...g.shadowRoot.querySelectorAll('tbody tr')].filter(tr => it[tr.index]);
+    const mapa = {};
+    cab.forEach(h => {
+      const n = {};
+      filas.forEach(tr => { const item = it[tr.index]; const td = [...tr.querySelectorAll('td')].find(d => cols.indexOf(d._column) === h.col); const t = txtCelda(td); if (!t) return;
+        Object.keys(item).forEach(k => { if (/_(label|representacion)$/.test(k) && limpio(item[k]) === t) n[k] = (n[k] || 0) + 1; }); });
+      const mejor = Object.entries(n).sort((a, b) => b[1] - a[1])[0]; if (mejor) mapa[h.t] = mejor[0];
+    });
+    return it.map(item => {
+      const o = { _href: Object.keys(item).filter(k => /_href$/.test(k)).map(k => String(item[k] || '')) };
+      Object.keys(mapa).forEach(h => { o[h] = limpio(item[mapa[h]]); });
+      o._fam = (Object.keys(item).find(k => /_href$/.test(k) && /\/familias\/editar\/[^?]/.test(String(item[k])) && !/\/subfamilias/.test(String(item[k]))) || '');
+      if (o._fam) o._fam = decodeURIComponent(String(item[o._fam]).split('/editar/')[1].split('?')[0]);
+      return o;
+    });
+  }
+  const codigoDe = (f, re) => { const h = f._href.find(x => re.test(x)); return h ? decodeURIComponent(h.split('/editar/')[1].split('?')[0]) : ''; };
+  // «FREEDOM 90CM/25T» → variedad FREEDOM, medida 90, 25 tallos
+  function trocear(desc) {
+    const d = limpio(desc);
+    let m = d.match(/^(.*?)\s*(\d+)\s*CM\s*\/\s*(\d+)\s*T/i);
+    if (m) return { variedad: sinRaros(m[1]), medida: +m[2], tallosPaquete: +m[3], rosa: true };
+    m = d.match(/^(.*?)\s*(\d+)\s*CM\b/i);
+    if (m) return { variedad: sinRaros(m[1]), medida: +m[2], tallosPaquete: null, rosa: false };
+    return { variedad: sinRaros(d), medida: null, tallosPaquete: null, rosa: false };
+  }
+  async function subirCatalogo(pedidoISO) {
+    if (ocupado || !cogerCerrojo()) return;
+    if (!(await cerrojoComun())) { soltarCerrojo(); return; }
+    ocupado = true; ultimoErr = ''; pintar();
+    try {
+      // Clientes
+      fase = 'Leyendo clientes de AmbarX…'; pintar();
+      const cl = await conMarco(doc => leerTabla(doc), 'clientes');
+      const fbCli = (await fb('GET', 'buscaflor/clientes/items')) || {};
+      const upd = {}; let nCliNuevos = 0, nCliCambios = 0;
+      cl.forEach(f => {
+        const c = codigoDe(f, /\/clientes\/editar\//); if (!c || /[.#$\/\[\]]/.test(c)) return;
+        const v = { codigo: c, nombre: f['Nombre'] || '', denominacion: f['Denominación'] || '', poblacion: f['Población'] || '' };
+        const a = fbCli[c];
+        if (!a) { upd['clientes/items/' + c] = v; nCliNuevos++; return; }
+        let cambia = false;
+        ['nombre', 'denominacion', 'poblacion'].forEach(k => { if (v[k] && limpio(a[k]) !== v[k]) { upd['clientes/items/' + c + '/' + k] = v[k]; cambia = true; } });
+        if (cambia) nCliCambios++;
+      });
+      // Artículos
+      fase = 'Leyendo artículos de AmbarX…'; pintar();
+      const ar = await conMarco(doc => leerTabla(doc), 'articulos');
+      const fbArt = (await fb('GET', 'buscaflor/articulos/items')) || {};
+      let nArtNuevos = 0, nArtCambios = 0, nFam = 0;
+      ar.forEach(f => {
+        const c = codigoDe(f, /\/articulos\/editar\//); if (!c || /[.#$\/\[\]]/.test(c)) return;
+        const desc = limpio(f['Descripción']); if (!desc) return;
+        const pvp = (() => { const t = f['P.V.P. (Sin I.V.A.)'] || ''; if (!/\d/.test(t)) return null; const n = parseFloat(t.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')); return isNaN(n) ? null : Math.round(n * 1000) / 1000; })();
+        const tr = trocear(desc);
+        const fam = (f._fam || '').split(' / ')[0];
+        const a = fbArt[c], base = 'articulos/items/' + c;
+        if (!a) {
+          const v = { codigo: c, descripcion: desc, variedad: tr.variedad };
+          if (tr.medida != null) v.medida = tr.medida; if (tr.tallosPaquete != null) v.tallosPaquete = tr.tallosPaquete; if (pvp != null) v.pvp = pvp;
+          if (tr.rosa && fam) v.familia = fam;
+          upd[base] = v; nArtNuevos++; return;
+        }
+        let cambia = false;
+        if (limpio(a.descripcion) !== desc) {
+          upd[base + '/descripcion'] = desc; upd[base + '/variedad'] = tr.variedad;
+          if (tr.medida != null) upd[base + '/medida'] = tr.medida; if (tr.tallosPaquete != null) upd[base + '/tallosPaquete'] = tr.tallosPaquete; cambia = true;
+        }
+        if (pvp != null && +a.pvp !== pvp) { upd[base + '/pvp'] = pvp; cambia = true; }
+        // La familia solo se copia en las rosas (en AmbarX «VERDE» sirve también para los verdes)
+        if (tr.rosa && fam && a.familia !== fam) { upd[base + '/familia'] = fam; cambia = true; nFam++; }
+        if (cambia) nArtCambios++;
+      });
+      fase = 'Subiendo a la app…'; pintar();
+      const ahora = ahoraISO();
+      upd['clientes/actualizado'] = ahora.slice(0, 16); upd['clientes/fuente'] = 'AmbarX - Clientes (copia diaria automática)';
+      upd['clientes/total'] = Object.keys(fbCli).length + nCliNuevos;
+      upd['articulos/actualizado'] = ahora.slice(0, 16) + ':00'; upd['articulos/fuente'] = 'AmbarX - Archivo de artículos (copia diaria automática)';
+      upd['articulos/total'] = Object.keys(fbArt).length + nArtNuevos;
+      await fb('PATCH', 'buscaflor', upd);
+      const res = { estado: 'hecho', hecho: ahora, atendido: pedidoISO || ahora, error: null,
+        clientes: { leidos: cl.length, nuevos: nCliNuevos, cambiados: nCliCambios },
+        articulos: { leidos: ar.length, nuevos: nArtNuevos, cambiados: nArtCambios, familias: nFam } };
+      await fb('PATCH', RUTA_CAT, res);
+      ultimo = { hora: ahora, n: cl.length + ar.length, que: 'clientes y art.' };
+    } catch (e) {
+      ultimoErr = String(e.message || e);
+      try { await fb('PATCH', RUTA_CAT, { estado: 'error', error: ultimoErr, atendido: pedidoISO || ahoraISO() }); } catch (e2) {}
+      console.error('[bf-catalogo]', e);
+    } finally { ocupado = false; fase = ''; soltarCerrojo(); pintar(); }
+  }
+
   // Mira cada 15 s si alguien ha pedido actualizar desde la app
   // ---------------- Sesión de AmbarX: que no caduque y avisar si pide contraseña ----------------
   // La contraseña de AmbarX nunca la escribe el script: si la sesión se pierde, avisa y la pone Javier.
@@ -614,6 +722,10 @@
       const r = await fb('GET', RUTA_PET_REP);
       if (r && r.pedido && r.estado === 'pedido' && (!r.atendido || r.pedido > r.atendido)) { ultimoAutoRep = Date.now(); await subirReparto(r.fecha, r.pedido, true); return; }
       await pasarEntregas(); if (ocupado) return;
+      const pc = await fb('GET', RUTA_CAT);
+      const hoyC = ahoraISO().slice(0, 10), mC = new Date().getHours() * 60 + new Date().getMinutes();
+      if (pc && pc.pedido && pc.estado === 'pedido' && (!pc.atendido || pc.pedido > pc.atendido)) { await subirCatalogo(pc.pedido); return; }
+      if (mC >= CAT_DESDE && (!pc || !pc.hecho || String(pc.hecho).slice(0, 10) < hoyC) && !(pc && pc.estado === 'error' && String(pc.atendido || '').slice(0, 10) === hoyC && Date.now() - new Date(pc.atendido).getTime() < 3600000)) { await subirCatalogo(null); return; }
       const h = new Date(), min = h.getHours() * 60 + h.getMinutes();
       if (h.getDay() !== 0 && min >= 390 && min <= 900 && Date.now() - ultimoAutoRep > REP_AUTO_MIN * 60000) { ultimoAutoRep = Date.now(); await subirReparto(null, null, false); }
     } catch (e) { errSesion = String(e.message || e); pintar(); }
@@ -641,12 +753,13 @@
     const f = document.createElement('div'); f.id = 'bf-stock-menu';
     f.style.cssText = 'position:fixed;right:8px;bottom:40px;z-index:100000;background:#fff;color:#222;border:1px solid #999;border-radius:6px;padding:10px;font:13px Arial,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3);width:260px';
     f.innerHTML = '<b>Stock de AmbarX → app de pedidos</b><br><br>' + (sesion
-      ? '<div style="margin-bottom:8px">Sesión: ' + (sesion.email || '') + '</div><button id="bf-ya">Subir el stock ahora</button> <button id="bf-rep">Subir reparto de hoy</button><br><br><button id="bf-out">Salir</button> <button id="bf-no">Cerrar</button>'
+      ? '<div style="margin-bottom:8px">Sesión: ' + (sesion.email || '') + '</div><button id="bf-ya">Subir el stock ahora</button> <button id="bf-rep">Subir reparto de hoy</button><br><br><button id="bf-cat">Copiar clientes y artículos</button><br><br><button id="bf-out">Salir</button> <button id="bf-no">Cerrar</button>'
       : '<input id="bf-em" type="email" placeholder="email" style="width:100%;box-sizing:border-box;margin-bottom:6px"><input id="bf-pw" type="password" placeholder="contraseña" style="width:100%;box-sizing:border-box;margin-bottom:6px"><div id="bf-msg" style="color:#c0392b;min-height:16px"></div><button id="bf-ok">Entrar</button> <button id="bf-no">Cerrar</button>');
     document.body.appendChild(f);
     f.querySelector('#bf-no').onclick = () => f.remove();
     if (sesion) {
       f.querySelector('#bf-ya').onclick = () => { f.remove(); subirStock(null); };
+      f.querySelector('#bf-cat').onclick = () => { f.remove(); subirCatalogo(null); };
       f.querySelector('#bf-rep').onclick = () => { f.remove(); ultimoAutoRep = Date.now(); subirReparto(null, null, false); };
       f.querySelector('#bf-out').onclick = () => { sesion = null; idToken = null; localStorage.removeItem(LS_AUTH); f.remove(); pintar(); };
     } else {
