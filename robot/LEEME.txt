@@ -1,0 +1,14 @@
+BUSCAFLOR - ROBOT DE AMBARX (sin depender de que Chrome este abierto)
+
+Antes: si quieres, crea en AmbarX un usuario propio para el robot (por ejemplo "robot").
+
+1) Clic derecho en instalar.cmd > "Ejecutar como administrador".
+   Descarga lo necesario y te pide el usuario y la contrasena de AmbarX del robot.
+2) Doble clic en configurar.cmd.
+   Se abre AmbarX en una ventana del robot. Abajo a la derecha, en el panel de Buscaflor,
+   inicia sesion en la app con tu email (solo esta vez). Luego cierra esa ventana.
+3) Clic derecho en activar.cmd > "Ejecutar como administrador".
+   Desde ese momento el robot arranca solo al encender el ordenador, en segundo plano.
+
+Para pararlo: Programador de tareas > "Buscaflor Robot AmbarX" > Deshabilitar.
+Registro: robot.log en esta carpeta.

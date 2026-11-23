@@ -1,0 +1,7 @@
+config.json
+perfil/
+node/
+node_modules/
+robot.log*
+script-cache.js
+*_resultado.txt
