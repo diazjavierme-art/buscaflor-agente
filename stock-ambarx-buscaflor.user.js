@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.0
+// @version      0.9.1
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -777,6 +777,22 @@
         try { const c = await conMarco(doc => pendientesDelMes(doc).then(x => x.filas.length), 'ventas/facturacion/albaranes-automatica'); r.pendientesDespues = c; } catch (e) { r.pendientesDespues = 'sin comprobar: ' + (e.message || e); } }
       await fb('PUT', RUTA_FACT, r);
       ultimo = { hora: ahoraISO(), n: r.albaranes, que: 'albaranes facturados' };
+      // Para la revisión del día 1: copia las facturas de hoy con sus líneas (duplicados, precios raros, líneas sin cobrar)
+      if (r.estado === 'facturado') {
+        try {
+          const hoy = ahoraISO().slice(0, 10), fechaES = hoy.slice(8, 10) + '/' + hoy.slice(5, 7) + '/' + hoy.slice(0, 4);
+          fase = 'Leyendo las facturas para revisarlas…'; pintar();
+          const lista = await conMarco(doc => leerListado(doc, fechaES), 'ventas/facturas');
+          const facturas = {}; let i = 0;
+          for (const h of lista) {
+            i++; fase = 'Leyendo factura ' + h.num + ' (' + i + '/' + lista.length + ')'; pintar();
+            let det; try { det = await conMarco(doc => leerDocumento(doc), 'ventas/facturas/editar/' + encodeURIComponent(h.num)); } catch (e) { det = { error: String(e.message || e) }; }
+            facturas[h.num.replace(/[.#$\/\[\]]/g, '-')] = { num: h.num, cliCod: h.cliCod, cliente: h.cliente, total: h.total, origen: det.origen || '', lineas: det.lineas || [], error: det.error || null };
+          }
+          await fb('PUT', 'buscaflor/revisionFacturas/' + hoy.slice(0, 7), { leido: ahoraISO(), fecha: hoy, n: lista.length, facturas });
+          await fb('PATCH', RUTA_FACT, { facturasLeidas: lista.length });
+        } catch (e) { try { await fb('PATCH', RUTA_FACT, { facturasLeidas: 'error: ' + (e.message || e) }); } catch (e2) {} }
+      }
     } catch (e) {
       ultimoErr = String(e.message || e);
       try { await fb('PATCH', RUTA_FACT, { mes, estado: 'error', error: ultimoErr, hecho: ahoraISO() }); } catch (e2) {}
