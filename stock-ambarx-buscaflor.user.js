@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.2
+// @version      0.9.3
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -521,8 +521,13 @@
           const firmado = await estamparFirma(oficial, e.firma, tipo);
           await fb('PUT', RUTA_REP + '/' + f + '/pdfs/' + k, bytesAb64(firmado));
           a.pdf = 'ok'; a.pdfHora = ahoraISO();
-          fase = 'Guardando ' + num + ' firmado en AmbarX…'; pintar();
-          await conMarco(doc => adjuntarEnAmbarx(doc, firmado, nombrePdf), ruta);
+          // Si el cliente tiene email, NO se adjunta aquí: al subir el PDF en «Enviar por email» AmbarX ya lo guarda
+          // como adjunto del documento, y si ya estuviera adjunto lo mete otra vez en el email (salían dos PDF, 23-11)
+          if (!correos.length) {
+            fase = 'Guardando ' + num + ' firmado en AmbarX…'; pintar();
+            await conMarco(doc => adjuntarEnAmbarx(doc, firmado, nombrePdf), ruta);
+            a.email = 'sinEmail'; a.emailHora = ahoraISO();
+          }
           a.firma = 'adjunto'; a.firmaHora = ahoraISO(); a.nombrePdf = nombrePdf;
         });
         p = pasos(Object.assign({}, e, { ambarx: a }));
@@ -537,8 +542,15 @@
           fase = 'Enviando ' + num + ' firmado por email…'; pintar();
           const pdf = await fb('GET', RUTA_REP + '/' + f + '/pdfs/' + k);
           if (!pdf) throw new Error('No encuentro el PDF firmado');
-          const r = await conMarco(doc => emailConPdf(doc, b64aBytes(pdf), nombrePdf, correos), ruta);
-          a.email = r.email; a.para = r.para; a.emailHora = ahoraISO();
+          try {
+            const r = await conMarco(doc => emailConPdf(doc, b64aBytes(pdf), nombrePdf, correos), ruta);
+            a.email = r.email; a.para = r.para; a.emailHora = ahoraISO();
+            if (r.email === 'sinEmail') await conMarco(doc => adjuntarEnAmbarx(doc, b64aBytes(pdf), nombrePdf), ruta);
+          } catch (err) {
+            // Último intento fallido: que al menos quede el PDF firmado como adjunto del documento
+            if ((a.n.email || 0) >= 2) { try { await conMarco(doc => adjuntarEnAmbarx(doc, b64aBytes(pdf), nombrePdf), ruta); } catch (e2) {} }
+            throw err;
+          }
         });
         p = pasos(Object.assign({}, e, { ambarx: a }));
         if (p.pdf) await paso('pdf', async () => {
