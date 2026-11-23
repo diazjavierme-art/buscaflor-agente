@@ -316,7 +316,11 @@ function datosPeriodo(r){
 }
 function variacion(a,b,t){ if(!b) return ''; var v=(a-b)/b*100; return '<span class="'+(v>=0?'up':'down')+'">'+(v>=0?'▲ ':'▼ ')+pct(Math.abs(v),0)+'</span> '+(t||'vs anterior'); }
 function pintarResumen(){
-  var r=rango(PER.tipo, PER.off), ra=rango(PER.tipo, PER.tipo==='dia'?PER.off-7:PER.off-1), vsTxt=PER.tipo==='dia'?'vs mismo día semana pasada':PER.tipo==='semana'?'vs semana anterior':'vs mes anterior', o=datosPeriodo(r), oa=datosPeriodo(ra);
+  var r=rango(PER.tipo, PER.off), ra=rango(PER.tipo, PER.tipo==='dia'?PER.off-7:PER.off-1), vsTxt=PER.tipo==='dia'?'vs mismo día semana pasada':PER.tipo==='semana'?'vs semana anterior':'vs mes anterior';
+  if(PER.tipo==='mes'){ var hoyS=hoyISO(new Date()), hastaR=r.hasta>hoyS?hoyS:r.hasta, yA=(+r.desde.slice(0,4)-1);
+    ra={desde:yA+r.desde.slice(4), hasta:yA+hastaR.slice(4), etq:''};
+    vsTxt=hastaR<r.hasta?'vs mismo periodo de '+yA+' (1–'+(+hastaR.slice(8))+')':'vs '+MESES[+r.desde.slice(5,7)-1]+' '+yA; }
+  var o=datosPeriodo(r), oa=datosPeriodo(ra);
   document.getElementById('perEtq').textContent=r.etq.charAt(0).toUpperCase()+r.etq.slice(1);
   document.getElementById('perSig').disabled = PER.off>=0;
   var repDias=Object.keys(((D.ventasAmbarx||{}).dias)||{}).concat(Object.keys(D.reparto||{})).sort(), primero=repDias[0]||null, completo=!primero||primero<=r.desde, antCompleto=!primero||primero<=ra.desde;
