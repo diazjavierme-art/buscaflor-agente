@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.1
+// @version      0.9.2
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -457,10 +457,12 @@
     return 'cobrado';
   }
 
+  const DIAS_ENTREGAS = 3; // hoy y los 2 días anteriores
   async function pasarEntregas() {
     if (ocupado) return;
-    const f = ahoraISO().slice(0, 10);
-    const ent = (await fb('GET', RUTA_REP + '/' + f + '/entregas')) || {};
+    // Repasa hoy y los 2 días anteriores (3 días): si el servidor estuvo parado, las entregas firmadas que quedaron
+    // sin pasar a AmbarX se terminan al volver. Va día a día (primero hoy); el resto en las vueltas siguientes.
+    let f = '', ent = {}, pend = [];
     // Cada paso (firma, cobro, PDF) va por su lado: si uno falla, los demás se hacen igual (3 intentos cada uno)
     const pasos = e => { const a = e.ambarx || {}, c = e.cobro || {}, n = a.n || {};
       return {
@@ -469,7 +471,15 @@
         email: a.firma === 'adjunto' && !a.email && (n.email || 0) < 3,
         pdf: !a.pdf && (n.pdf || 0) < 3 && (a.firma === 'firmado' || a.firma === 'error' || !e.firma)
       }; };
-    const pend = Object.keys(ent).filter(k => { const e = ent[k]; if (e.estado !== 'entregado') return false; const p = pasos(e); return p.firma || p.cobro || p.email || p.pdf; });
+    const yaPasados = new Set(); // documentos que ya se firmaron en AmbarX desde un día posterior: no se repiten (ni firma ni email)
+    for (let atras = 0; atras < DIAS_ENTREGAS; atras++) {
+      const d0 = new Date(); d0.setDate(d0.getDate() - atras);
+      const fd = ahoraISO(d0).slice(0, 10);
+      const en = (await fb('GET', RUTA_REP + '/' + fd + '/entregas')) || {};
+      const pe = Object.keys(en).filter(k => { const e = en[k]; if (e.estado !== 'entregado' || yaPasados.has(k)) return false; const p = pasos(e); return p.firma || p.cobro || p.email || p.pdf; });
+      if (pe.length) { f = fd; ent = en; pend = pe; break; }
+      for (const k of Object.keys(en)) { const a = en[k].ambarx || {}; if (a.firma || a.email) yaPasados.add(k); }
+    }
     if (!pend.length || !cogerCerrojo()) return;
     if (!(await cerrojoComun())) { soltarCerrojo(); return; }
     ocupado = true; ultimoErr = ''; pintar();
