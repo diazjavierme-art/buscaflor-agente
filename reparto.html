@@ -162,7 +162,7 @@ function fechaLarga(f){ var d=new Date(f+'T12:00:00'); var s=d.toLocaleDateStrin
 function moverDia(n){ var d=new Date(S.fecha+'T12:00:00'); d.setDate(d.getDate()+n); S.fecha=hoyISO(d); escuchar(); }
 
 function reps(){ var r={}; Object.keys(REP_DEF).forEach(function(k){ r[k]=Object.assign({},REP_DEF[k]); }); Object.keys(S.rep||{}).forEach(function(k){ r[k]=Object.assign(r[k]||{}, S.rep[k]); }); return r; }
-function nombreRep(c){ var r=reps()[c]; return r ? r.nombre : ('Comercial ' + c); }
+function nombreRep(c){ if(c===''||c==null) return '⚠ Sin repartidor: asígnalos'; var r=reps()[c]; return r ? r.nombre : ('Comercial ' + c); }
 // Dirección de entrega: primero el listado de reparto (configPedidos/direccionesReparto), si no la fiscal de AmbarX
 function entrega(d){
   var c=String(d.cliCod||''), nom=String(d.cliente||'').toUpperCase(), hit=null;
@@ -271,7 +271,8 @@ function pintarOficina(app, docs){
   var t=totalesDe(docs);
   h+='<div class="resumen"><div><b>'+t.hechas+'/'+t.n+'</b><span>entregados</span></div><div><b>'+num(t.efectivo)+'</b><span>€ efectivo</span></div><div><b>'+num(t.tarjeta)+'</b><span>€ tarjeta</span></div></div>';
   if (!docs.length) h+='<div class="vacio">No hay albaranes ni facturas para este día.</div>';
-  Object.keys(grupos).sort(function(a,b){ return (+a)-(+b); }).forEach(function(c){
+  if (grupos['']) h+='<div class="alerta mal">⚠ Hay '+grupos[''].length+' documento(s) sin repartidor en AmbarX: ningún repartidor los ve. Ábrelos y pulsa «Cambiar repartidor» (o «Recogen en la nave»).</div>';
+  Object.keys(grupos).sort(function(a,b){ return a===''?-1:b===''?1:(+a)-(+b); }).forEach(function(c){
     var g=ordenar(grupos[c], c), tg=totalesDe(g), ab=S.filtroCom===c;
     h+='<h2><span onclick="S.filtroCom=S.filtroCom===\''+c+'\'?null:\''+c+'\';pintar()">'+(ab?'▾ ':'▸ ')+esc(nombreRep(c))+' · '+tg.hechas+'/'+tg.n+'</span>'+
       '<span><button class="btn peq" onclick="hojaRuta(\''+c+'\')">Hoja de ruta</button></span></h2>';
