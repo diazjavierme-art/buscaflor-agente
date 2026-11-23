@@ -409,12 +409,12 @@ function hacerReasignar(k,c){
 var F = null;
 function entregar(k){
   var d=S.docs[k];
-  F={ k:k, forma:null, firma:null };
+  F={ k:k, forma:'pendiente', firma:null }; // por defecto «No cobra»
   var h='<h3>'+esc(d.cliente)+'</h3>'+
     '<div class="doc-cab"><div><div class="t">'+(d.tipo==='factura'?'Factura':'Albarán')+'</div><div style="font-weight:600">'+esc(d.num)+'</div></div><div style="text-align:right"><div class="t">Total con IVA</div><div class="v">'+eur(d.total)+'</div></div></div>'+
     '<details style="margin:8px 0"><summary class="nota">Ver lo que lleva ('+(d.lineas||[]).length+' líneas)</summary>'+tablaLineas(d)+'</details>'+
     '<div class="paso"><i>1</i>Cobro</div><div class="chips" id="chCobro">'+
-      [['efectivo',ico('efe')+' Efectivo'],['tarjeta',ico('tar')+' Tarjeta'],['transferencia',ico('ban')+' Transferencia'],['pendiente',ico('no')+' No cobra']].map(function(x){ return '<button data-f="'+x[0]+'">'+x[1]+'</button>'; }).join('')+'</div>'+
+      [['efectivo',ico('efe')+' Efectivo'],['tarjeta',ico('tar')+' Tarjeta'],['transferencia',ico('ban')+' Transferencia'],['pendiente',ico('no')+' No cobra']].map(function(x){ return '<button data-f="'+x[0]+'"'+(x[0]==='pendiente'?' class="sel"':'')+'>'+x[1]+'</button>'; }).join('')+'</div>'+
     '<div id="cajaImp" style="display:none"><label>Importe cobrado</label><input id="imp" type="number" inputmode="decimal" step="0.01" value="'+(+d.total||0).toFixed(2)+'"></div>'+
     '<div class="paso"><i>2</i>Firma del cliente</div><div id="cajaFirma" onclick="abrirPad()">'+ico('firma')+'<span>Toca para que firme el cliente</span></div>'+
     '<div class="nota" style="margin-top:6px">Al guardar, el '+(d.tipo==='factura'?'documento':'albarán')+' firmado se guarda en AmbarX y se le envía al cliente por email.</div>'+
