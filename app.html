@@ -19,16 +19,20 @@ body{font-family:Inter,system-ui,sans-serif;background:var(--bg);display:flex;fl
 #marcos{flex:1;position:relative;min-height:0}
 #marcos iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:var(--bg);display:none}
 #marcos iframe.on{display:block}
-nav{order:-1;display:flex;background:#fff;border-bottom:1px solid var(--line);padding:calc(4px + env(safe-area-inset-top)) 6px 4px;gap:4px;box-shadow:0 1px 4px rgba(16,24,40,.05)}
-nav button{flex:1;border:0;background:none;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:6px;padding:6px 4px;border-radius:999px;font:600 12.5px Inter,sans-serif;color:var(--muted);cursor:pointer}
-nav button svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-nav button.on{color:var(--navy);background:var(--soft)}
+body{padding-top:env(safe-area-inset-top)}
+nav{display:flex;background:#fff;border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom));gap:4px;box-shadow:0 -1px 6px rgba(16,24,40,.06)}
+nav button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 2px;border-radius:12px;font:600 11px Inter,sans-serif;color:var(--muted);cursor:pointer;-webkit-tap-highlight-color:transparent}
+nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--navy)}
+nav button.on svg{background:var(--soft);border-radius:999px;padding:3px 14px;width:52px;height:30px;box-sizing:border-box}
 @media (min-width:900px){
-  body{flex-direction:row}
-  nav{flex-direction:column;justify-content:flex-start;width:92px;border-bottom:0;border-right:1px solid var(--line);padding:14px 8px;box-shadow:none;gap:6px}
+  body{flex-direction:row;padding-top:0}
+  nav{order:-1}
+  nav{flex-direction:column;justify-content:flex-start;width:92px;border-top:0;border-right:1px solid var(--line);padding:14px 8px;box-shadow:none;gap:6px}
   nav .marca{display:flex}
   nav button{flex:none;flex-direction:column;gap:3px;padding:10px 2px;border-radius:10px;font-size:11.5px}
   nav button svg{width:22px;height:22px}
+  nav button.on{background:var(--soft)} nav button.on svg{background:none;padding:0;width:22px;height:22px}
 }
 nav .marca{display:none;align-items:center;justify-content:center;width:44px;height:44px;margin:0 auto 12px;border-radius:11px;background:var(--navy);color:#fff;font-weight:700;font-size:20px}
 </style>
