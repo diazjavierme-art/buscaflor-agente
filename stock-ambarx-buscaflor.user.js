@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.8.0
-// @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas).
+// @version      0.9.0
+// @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
 // @grant        none
@@ -694,6 +694,96 @@
     } finally { ocupado = false; fase = ''; soltarCerrojo(); pintar(); }
   }
 
+
+  // ---------------- Fin de mes: facturación automática de albaranes ----------------
+  // Último día del mes, de 20:00 a 23:50. Una factura por cliente, serie A, banco 20, forma de pago del cliente.
+  // Si algo no está como se espera, NO factura y deja el aviso en peticiones/facturacionMes.
+  const RUTA_FACT = 'buscaflor/peticiones/facturacionMes';
+  const btnTxt = (doc, re) => hondo(doc, 'vaadin-button').filter(x => re.test((x.textContent || '').trim())).pop();
+  async function pendientesDelMes(doc) {
+    const rango = await hastaQue(() => hondo(doc, 'vaadin-select').find(x => x.label === 'Rangos frecuentes'), 30000);
+    if (!rango) throw new Error('No encuentro el filtro de fechas');
+    rango.value = '7'; rango.dispatchEvent(new CustomEvent('change', { bubbles: true })); // «Este mes»
+    await espera(1500);
+    const dps = hondo(doc, 'vaadin-date-picker');
+    const desde = (dps.find(d => d.label === 'Desde') || {}).value || '', hasta = (dps.find(d => d.label === 'Hasta') || {}).value || '';
+    const hoy = ahoraISO().slice(0, 10);
+    if (desde !== hoy.slice(0, 8) + '01' || hasta !== hoy) throw new Error('El filtro de fechas no es este mes (' + desde + ' a ' + hasta + ')');
+    const sig = btnTxt(doc, /^Siguiente$/); if (!sig) throw new Error('No encuentro «Siguiente»');
+    sig.click();
+    const g = await hastaQue(() => { const x = hondo(doc, 'vaadin-grid')[0]; return x && btnTxt(doc, /^Facturar$/) && (x.size === 0 || itemsDe(x).length >= x.size) ? x : null; }, 90000, 1000);
+    if (!g) throw new Error('No sale la lista de albaranes a facturar');
+    await espera(1500);
+    const filas = itemsDe(g).map(it => { const v = Object.entries(it);
+      const lab = re => v.filter(([k, y]) => /_label$/.test(k) && re.test(String(y))).map(z => String(z[1]));
+      const cli = (v.find(([k, y]) => /_representacion$/.test(k) && / - /.test(String(y))) || [])[1] || '';
+      const e = lab(/€/); return { doc: lab(/^[A-Z]-\d+$/)[0] || '', cli: String(cli), total: numEs(e[2]) }; });
+    return { g, filas };
+  }
+  async function facturarMes(doc) {
+    const ahora = ahoraISO(), hoy = ahora.slice(0, 10);
+    // Ajustes: una factura por cliente y forma de pago del cliente
+    const aj = btnTxt(doc, /^Ajustes$/); if (!aj) throw new Error('No encuentro «Ajustes»');
+    aj.click(); await espera(1500);
+    const radio = hondo(doc, 'vaadin-radio-button').find(x => (x.label || x.textContent || '').trim() === 'Cliente');
+    const fp = hondo(doc, 'vaadin-checkbox').find(x => /Tomar forma de pago del cliente/.test(x.label || x.textContent || ''));
+    if (!radio || !fp) throw new Error('No encuentro los ajustes de agrupar y forma de pago');
+    if (!radio.checked) { radio.click(); await espera(600); }
+    if (!fp.checked) { fp.click(); await espera(600); }
+    if (!radio.checked || !fp.checked) throw new Error('No se han podido poner los ajustes');
+    const ac = btnTxt(doc, /^Aceptar$/); if (ac) ac.click(); await espera(1200);
+    const { g, filas } = await pendientesDelMes(doc);
+    const total = Math.round(filas.reduce((a, f) => a + f.total, 0) * 100) / 100;
+    const clientes = new Set(filas.map(f => f.cli)).size;
+    if (!filas.length) return { estado: 'nadaQueFacturar', mes: hoy.slice(0, 7), hecho: ahora, albaranes: 0 };
+    // Datos de la factura: serie A, fecha de hoy (último día del mes), banco 20
+    const serie = hondo(doc, 'vaadin-select').find(x => x.label === 'Serie');
+    const fecha = hondo(doc, 'vaadin-date-picker').find(x => x.label === 'Fecha');
+    const banco = hondo(doc, 'vaadin-text-field').map(t => t.value || '').find(v => /^\d+ - /.test(v)) || '';
+    const serieTxt = serie ? ((serie.querySelector('vaadin-select-item[selected]') || {}).textContent || (serie.value === '2' ? 'A' : serie.value)) : '';
+    if (!serie || String(serieTxt).trim() !== 'A') throw new Error('La serie de factura no es A');
+    if (!fecha || fecha.value !== hoy) throw new Error('La fecha de factura no es hoy (' + (fecha && fecha.value) + ')');
+    if (!/^20 - /.test(banco)) throw new Error('El banco para efectos no es el 20 (' + banco + ')');
+    // Marcar todos
+    const sc = g.querySelector('vaadin-grid-flow-selection-column');
+    const cab = sc && sc._headerCell && sc._headerCell._content && sc._headerCell._content.querySelector('vaadin-checkbox');
+    if (!cab) throw new Error('No encuentro la casilla de marcar todos');
+    if (!sc.selectAll) { cab.click(); await espera(2500); }
+    const marcados = hondo(g, 'vaadin-checkbox').filter(c => c.checked).length - 1;
+    if (marcados < filas.length) throw new Error('Solo se han marcado ' + marcados + ' de ' + filas.length + ' albaranes');
+    // Facturar (y confirmar si AmbarX lo pregunta)
+    btnTxt(doc, /^Facturar$/).click();
+    const t0 = Date.now(); let confirmado = false;
+    while (Date.now() - t0 < 240000) {
+      await espera(1500);
+      const dlg = hondo(doc, 'vaadin-dialog, vaadin-confirm-dialog').find(d => d.opened);
+      if (dlg && !confirmado) { const b = hondo(doc, 'vaadin-button').filter(x => /^(Aceptar|Sí|Si|Confirmar|Facturar)$/.test((x.textContent || '').trim()) && x.closest && !x.closest('vaadin-grid')).pop(); if (b) { b.click(); confirmado = true; continue; } }
+      const gg = hondo(doc, 'vaadin-grid')[0];
+      if (!dlg && (!gg || gg.size === 0 || !btnTxt(doc, /^Facturar$/))) break;
+    }
+    const aviso = hondo(doc, 'vaadin-notification-card').map(c => limpio(c.innerText || c.textContent)).filter(Boolean).join(' | ');
+    return { estado: 'facturado', mes: hoy.slice(0, 7), hecho: ahoraISO(), albaranes: filas.length, clientes, total, aviso: aviso.slice(0, 500) };
+  }
+  async function hacerFacturacionMes() {
+    if (ocupado || !cogerCerrojo()) return;
+    if (!(await cerrojoComun())) { soltarCerrojo(); return; }
+    ocupado = true; ultimoErr = ''; fase = 'Facturando albaranes del mes…'; pintar();
+    const mes = ahoraISO().slice(0, 7);
+    try {
+      await fb('PATCH', RUTA_FACT, { mes, estado: 'enCurso', empezado: ahoraISO(), error: null });
+      const r = await conMarco(doc => facturarMes(doc), 'ventas/facturacion/albaranes-automatica');
+      // Comprobación: vuelve a mirar cuántos albaranes del mes quedan sin facturar
+      if (r.estado === 'facturado') { fase = 'Comprobando…'; pintar(); await espera(3000);
+        try { const c = await conMarco(doc => pendientesDelMes(doc).then(x => x.filas.length), 'ventas/facturacion/albaranes-automatica'); r.pendientesDespues = c; } catch (e) { r.pendientesDespues = 'sin comprobar: ' + (e.message || e); } }
+      await fb('PUT', RUTA_FACT, r);
+      ultimo = { hora: ahoraISO(), n: r.albaranes, que: 'albaranes facturados' };
+    } catch (e) {
+      ultimoErr = String(e.message || e);
+      try { await fb('PATCH', RUTA_FACT, { mes, estado: 'error', error: ultimoErr, hecho: ahoraISO() }); } catch (e2) {}
+      console.error('[bf-facturacion]', e);
+    } finally { ocupado = false; fase = ''; soltarCerrojo(); pintar(); }
+  }
+
   // Mira cada 15 s si alguien ha pedido actualizar desde la app
   // ---------------- Sesión de AmbarX: que no caduque y avisar si pide contraseña ----------------
   // La contraseña de AmbarX nunca la escribe el script: si la sesión se pierde, avisa y la pone Javier.
@@ -722,6 +812,11 @@
       const r = await fb('GET', RUTA_PET_REP);
       if (r && r.pedido && r.estado === 'pedido' && (!r.atendido || r.pedido > r.atendido)) { ultimoAutoRep = Date.now(); await subirReparto(r.fecha, r.pedido, true); return; }
       await pasarEntregas(); if (ocupado) return;
+      { const d = new Date(), manana = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1), mF = d.getHours() * 60 + d.getMinutes();
+        if (manana.getDate() === 1 && mF >= 20 * 60 && mF <= 23 * 60 + 50) {
+          const pf = await fb('GET', RUTA_FACT); const mes = ahoraISO().slice(0, 7);
+          if (!pf || pf.mes !== mes) { await hacerFacturacionMes(); return; }
+        } }
       const pc = await fb('GET', RUTA_CAT);
       const hoyC = ahoraISO().slice(0, 10), mC = new Date().getHours() * 60 + new Date().getMinutes();
       if (pc && pc.pedido && pc.estado === 'pedido' && (!pc.atendido || pc.pedido > pc.atendido)) { await subirCatalogo(pc.pedido); return; }
