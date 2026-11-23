@@ -534,7 +534,71 @@ function pdfEntrega(k){
   if (e.firma){ try{ doc.text('Firma del cliente:',14,y+4); doc.addImage(e.firma,/png/.test(e.firma.slice(0,30))?'PNG':'JPEG',14,y+6,70,22); }catch(err){} }
   compartirPdf(doc, d.num+'_firmado.pdf', (d.tipo==='factura'?'Factura ':'Albarán ')+d.num);
 }
+// Hoja de ruta: paradas en orden, enlaces de Google Maps y mensaje listo para WhatsApp (formato de tarjetas con ▶️ por parada)
+var ALMACEN='Calle San Nicolas 8, 41500 Alcala de Guadaira';
+function dirMaps(d){
+  var en=entrega(d);
+  if(en.reparto){ var t0=[en.direccion,en.poblacion].filter(Boolean).join(', '); return {q:t0, t:t0}; }
+  var dir=String(d.direccion||'').replace(/\.?\s*apartado de correos.*$/i,'').trim();
+  var p=String(d.poblacion||'').split(',').map(function(x){return x.trim();});
+  var pueblo=(p[0]||'').split('-')[0], cp=(p[1]||'').match(/\d{5}/)?p[1]:'';
+  var texto=[dir,[cp,pueblo].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  // Direcciones por km de carretera: Google las sitúa mal, así que se busca el negocio por su nombre en el pueblo
+  if(/\b(km|ctra|crta|carretera)\b/i.test(dir) && pueblo){
+    var nom=String(d.cliente||'').replace(/,.*$/,'').replace(/\b(S\.?\s?L\.?\s?L?\.?\s?U?\.?|S\.?\s?A\.?|SL|SLL|SLU|SA)\s*$/i,'').trim();
+    return {q:nom+', '+pueblo, t:texto};
+  }
+  return {q:texto, t:texto};
+}
+function paradasDe(c){
+  var docs=ordenar(lista().filter(function(d){ var e=S.ent[d.k]; return comDe(d)===c && !(e && e.estado==='entregado'); }), c), par=[], idx={};
+  docs.forEach(function(d){ var dm=dirMaps(d), q=dm.q, key=(d.cliCod||d.cliente)+'|'+q;
+    if(idx[key]!=null){ par[idx[key]].docs.push(d); return; }
+    var en=entrega(d); idx[key]=par.length; par.push({ cliente:d.cliente, nombre:en.nombre, q:q, t:dm.t, tel:en.tel||d.tel||'', docs:[d] }); });
+  return par;
+}
+function urlNav(q){ return 'https://www.google.com/maps/dir/?api=1&travelmode=driving&dir_action=navigate&destination='+encodeURIComponent(q); }
+function urlsRuta(par){
+  // Google Maps admite como mucho 9 paradas intermedias por enlace: se parte en tramos
+  var out=[], origen=ALMACEN, i=0;
+  while(i<par.length){ var tramo=par.slice(i,i+10), dest=tramo[tramo.length-1].q, way=tramo.slice(0,-1).map(function(p){return p.q;});
+    out.push('https://www.google.com/maps/dir/?api=1&travelmode=driving&origin='+encodeURIComponent(origen)+'&destination='+encodeURIComponent(dest)+(way.length?'&waypoints='+encodeURIComponent(way.join('|')):''));
+    origen=dest; i+=10; }
+  return out;
+}
+function mensajeRuta(c, par){
+  var f=S.fecha.split('-'), rutas=urlsRuta(par);
+  var m='*RUTA '+f[2]+'/'+f[1]+' – '+nombreRep(c)+'*\n'+par.length+' paradas\n\n';
+  if(rutas.length){ m+='🗺️ *Ruta completa*'+(rutas.length>1?' (en '+rutas.length+' tramos)':'')+': pulsa «Iniciar» y, al llegar a cada parada, «Continuar» (no la X).\n';
+    rutas.forEach(function(u,i){ m+=(rutas.length>1?'Tramo '+(i+1)+': ':'')+u+'\n'; }); m+='\n👉 Si se corta, pulsa el ▶️ de la SIGUIENTE parada: te lleva desde donde estés.\n\n'; }
+  par.forEach(function(p,i){
+    m+='*'+(i+1)+'. '+String(p.cliente).toUpperCase()+'*'+(p.nombre?' ('+p.nombre+')':'')+'\n';
+    m+=(p.t||'(sin dirección: llamar)')+(p.tel?' · 📞 '+p.tel:'')+'\n';
+    m+=p.docs.map(function(d){ return (d.tipo==='factura'?'Factura ':'Albarán ')+d.num+' · '+eur(d.total); }).join(' / ')+'\n';
+    if(p.q) m+='▶️ '+urlNav(p.q)+'\n';
+    m+='\n';
+  });
+  m+='*VUELTA AL ALMACÉN*\n▶️ '+urlNav(ALMACEN);
+  return m;
+}
 function hojaRuta(c){
+  var par=paradasDe(c), msg=mensajeRuta(c,par), rutas=urlsRuta(par);
+  var h='<h3>Hoja de ruta · '+esc(nombreRep(c))+'</h3><div class="nota">'+esc(fechaLarga(S.fecha))+' · '+par.length+' paradas pendientes, en el orden de la ruta (se cambia con las flechas del repartidor).</div>';
+  if(!par.length) h+='<div class="vacio">No quedan entregas pendientes.</div>';
+  else {
+    h+='<div class="fila-btn">'+rutas.map(function(u,i){ return '<a class="btn primario" style="text-decoration:none;text-align:center" target="_blank" href="'+esc(u)+'">'+ico('pin')+' Ver ruta en Maps'+(rutas.length>1?' (tramo '+(i+1)+')':'')+'</a>'; }).join('')+'</div>';
+    h+='<ol style="padding-left:20px;margin:10px 0">'+par.map(function(p){ return '<li style="margin-bottom:6px"><b>'+esc(p.cliente)+'</b><br><span class="nota">'+esc(p.t||'(sin dirección)')+(p.tel?' · '+esc(p.tel):'')+'</span> <a target="_blank" href="'+esc(urlNav(p.q))+'">Maps</a></li>'; }).join('')+'</ol>';
+    h+='<label>Mensaje para WhatsApp</label><textarea id="msgRuta" readonly style="width:100%;min-height:220px;font-size:12px;box-sizing:border-box">'+esc(msg)+'</textarea>';
+    h+='<div class="fila-btn"><button class="btn" onclick="copiarRuta()">Copiar mensaje</button><a class="btn verde" style="text-decoration:none;text-align:center" target="_blank" href="https://wa.me/?text='+encodeURIComponent(msg)+'">Enviar por WhatsApp</a></div>';
+  }
+  h+='<div class="fila-btn"><button class="btn" onclick="hojaRutaPdf(\''+c+'\')">Hoja en PDF</button><button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
+  velo(h);
+}
+function copiarRuta(){ var t=document.getElementById('msgRuta'); if(!t) return;
+  var ok=function(){ toast('Mensaje copiado'); };
+  if(navigator.clipboard) navigator.clipboard.writeText(t.value).then(ok,function(){ t.select(); document.execCommand('copy'); ok(); });
+  else { t.select(); document.execCommand('copy'); ok(); } }
+function hojaRutaPdf(c){
   var docs=ordenar(lista().filter(function(d){ return comDe(d)===c; }), c), doc=nuevoPdf(); if(!doc) return;
   doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('Hoja de ruta · '+nombreRep(c),14,15);
   doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.text(fechaLarga(S.fecha)+' · '+docs.length+' entregas · Rosas de Buscaflor',14,20);
