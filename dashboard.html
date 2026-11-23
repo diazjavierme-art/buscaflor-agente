@@ -70,6 +70,18 @@ th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
 #bfLogin form{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;width:min(340px,90vw);display:flex;flex-direction:column;gap:10px}
 #bfLogin input{font:15px Inter,sans-serif;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--ink)}
 #bfLogin button{font:600 15px Inter,sans-serif;padding:10px;border:0;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
+.seg{display:inline-flex;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:3px;gap:2px}
+.seg button{border:0;background:none;font:600 13px Inter,sans-serif;color:var(--muted);padding:6px 14px;border-radius:999px;cursor:pointer}
+.seg button.on{background:var(--panel);color:var(--accent);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.perbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.pernav{display:flex;align-items:center;gap:6px;font-weight:600;font-size:14px}
+.pernav button{border:1px solid var(--line);background:var(--panel);color:var(--ink);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px}
+.ejec{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:12px;padding:14px 16px}
+.ejec h3{margin:0 0 8px;font-size:14.5px}
+.ejec ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14px}
+.alerta{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;padding:7px 0;border-bottom:1px solid var(--line)}
+.alerta:last-child{border-bottom:0}
+.up{color:var(--ok);font-weight:600} .down{color:var(--bad);font-weight:600}
 </style>
 </head>
 <body>
@@ -89,7 +101,8 @@ th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
     <span class="upd" id="upd">Cargando…</span>
   </div>
   <nav role="tablist">
-    <button role="tab" data-s="hoy" aria-selected="true">Hoy</button>
+    <button role="tab" data-s="resumen" aria-selected="true">Resumen</button>
+    <button role="tab" data-s="hoy" aria-selected="false">Hoy</button>
     <button role="tab" data-s="anio" aria-selected="false">2026</button>
     <button role="tab" data-s="ratios" aria-selected="false">Ratios</button>
     <button role="tab" data-s="hist" aria-selected="false">Histórico</button>
@@ -98,8 +111,27 @@ th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
 </div></header>
 
 <main class="wrap">
+  <!-- RESUMEN EJECUTIVO -->
+  <section id="s-resumen" class="on">
+    <div class="perbar">
+      <div class="seg" id="segPer"><button data-p="dia" class="on">Día</button><button data-p="semana">Semana</button><button data-p="mes">Mes</button></div>
+      <div class="pernav"><button id="perAnt" aria-label="Periodo anterior">‹</button><span id="perEtq"></span><button id="perSig" aria-label="Periodo siguiente">›</button></div>
+    </div>
+    <div class="ejec"><h3>Resumen ejecutivo</h3><ul id="rTexto"></ul></div>
+    <div class="tiles" id="rTiles"></div>
+    <div class="grid2">
+      <div class="card"><h3>Clientes que más compran</h3><div class="sub">Venta sin IVA del periodo.</div><div class="scroll" id="rCli"></div></div>
+      <div class="card"><h3>Lo que más se vende</h3><div class="sub">Por familia y por artículo.</div><div class="scroll" id="rArt"></div></div>
+    </div>
+    <div class="grid2">
+      <div class="card" id="rDiasCard"><h3>Venta por día</h3><div class="chart" id="rDias"></div></div>
+      <div class="card"><h3>Avisos</h3><div id="rAvisos"></div></div>
+    </div>
+    <div class="nota" id="rNota"></div>
+  </section>
+
   <!-- HOY: operativa en vivo -->
-  <section id="s-hoy" class="on">
+  <section id="s-hoy">
     <div><h2>Operativa</h2><div class="sub">En vivo desde la app de pedidos, el reparto, las etiquetas y AmbarX.</div></div>
     <div class="tiles" id="tOper"></div>
     <div class="grid2">
@@ -242,7 +274,95 @@ var DEF_R=[
 function fmtR(v,u){ return u==='%'?pct(v):u==='€'?eur(v):u==='d'?num(v)+' d':num(v,2); }
 
 /* ---------- pintar ---------- */
+
+/* ---------- RESUMEN EJECUTIVO (día / semana / mes) ---------- */
+var PER={tipo:'dia', off:0};
+document.querySelectorAll('#segPer button').forEach(function(b){ b.onclick=function(){ document.querySelectorAll('#segPer button').forEach(function(x){x.classList.toggle('on',x===b);}); PER.tipo=b.dataset.p; PER.off=0; pintar(); }; });
+document.getElementById('perAnt').onclick=function(){ PER.off--; pintar(); };
+document.getElementById('perSig').onclick=function(){ if(PER.off<0){ PER.off++; pintar(); } };
+function rango(tipo, off){
+  var d=new Date(); d.setHours(12,0,0,0);
+  if(tipo==='dia'){ d.setDate(d.getDate()+off); var f=hoyISO(d); return {desde:f, hasta:f, etq:d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}; }
+  if(tipo==='semana'){ var dow=(d.getDay()+6)%7; d.setDate(d.getDate()-dow+7*off); var a=new Date(d); var b=new Date(d); b.setDate(b.getDate()+6);
+    return {desde:hoyISO(a), hasta:hoyISO(b), etq:'Semana del '+a.getDate()+' '+MESES[a.getMonth()]+' al '+b.getDate()+' '+MESES[b.getMonth()]}; }
+  var m=new Date(d.getFullYear(), d.getMonth()+off, 1, 12), fin=new Date(m.getFullYear(), m.getMonth()+1, 0, 12);
+  return {desde:hoyISO(m), hasta:hoyISO(fin), etq:m.toLocaleDateString('es-ES',{month:'long',year:'numeric'})};
+}
+function familiaDe(desc){ var d=String(desc||'').toUpperCase();
+  if(/CLAVEL/.test(d)) return 'Clavel'; if(/ALSTRO/.test(d)) return 'Alstroemeria'; if(/PANICUL/.test(d)) return 'Paniculata';
+  if(/\d+\s*CM\s*\/?\s*\d+\s*T|\d+\s*CM\b.*25/.test(d)) return 'Rosas'; if(/HORTENS/.test(d)) return 'Hortensia'; if(/NARDO/.test(d)) return 'Nardos';
+  if(/PORTE|TRANSPORTE|PALET|BOLSA|ALQUILER|COMUNIDAD|TIPSA|CAJA/.test(d)) return 'Otros'; return 'Otras flores'; }
+function datosPeriodo(r){
+  var o={venta:0, docs:0, cli:{}, art:{}, fam:{}, dias:{}, entregas:0, firmadas:0, cobrado:{}, rosaBajo:0, rosaBajoN:0, clavelBajo:0, ceros:0, diasCon:0};
+  Object.keys(D.reparto||{}).forEach(function(f){ if(f<r.desde||f>r.hasta) return; var dia=D.reparto[f]||{}, docs=dia.docs||{}, vd=0;
+    Object.values(docs).forEach(function(doc){ if(doc.tipo==='factura' && doc.origen && doc.origen!=='Directa') return; o.docs++;
+      var t=0; arr(doc.lineas).forEach(function(l){ var imp=l.t!=null?(+l.t||0):(+l.p||0)*(+l.u||0)*(1-(+l.dto||0)/100); t+=imp;
+        var nm=String(l.d||l.c||'?').trim(); o.art[nm]=(o.art[nm]||0)+imp; var fa=familiaDe(nm); o.fam[fa]=(o.fam[fa]||0)+imp;
+        var up=String(nm).toUpperCase();
+        if(/60\s*CM/.test(up) && fa==='Rosas' && +l.p>0 && +l.p<18){ o.rosaBajo+=(18-l.p)*(+l.u||0); o.rosaBajoN++; }
+        if(fa==='Clavel' && +l.p>0 && +l.p<0.30) o.clavelBajo+=(+l.u||0);
+        if(imp===0 && fa!=='Otros' && (+l.u||0)>0) o.ceros++; });
+      vd+=t; var k=doc.cliente||doc.cliCod||'?'; o.cli[k]=(o.cli[k]||0)+t; });
+    Object.values(dia.entregas||{}).forEach(function(e){ o.entregas++; if(e.estado==='entregado') o.firmadas++; var c=e.cobro||{}; if(c.forma&&c.forma!=='pendiente'&&+c.importe) o.cobrado[c.forma]=(o.cobrado[c.forma]||0)+(+c.importe); });
+    if(Object.keys(docs).length){ o.dias[f]=vd; o.diasCon++; } o.venta+=vd; });
+  return o;
+}
+function variacion(a,b,t){ if(!b) return ''; var v=(a-b)/b*100; return '<span class="'+(v>=0?'up':'down')+'">'+(v>=0?'▲ ':'▼ ')+pct(Math.abs(v),0)+'</span> '+(t||'vs anterior'); }
+function pintarResumen(){
+  var r=rango(PER.tipo, PER.off), ra=rango(PER.tipo, PER.tipo==='dia'?PER.off-7:PER.off-1), vsTxt=PER.tipo==='dia'?'vs mismo día semana pasada':PER.tipo==='semana'?'vs semana anterior':'vs mes anterior', o=datosPeriodo(r), oa=datosPeriodo(ra);
+  document.getElementById('perEtq').textContent=r.etq.charAt(0).toUpperCase()+r.etq.slice(1);
+  document.getElementById('perSig').disabled = PER.off>=0;
+  var repDias=Object.keys(D.reparto||{}).sort(), primero=repDias[0]||null, completo=!primero||primero<=r.desde, antCompleto=!primero||primero<=ra.desde;
+  var ncli=Object.keys(o.cli).length, ticket=o.docs?o.venta/o.docs:null;
+  var cob=Object.keys(o.cobrado).reduce(function(s,k){return s+o.cobrado[k];},0);
+  // margen (control semanal / mensual)
+  var dash=D.dash||{}, mg=null, mgEtq='';
+  if(PER.tipo==='semana' && dash.semana && dash.semana.desde===r.desde){ mg=dash.semana.pct; mgEtq='Control semanal'+(dash.semana.parcial?' (parcial)':''); }
+  if(PER.tipo==='mes'){ var mm=(dash.mensual||{})[r.desde.slice(0,7)]; if(mm){ mg=mm.pct; mgEtq='Cierre mensual'; } }
+  document.getElementById('rTiles').innerHTML =
+    tile('Ventas (sin IVA)', eur(o.venta), antCompleto&&completo&&oa.venta?variacion(o.venta,oa.venta,vsTxt):(PER.tipo==='dia'?'Sin dato del mismo día de la semana pasada':'Datos desde el '+(primero?primero.split('-').reverse().slice(0,2).join('/'):'—'))) +
+    tile('Albaranes y facturas', num(o.docs), ticket?'Ticket medio '+eur(ticket):'') +
+    tile('Clientes que compran', num(ncli), oa.venta&&antCompleto?num(Object.keys(oa.cli).length)+' '+vsTxt.replace('vs ','en el '):'') +
+    tile('Entregas firmadas', num(o.firmadas), o.entregas?'Cobrado en reparto '+eur(cob,2):'') +
+    tile('Margen bruto', mg==null?'—':pct(mg), mg==null?(PER.tipo==='dia'?'Se calcula por semana y mes':'Aún no calculado'):mgEtq) +
+    tile('Rosa 60 bajo 18 €', o.rosaBajoN?eur(o.rosaBajo):'0 €', o.rosaBajoN?num(o.rosaBajoN)+' líneas por debajo':'', o.rosaBajoN?chip('warn','revisar'):chip('ok','en tarifa'));
+  var cl=Object.keys(o.cli).sort(function(a,b){return o.cli[b]-o.cli[a];});
+  document.getElementById('rCli').innerHTML = cl.length? '<table><tr><th>Cliente</th><th>Venta</th><th>%</th></tr>'+cl.slice(0,8).map(function(k){ return '<tr><td>'+esc(k)+'</td><td>'+eur(o.cli[k])+'</td><td>'+pct(o.cli[k]/o.venta*100)+'</td></tr>'; }).join('')+'</table>' : '<div class="vacio">Sin ventas en este periodo.</div>';
+  var fa=Object.keys(o.fam).sort(function(a,b){return o.fam[b]-o.fam[a];}), ar=Object.keys(o.art).sort(function(a,b){return o.art[b]-o.art[a];});
+  document.getElementById('rArt').innerHTML = fa.length? '<table><tr><th>Familia</th><th>Venta</th><th>%</th></tr>'+fa.map(function(k){ return '<tr><td>'+esc(k)+'</td><td>'+eur(o.fam[k])+'</td><td>'+pct(o.fam[k]/o.venta*100)+'</td></tr>'; }).join('')+'</table>'+
+    '<table style="margin-top:10px"><tr><th>Artículo</th><th>Venta</th></tr>'+ar.slice(0,6).map(function(k){ return '<tr><td>'+esc(k)+'</td><td>'+eur(o.art[k])+'</td></tr>'; }).join('')+'</table>' : '<div class="vacio">—</div>';
+  var dk=Object.keys(o.dias).sort();
+  document.getElementById('rDiasCard').style.display = PER.tipo==='dia'?'none':'';
+  if(PER.tipo!=='dia') barras('rDias', dk.map(function(f){ return {l:f.slice(8)+'/'+f.slice(5,7), t:f.split('-').reverse().join('/'), v:Math.round(o.dias[f])}; }), {fmt:eur, titulo:'Venta por día'});
+  // avisos
+  var av=[], ag=D.agente||{}, visto=ag.visto?new Date(ag.visto):null, minVisto=visto?(Date.now()-visto)/6e4:null, h=new Date().getHours();
+  if(minVisto==null||minVisto>30) av.push(['bad','La oficina (AmbarX) no da señales desde '+(visto?visto.toLocaleString('es-ES',{weekday:'short',hour:'2-digit',minute:'2-digit'}):'—')+': el stock y el reparto no se actualizan.']);
+  var st=D.stock||{}, hs=st.leido?(Date.now()-new Date(st.leido))/36e5:null; if(hs==null||hs>24) av.push(['warn','El stock de AmbarX es de hace '+(hs==null?'—':Math.round(hs)+' h')+'.']);
+  if(o.rosaBajoN) av.push(['warn',num(o.rosaBajoN)+' líneas de rosa 60 por debajo de 18 €: '+eur(o.rosaBajo)+' sin ingresar.']);
+  if(o.clavelBajo) av.push(['warn',num(o.clavelBajo)+' tallos de clavel por debajo de 0,30 €.']);
+  if(o.ceros) av.push(['warn',num(o.ceros)+' líneas de flor a 0 € (abonos o sin cobrar).']);
+  var pend=arr(D.pedidos).filter(function(p){return ['terminado','cerrado'].indexOf(p.estado)<0;}); if(pend.length) av.push(['ok',num(pend.length)+' pedidos abiertos en la app.']);
+  var fm=D.factMes||{}; if(fm.estado==='error') av.push(['bad','Facturación de fin de mes con error: '+(fm.error||'')]);
+  if(PER.tipo==='dia' && o.entregas && o.firmadas<o.docs) av.push(['ok',num(o.docs-o.firmadas)+' documentos sin firma de entrega (recogidas en nave o pendientes).']);
+  document.getElementById('rAvisos').innerHTML = av.length? av.map(function(a){ return '<div class="alerta">'+chip(a[0],a[0]==='bad'?'urgente':a[0]==='warn'?'atención':'info')+'<span>'+esc(a[1])+'</span></div>'; }).join('') : '<div class="vacio">Todo en orden.</div>';
+  // texto ejecutivo
+  var tx=[];
+  if(!o.docs) tx.push('Sin ventas registradas '+(PER.tipo==='dia'?'este día':'en este periodo')+'.');
+  else {
+    tx.push('Ventas de <b>'+eur(o.venta)+'</b> sin IVA en '+num(o.docs)+' documentos a '+num(ncli)+' clientes'+(antCompleto&&completo&&oa.venta?' ('+variacion(o.venta,oa.venta,vsTxt)+')':'')+'.');
+    if(cl.length) tx.push('Principales clientes: '+cl.slice(0,3).map(function(k){return esc(k)+' ('+eur(o.cli[k])+')';}).join(', ')+'. Los 3 primeros suman el '+pct(cl.slice(0,3).reduce(function(s,k){return s+o.cli[k];},0)/o.venta*100,0)+'.');
+    if(fa.length) tx.push('Por familias: '+fa.slice(0,4).map(function(k){return esc(k)+' '+pct(o.fam[k]/o.venta*100,0);}).join(', ')+'.');
+    if(mg!=null) tx.push('Margen bruto del periodo: <b>'+pct(mg)+'</b> ('+esc(mgEtq)+').');
+    if(o.firmadas||cob) tx.push(num(o.firmadas)+' entregas firmadas; cobrado en reparto '+eur(cob,2)+'.');
+    if(o.rosaBajoN) tx.push('<span class="down">Atención:</span> rosa 60 vendida por debajo de 18 € en '+num(o.rosaBajoN)+' líneas.');
+  }
+  if(av.some(function(a){return a[0]==='bad';})) tx.push('<span class="down">Hay avisos urgentes abajo.</span>');
+  document.getElementById('rTexto').innerHTML = tx.map(function(t){return '<li>'+t+'</li>';}).join('');
+  document.getElementById('rNota').innerHTML = 'Ventas, clientes y productos salen de los albaranes y facturas directas que sube la oficina desde AmbarX (sin IVA; no cuentan las facturas que agrupan albaranes). Hay datos desde el '+(primero?primero.split('-').reverse().join('/'):'—')+'. El margen viene del control semanal de los lunes y del cierre mensual.';
+}
+
 function pintar(){
+  try{ pintarResumen(); }catch(e){ console.error(e); }
   var dash=D.dash||{};
   document.getElementById('upd').textContent = 'Cifras financieras actualizadas el '+(dash.actualizado?dash.actualizado.slice(0,10).split('-').reverse().join('/'):'—')+' · operativa en vivo';
 
@@ -361,6 +481,8 @@ oir('buscaflor/etiquetas/documentos','etiq', function(v){return v||{};});
 oir('buscaflor/reparto','reparto', function(v){return v||{};});
 oir('buscaflor/clientes/items','clientes', function(v){return v||{};});
 oir('buscaflor/articulos/items','articulos', function(v){return v||{};});
+oir('buscaflor/peticiones/agenteStock','agente');
+oir('buscaflor/peticiones/facturacionMes','factMes');
 </script>
 
 <script>
