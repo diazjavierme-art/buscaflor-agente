@@ -522,7 +522,7 @@ function verRepartidores(){
   var r=reps();
   var h='<h3>Repartidores</h3><div class="nota">El número es el «Comercial» de AmbarX. Cada repartidor entra con su móvil y un PIN de 6 cifras, y solo ve sus entregas. Los transportistas externos pueden tener acceso o usar la hoja de ruta en papel.</div>'+
     Object.keys(r).sort(function(a,b){return a-b;}).map(function(c){ var x=r[c]; return '<div class="card" style="border-left-color:var(--navy)"><b class="mono">'+esc(c)+'</b> · '+esc(x.nombre)+(x.externo?' <span class="tag">externo</span>':'')+(x.nave?' <span class="tag">nave</span>':'')+
-      '<div class="nota">'+(x.email?'Entra con '+esc(x.movil||x.email)+(x.sinPin?' (sin PIN)':' + PIN'):'Sin acceso')+'</div>'+(!x.nave?'<button class="btn peq" onclick="editarRep(\''+c+'\')">'+(x.email?'Cambiar acceso':'Dar acceso')+'</button>':'')+'</div>'; }).join('')+
+      '<div class="nota">'+(x.email?'Entra con '+esc(x.movil||x.email)+(x.sinPin?' (sin PIN)':' + PIN'):'Sin acceso')+'</div>'+'<button class="btn peq" onclick="editarRep(\''+c+'\')">'+(x.email?'Cambiar acceso':'Dar acceso')+'</button>'+'</div>'; }).join('')+
     '<div class="fila-btn"><button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
   velo(h);
 }
@@ -587,8 +587,8 @@ document.getElementById('bMenu').onclick=menu;
 function elegirQuien(){
   var r=reps();
   var h='<h3>¿Quién eres?</h3><div class="nota">Elige tu nombre para ver tus entregas. El móvil lo recordará.</div><div class="fila-btn" style="flex-direction:column">'+
-    Object.keys(r).filter(function(c){ return !r[c].nave; }).sort(function(a,b){return a-b;}).map(function(c){
-      return '<button class="btn'+(quien()===c?' primario':'')+'" style="padding:15px;font-size:16px" onclick="ponerQuien(\''+c+'\')">🚚 '+esc(r[c].nombre)+'</button>'; }).join('')+
+    Object.keys(r).sort(function(a,b){return a-b;}).map(function(c){
+      return '<button class="btn'+(quien()===c?' primario':'')+'" style="padding:15px;font-size:16px" onclick="ponerQuien(\''+c+'\')">'+(r[c].nave?'🏬 ':'🚚 ')+esc(r[c].nombre)+(r[c].nave?' (almacén)':'')+'</button>'; }).join('')+
     '<button class="btn'+(quien()==='oficina'?' primario':'')+'" style="padding:15px;font-size:16px" onclick="ponerQuien(\'oficina\')">🏢 Oficina (ver todos)</button></div>';
   velo(h);
   var v=document.getElementById('velo'); if(v) v.onclick=null; // no se cierra tocando fuera
