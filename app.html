@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Buscaflor</title>
+<meta name="theme-color" content="#1F344C">
+<link rel="manifest" href="app.webmanifest">
+<link rel="apple-touch-icon" href="icons/app-180.png">
+<link rel="icon" href="icons/app-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Buscaflor">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap">
+<style>
+:root{--navy:#1F344C;--bg:#F3F4F6;--line:#E5E7EB;--muted:#6B7280;--soft:#E5ECF4}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+#marcos{flex:1;position:relative;min-height:0}
+#marcos iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:var(--bg);display:none}
+#marcos iframe.on{display:block}
+nav{display:flex;background:#fff;border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom));gap:2px;box-shadow:0 -2px 8px rgba(16,24,40,.05)}
+nav button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 2px 6px;border-radius:10px;font:600 11.5px Inter,sans-serif;color:var(--muted);cursor:pointer}
+nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--navy);background:var(--soft)}
+@media (min-width:900px){
+  body{flex-direction:row}
+  nav{order:-1;flex-direction:column;justify-content:flex-start;width:92px;border-top:0;border-right:1px solid var(--line);padding:14px 8px;box-shadow:none;gap:6px}
+  nav .marca{display:flex}
+  nav button{flex:none;padding:10px 2px}
+}
+nav .marca{display:none;align-items:center;justify-content:center;width:44px;height:44px;margin:0 auto 12px;border-radius:11px;background:var(--navy);color:#fff;font-weight:700;font-size:20px}
+</style>
+</head>
+<body>
+<div id="marcos"></div>
+<nav id="nav">
+  <div class="marca">B</div>
+  <button data-t="dashboard" data-src="dashboard.html"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-6"/></svg>Resumen</button>
+  <button data-t="pedidos" data-src="pedidos.html"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>Pedidos</button>
+  <button data-t="reparto" data-src="reparto.html"><svg viewBox="0 0 24 24"><rect x="1" y="6" width="14" height="11" rx="1"/><path d="M15 9h4l3 4v4h-7"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>Reparto</button>
+</nav>
+<script>
+(function(){
+  var marcos=document.getElementById('marcos'), botones=[].slice.call(document.querySelectorAll('nav button')), abiertos={};
+  function ir(t){
+    var b=botones.filter(function(x){return x.dataset.t===t;})[0]||botones[0]; t=b.dataset.t;
+    botones.forEach(function(x){x.classList.toggle('on',x===b);});
+    if(!abiertos[t]){ var f=document.createElement('iframe'); f.src=b.dataset.src; f.title=b.textContent.trim(); f.setAttribute('allow','clipboard-write; camera; microphone; geolocation'); marcos.appendChild(f); abiertos[t]=f; }
+    Object.keys(abiertos).forEach(function(k){abiertos[k].classList.toggle('on',k===t);});
+    try{ localStorage.setItem('bf_app_tab',t); }catch(e){}
+    if(location.hash!=='#'+t) history.replaceState(null,'','#'+t);
+    document.title='Buscaflor · '+b.textContent.trim();
+  }
+  botones.forEach(function(b){ b.onclick=function(){ if(b.classList.contains('on') && abiertos[b.dataset.t]){ try{ abiertos[b.dataset.t].contentWindow.location.reload(); }catch(e){} } else ir(b.dataset.t); }; });
+  var ini=(location.hash||'').slice(1); try{ ini=ini||localStorage.getItem('bf_app_tab')||'dashboard'; }catch(e){ ini=ini||'dashboard'; }
+  ir(ini);
+})();
+</script>
+</body>
+</html>
