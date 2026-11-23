@@ -174,7 +174,7 @@ var REP_DEF = {
 };
 
 // ---------- estado ----------
-var S = { dirs: {}, fecha: hoyISO(), docs: {}, ent: {}, asig: {}, orden: {}, leido: '', pet: null, rep: {}, yo: null, miCom: null, vista: 'lista', filtroCom: null };
+var S = { dirs: {}, fecha: hoyISO(), docs: {}, ent: {}, asig: {}, orden: {}, salida: {}, coords: {}, eta: {}, leido: '', pet: null, rep: {}, yo: null, miCom: null, vista: 'lista', filtroCom: null };
 var refs = [];
 
 var DOM_REP='@reparto.rosasdebuscaflor.com';
@@ -218,6 +218,9 @@ function lista(){
 }
 function ordenar(arr, com){
   var o = (S.orden && S.orden[com]) || [];
+  if(!o.length && arr.length>1) o = rutaAuto(arr);
+  arr.sort(function(a,b){ var ia=o.indexOf(a.k), ib=o.indexOf(b.k); if(ia<0) ia=999; if(ib<0) ib=999; return ia-ib; });
+  calcEta(arr, com);
   return arr.sort(function(a,b){
     var ea=!!S.ent[a.k], eb=!!S.ent[b.k]; if(ea!==eb) return ea?1:-1;
     var ia=o.indexOf(a.k), ib=o.indexOf(b.k); if(ia<0) ia=999; if(ib<0) ib=999; if(ia!==ib) return ia-ib;
@@ -225,14 +228,65 @@ function ordenar(arr, com){
   });
 }
 
+// ---------- ruta automática y horas de llegada ----------
+var ALM={lat:37.3755131, lng:-5.8983456};
+function claveCoord(d){ return String(d.cliCod||'') || String(dirMaps(d).t||d.cliente||'').replace(/[.#$\/\[\]]/g,'-').slice(0,80); }
+function coordDe(d){ var c=S.coords[claveCoord(d)]; return c && c.lat!=null ? c : null; }
+function km(a,b){ var R=6371, r=Math.PI/180, dl=(b.lat-a.lat)*r, dn=(b.lng-a.lng)*r;
+  var x=Math.sin(dl/2)*Math.sin(dl/2)+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dn/2)*Math.sin(dn/2); return 2*R*Math.asin(Math.sqrt(x)); }
+// Minutos de coche aproximados: distancia en línea recta × 1,3; 25 km/h en ciudad (tramos cortos), 65 km/h en carretera
+function minutos(a,b){ var d=km(a,b)*1.3; return d<0.05?0 : d<10 ? d/25*60 : 10/25*60 + (d-10)/65*60; }
+function rutaAuto(arr){
+  var con=arr.filter(coordDe), sin=arr.filter(function(d){ return !coordDe(d); });
+  // vecino más cercano desde el almacén y luego mejora 2-opt
+  var ruta=[], quedan=con.slice(), pos=ALM;
+  while(quedan.length){ var mi=0, md=1e9; quedan.forEach(function(d,i){ var x=km(pos,coordDe(d)); if(x<md){md=x;mi=i;} }); pos=coordDe(quedan[mi]); ruta.push(quedan.splice(mi,1)[0]); }
+  var P=function(i){ return i<0?ALM:coordDe(ruta[i]); }, mejora=true, vueltas=0;
+  while(mejora && vueltas++<50){ mejora=false;
+    for(var i=0;i<ruta.length-1;i++) for(var j=i+1;j<ruta.length;j++){
+      var antes=km(P(i-1),P(i))+(j+1<ruta.length?km(P(j),P(j+1)):0), despues=km(P(i-1),P(j))+(j+1<ruta.length?km(P(i),P(j+1)):0);
+      if(despues+1e-9<antes){ var seg=ruta.slice(i,j+1).reverse(); Array.prototype.splice.apply(ruta,[i,seg.length].concat(seg)); mejora=true; } } }
+  return ruta.concat(sin).map(function(d){ return d.k; });
+}
+function calcEta(arr, com){
+  var sal=(S.salida||{})[com]; arr.forEach(function(d){ delete S.eta[d.k]; }); if(!sal || !/^\d{1,2}:\d{2}$/.test(sal)) return;
+  var t=+sal.split(':')[0]*60 + +sal.split(':')[1], pos=ALM, ult=null;
+  arr.forEach(function(d){ var c=coordDe(d); if(!c) return;
+    if(ult && km(ult,c)<0.05){ S.eta[d.k]=S.eta[ult.k]; return; }      // mismo sitio que la parada anterior
+    if(ult) t+=10;                                                       // 10 min por entrega
+    t+=minutos(pos,c); pos=c; ult={lat:c.lat,lng:c.lng,k:d.k};
+    var h=Math.round(t/5)*5; S.eta[d.k]=('0'+Math.floor(h/60)%24).slice(-2)+':'+('0'+h%60).slice(-2); });
+}
+function horaLlegada(d){ return S.eta[d.k] || ''; }
+// Geocodificar (OpenStreetMap) los clientes que aún no tienen coordenadas; se guardan en Firebase para todos
+var GEO={cola:[], en:{}, activo:false};
+function asegurarCoords(){
+  lista().forEach(function(d){ var k=claveCoord(d); if(!k || S.coords[k] || GEO.en[k]) return; GEO.en[k]=1; GEO.cola.push(d); });
+  if(!GEO.activo) sigGeo();
+}
+function sigGeo(){
+  var d=GEO.cola.shift(); if(!d){ GEO.activo=false; return; } GEO.activo=true;
+  var dm=dirMaps(d), p=String(d.poblacion||'').split(',')[0].split('-')[0].trim();
+  var qs=[dm.t, dm.q, [String(d.cliente||'').replace(/,.*$/,''), p].filter(Boolean).join(', '), p].filter(function(x,i,a){ return x && a.indexOf(x)===i; });
+  var intenta=function(i){
+    if(i>=qs.length){ db.ref('buscaflor/configPedidos/coords/'+claveCoord(d)).set({ lat:null, q:qs[0]||'', fallo:ahora() }); setTimeout(sigGeo,1100); return; }
+    fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=es&q='+encodeURIComponent(qs[i]))
+      .then(function(r){ return r.json(); }).then(function(r){
+        if(r && r[0]){ db.ref('buscaflor/configPedidos/coords/'+claveCoord(d)).set({ lat:+r[0].lat, lng:+r[0].lon, q:qs[i], aprox: i>=2 }); setTimeout(sigGeo,1100); }
+        else setTimeout(function(){ intenta(i+1); },1100);
+      }, function(){ setTimeout(function(){ intenta(i+1); },1100); });
+  };
+  intenta(0);
+}
+
 // ---------- datos ----------
 function escuchar(){
   refs.forEach(function(r){ r.off(); }); refs=[];
   document.getElementById('fDia').textContent = fechaLarga(S.fecha);
   var base='buscaflor/reparto/'+S.fecha+'/';
-  [['docs','docs'],['entregas','ent'],['asignar','asig'],['orden','orden'],['leido','leido']].forEach(function(x){
+  [['docs','docs'],['entregas','ent'],['asignar','asig'],['orden','orden'],['salida','salida'],['leido','leido']].forEach(function(x){
     var r=db.ref(base+x[0]); refs.push(r);
-    r.on('value',function(s){ S[x[1]] = s.val() || (x[1]==='leido'?'':{}); pintar(); }, function(e){ pintarError(e); });
+    r.on('value',function(s){ S[x[1]] = s.val() || (x[1]==='leido'?'':{}); if(x[0]==='docs') asegurarCoords(); pintar(); }, function(e){ pintarError(e); });
   });
   var rp=db.ref('buscaflor/peticiones/reparto'); refs.push(rp); rp.on('value',function(s){ S.pet=s.val(); pintar(); });
   var ra=db.ref('buscaflor/peticiones/agenteStock'); refs.push(ra); ra.on('value',function(s){ S.ag=s.val()||{}; pintar(); });
@@ -266,7 +320,7 @@ function tarjeta(d){
     : '<span class="tag ok">Entregado '+esc((e.hora||'').slice(11,16))+'</span><span class="tag">'+esc(textoCobro(e.cobro))+'</span>'+estadoAmbarx(e);
   return '<div class="'+cls+'"><div class="top" onclick="abrir(\''+d.k+'\')"><div><div class="cli">'+esc(d.cliente)+'</div>'+
     '<div class="dir">'+esc(dir||'(sin dirección en AmbarX)')+'</div>'+
-    '<div style="margin-top:5px"><span class="tag'+(d.tipo==='factura'?' fac':'')+'">'+(d.tipo==='factura'?'Factura ':'Albarán ')+esc(d.num)+'</span>'+estado+'</div></div>'+
+    '<div style="margin-top:5px">'+(!e&&horaLlegada(d)?'<span class="tag" style="font-weight:600">~'+horaLlegada(d)+'</span>':'')+'<span class="tag'+(d.tipo==='factura'?' fac':'')+'">'+(d.tipo==='factura'?'Factura ':'Albarán ')+esc(d.num)+'</span>'+estado+'</div></div>'+
     '<div class="imp">'+eur(d.total)+'</div></div>'+
     (!esOficina() && !e ? '<div class="acc">'+(q?'<a class="btn peq" href="https://www.google.com/maps/dir/?api=1&destination='+q+'" target="_blank">'+ico('pin')+' Cómo llegar</a>':'')+
       (tel?'<a class="btn peq" href="tel:'+esc(tel)+'">'+ico('tel')+' Llamar</a>':'')+
@@ -551,7 +605,7 @@ function dirMaps(d){
   return {q:texto, t:texto};
 }
 function paradasDe(c){
-  var docs=ordenar(lista().filter(function(d){ var e=S.ent[d.k]; return comDe(d)===c && !(e && e.estado==='entregado'); }), c), par=[], idx={};
+  var docs=ordenar(lista().filter(function(d){ return comDe(d)===c; }), c).filter(function(d){ var e=S.ent[d.k]; return !(e && e.estado==='entregado'); }), par=[], idx={};
   docs.forEach(function(d){ var dm=dirMaps(d), q=dm.q, key=(d.cliCod||d.cliente)+'|'+q;
     if(idx[key]!=null){ par[idx[key]].docs.push(d); return; }
     var en=entrega(d); idx[key]=par.length; par.push({ cliente:d.cliente, nombre:en.nombre, q:q, t:dm.t, tel:en.tel||d.tel||'', docs:[d] }); });
@@ -568,11 +622,12 @@ function urlsRuta(par){
 }
 function mensajeRuta(c, par){
   var f=S.fecha.split('-'), rutas=urlsRuta(par);
-  var m='*RUTA '+f[2]+'/'+f[1]+' – '+nombreRep(c)+'*\n'+par.length+' paradas\n\n';
+  var sal=(S.salida||{})[c];
+  var m='*RUTA '+f[2]+'/'+f[1]+' – '+nombreRep(c)+'*\n'+par.length+' paradas'+(sal?' · salida '+sal:'')+'\n\n';
   if(rutas.length){ m+='🗺️ *Ruta completa*'+(rutas.length>1?' (en '+rutas.length+' tramos)':'')+': pulsa «Iniciar» y, al llegar a cada parada, «Continuar» (no la X).\n';
     rutas.forEach(function(u,i){ m+=(rutas.length>1?'Tramo '+(i+1)+': ':'')+u+'\n'; }); m+='\n👉 Si se corta, pulsa el ▶️ de la SIGUIENTE parada: te lleva desde donde estés.\n\n'; }
   par.forEach(function(p,i){
-    m+='*'+(i+1)+'. '+String(p.cliente).toUpperCase()+'*'+(p.nombre?' ('+p.nombre+')':'')+'\n';
+    m+='*'+(i+1)+'. '+String(p.cliente).toUpperCase()+'*'+(p.nombre?' ('+p.nombre+')':'')+(horaLlegada(p.docs[0])?' · ~'+horaLlegada(p.docs[0]):'')+'\n';
     m+=(p.t||'(sin dirección: llamar)')+(p.tel?' · 📞 '+p.tel:'')+'\n';
     m+=p.docs.map(function(d){ return (d.tipo==='factura'?'Factura ':'Albarán ')+d.num+' · '+eur(d.total); }).join(' / ')+'\n';
     if(p.q) m+='▶️ '+urlNav(p.q)+'\n';
@@ -583,17 +638,24 @@ function mensajeRuta(c, par){
 }
 function hojaRuta(c){
   var par=paradasDe(c), msg=mensajeRuta(c,par), rutas=urlsRuta(par);
-  var h='<h3>Hoja de ruta · '+esc(nombreRep(c))+'</h3><div class="nota">'+esc(fechaLarga(S.fecha))+' · '+par.length+' paradas pendientes, en el orden de la ruta (se cambia con las flechas del repartidor).</div>';
+  var manual=((S.orden||{})[c]||[]).length>0;
+  var h='<h3>Hoja de ruta · '+esc(nombreRep(c))+'</h3><div class="nota">'+esc(fechaLarga(S.fecha))+' · '+par.length+' paradas pendientes · '+(manual?'orden puesto a mano':'ordenada sola desde el almacén')+'</div>'+
+    '<div class="fila-btn" style="align-items:flex-end"><div style="flex:1"><label>Hora de salida del almacén</label><input id="horaSalida" type="time" value="'+esc((S.salida||{})[c]||'')+'"></div>'+
+    '<button class="btn primario" onclick="guardarSalida(\''+c+'\')">Calcular horas</button></div>'+
+    (manual?'<div class="fila-btn"><button class="btn" onclick="ordenAuto(\''+c+'\')">Volver a ordenar sola desde el almacén</button></div>':'');
   if(!par.length) h+='<div class="vacio">No quedan entregas pendientes.</div>';
   else {
     h+='<div class="fila-btn">'+rutas.map(function(u,i){ return '<a class="btn primario" style="text-decoration:none;text-align:center" target="_blank" href="'+esc(u)+'">'+ico('pin')+' Ver ruta en Maps'+(rutas.length>1?' (tramo '+(i+1)+')':'')+'</a>'; }).join('')+'</div>';
-    h+='<ol style="padding-left:20px;margin:10px 0">'+par.map(function(p){ return '<li style="margin-bottom:6px"><b>'+esc(p.cliente)+'</b><br><span class="nota">'+esc(p.t||'(sin dirección)')+(p.tel?' · '+esc(p.tel):'')+'</span> <a target="_blank" href="'+esc(urlNav(p.q))+'">Maps</a></li>'; }).join('')+'</ol>';
+    h+='<ol style="padding-left:20px;margin:10px 0">'+par.map(function(p){ return '<li style="margin-bottom:6px">'+(horaLlegada(p.docs[0])?'<b>~'+horaLlegada(p.docs[0])+'</b> · ':'')+'<b>'+esc(p.cliente)+'</b>'+(coordDe(p.docs[0])?'':' <span class="tag mal">sin ubicar</span>')+'<br><span class="nota">'+esc(p.t||'(sin dirección)')+(p.tel?' · '+esc(p.tel):'')+'</span> <a target="_blank" href="'+esc(urlNav(p.q))+'">Maps</a></li>'; }).join('')+'</ol>';
     h+='<label>Mensaje para WhatsApp</label><textarea id="msgRuta" readonly style="width:100%;min-height:220px;font-size:12px;box-sizing:border-box">'+esc(msg)+'</textarea>';
     h+='<div class="fila-btn"><button class="btn" onclick="copiarRuta()">Copiar mensaje</button><a class="btn verde" style="text-decoration:none;text-align:center" target="_blank" href="https://wa.me/?text='+encodeURIComponent(msg)+'">Enviar por WhatsApp</a></div>';
   }
   h+='<div class="fila-btn"><button class="btn" onclick="hojaRutaPdf(\''+c+'\')">Hoja en PDF</button><button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
   velo(h);
 }
+function guardarSalida(c){ var v=document.getElementById('horaSalida').value;
+  db.ref('buscaflor/reparto/'+S.fecha+'/salida/'+c).set(v||null).then(function(){ toast(v?'Salida '+v+': horas calculadas':'Hora de salida quitada'); hojaRuta(c); }); }
+function ordenAuto(c){ db.ref('buscaflor/reparto/'+S.fecha+'/orden/'+c).remove().then(function(){ toast('Ordenada desde el almacén'); hojaRuta(c); }); }
 function copiarRuta(){ var t=document.getElementById('msgRuta'); if(!t) return;
   var ok=function(){ toast('Mensaje copiado'); };
   if(navigator.clipboard) navigator.clipboard.writeText(t.value).then(ok,function(){ t.select(); document.execCommand('copy'); ok(); });
@@ -715,6 +777,7 @@ function aplicarQuien(){
 
 document.getElementById('bfLogin').style.display='none';
 db.ref('buscaflor/configPedidos/direccionesReparto').on('value', function(s){ S.dirs=s.val()||{}; pintar(); });
+db.ref('buscaflor/configPedidos/coords').on('value', function(s){ S.coords=s.val()||{}; pintar(); });
 var primeraVez=true;
 db.ref('buscaflor/configPedidos/repartidores').on('value', function(s){
   S.rep=s.val()||{}; aplicarQuien(); pintar();
