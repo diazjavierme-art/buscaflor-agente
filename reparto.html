@@ -290,7 +290,15 @@ function pintarRepartidor(app, docs){
   var t=totalesDe(mios);
   var h='<div class="resumen"><div><b>'+t.hechas+'/'+t.n+'</b><span>entregas</span></div><div><b>'+num(t.efectivo)+'</b><span>€ efectivo</span></div><div><b>'+num(t.tarjeta)+'</b><span>€ tarjeta</span></div></div>';
   if (!mios.length) h+='<div class="vacio">No tienes entregas para este día.<br><br>'+(S.leido?'Última lectura de AmbarX: '+esc(S.leido.slice(11,16)):'Todavía no se han leído los albaranes de AmbarX.')+'</div>';
-  h+=mios.map(tarjeta).join('');
+  // Las entregas ya firmadas se quitan de la lista para que el repartidor no se lie; se pueden ver con el botón de abajo
+  var pend=mios.filter(function(d){ var e=S.ent[d.k]; return !(e && e.estado==='entregado'); });
+  var hechas=mios.filter(function(d){ var e=S.ent[d.k]; return e && e.estado==='entregado'; });
+  if (mios.length && !pend.length) h+='<div class="vacio">✔ Has terminado todas las entregas del día.</div>';
+  h+=pend.map(tarjeta).join('');
+  if (hechas.length) {
+    h+='<div class="fila-btn"><button class="btn" onclick="S.verHechas=!S.verHechas;pintar()">'+(S.verHechas?'Ocultar':'Ver')+' entregadas ('+hechas.length+')</button></div>';
+    if (S.verHechas) h+=hechas.map(tarjeta).join('');
+  }
   app.innerHTML=h;
 }
 
