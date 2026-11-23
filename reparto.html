@@ -412,17 +412,32 @@ function abrir(k){
   if (e) {
     h+='<label>Entrega</label><div class="nota">'+(e.estado==='incidencia'?'<b style="color:var(--rojo)">No entregado</b> · '+esc(e.motivo||''):'Entregado a las '+esc((e.hora||'').slice(11,16))+(e.recibe?' · recibe '+esc(e.recibe):'')+' · '+esc(textoCobro(e.cobro)))+(e.nota?'<br>Nota: '+esc(e.nota):'')+'<br>Por '+esc(e.por||'')+'</div>'+
       (e.firma?'<img class="firma-img" src="'+e.firma+'">':'')+
-      '<div style="margin-top:6px">'+estadoAmbarx(e)+'</div>'+((e.ambarx||{}).para&&(e.ambarx.para.length)?'<div class="nota">Enviado a '+esc(e.ambarx.para.join(', '))+'</div>':'')+((e.ambarx||{}).error?'<div class="nota" style="color:var(--rojo)">'+esc(e.ambarx.error)+'</div>':'')+
+      '<div style="margin-top:6px">'+estadoAmbarx(e)+(e.reenviar?(e.reenviar.hecho?'<span class="tag ok">Reenviado '+esc(String(e.reenviar.hecho).slice(11,16))+'</span>':e.reenviar.error?'<span class="tag mal">Reenvío: '+esc(e.reenviar.error)+'</span>':'<span class="tag">Reenvío pedido…</span>'):'')+'</div>'+((e.ambarx||{}).para&&(e.ambarx.para.length)?'<div class="nota">Enviado a '+esc(e.ambarx.para.join(', '))+'</div>':'')+((e.ambarx||{}).error?'<div class="nota" style="color:var(--rojo)">'+esc(e.ambarx.error)+'</div>':'')+
       (esOficina() && e.ambarx && (e.ambarx.firma==='error'||e.ambarx.email==='error'||e.ambarx.cobro==='error'||e.ambarx.pdf==='error') ? '<div class="fila-btn"><button class="btn peq" onclick="reintentarAmbarx(\''+k+'\')">Reintentar en AmbarX</button></div>':'');
   }
   h+='<div class="fila-btn">'+(!e && !esOficina()?'<button class="btn primario" onclick="entregar(\''+k+'\')">'+ico('firma')+' Entregar y firmar</button>':'')+
     (e && e.estado!=='incidencia'?'<button class="btn" onclick="pdfOficial(\''+k+'\')">'+ico('doc')+' '+(d.tipo==='factura'?'Factura':'Albarán')+' firmado (AmbarX)</button>':'')+
     (e?'<button class="btn peligro" onclick="deshacer(\''+k+'\')">Deshacer entrega</button>':'')+
+    (esOficina() && e && e.estado==='entregado' && e.firma?'<button class="btn" onclick="reenviarEmail(\''+k+'\')">Reenviar email</button>':'')+
     (esOficina()?'<button class="btn" onclick="reasignar(\''+k+'\')">Cambiar repartidor</button><button class="btn" onclick="editarDir(\''+k+'\')">Dirección de entrega</button>':'')+
     '<button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
   velo(h);
 }
 
+// Reenvío del justificante firmado: lo manda el buzón (facturasbuscaflor@gmail.com) en menos de 5 minutos
+function reenviarEmail(k){
+  var d=S.docs[k]||{}, para=(d.emails||[]).filter(Boolean).join(', ');
+  velo('<h3>Reenviar email</h3><div class="nota">'+esc(d.cliente)+' · '+(d.tipo==='factura'?'Factura ':'Albarán ')+esc(d.num)+'</div>'+
+    '<label>Enviar a (separa con comas)</label><input id="paraRe" type="email" multiple value="'+esc(para)+'" autocomplete="off">'+
+    '<div class="nota">Sale desde facturasbuscaflor@gmail.com con el justificante de entrega firmado en PDF. Las respuestas van a expansion@.</div>'+
+    '<div class="fila-btn"><button class="btn primario" onclick="confirmarReenvio(\''+k+'\')">Reenviar</button><button class="btn" onclick="abrir(\''+k+'\')">Cancelar</button></div>');
+}
+function confirmarReenvio(k){
+  var para=document.getElementById('paraRe').value.split(/[,;\s]+/).map(function(x){return x.trim();}).filter(function(x){return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x);});
+  if(!para.length){ toast('Pon al menos un email válido'); return; }
+  db.ref('buscaflor/reparto/'+S.fecha+'/entregas/'+k+'/reenviar').set({ pedido: ahora(), por: nombreYo(), para: para })
+    .then(function(){ toast('Pedido: sale en menos de 5 minutos'); abrir(k); }, function(e){ toast('Error: '+e.message); });
+}
 function reintentarAmbarx(k){
   var a=Object.assign({}, (S.ent[k]||{}).ambarx||{}); if(a.firma==='error') delete a.firma; if(a.email==='error') delete a.email; if(a.cobro==='error') delete a.cobro; if(a.pdf==='error') delete a.pdf; if(a.email==='error') delete a.email; a.n={}; a.errores={}; a.intentos=0; a.error=null;
   db.ref('buscaflor/reparto/'+S.fecha+'/entregas/'+k+'/ambarx').set(a).then(function(){ cerrarVelo(); toast('Se volverá a intentar en menos de un minuto'); });

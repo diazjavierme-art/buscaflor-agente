@@ -11,6 +11,9 @@
  * servidor ya no firma esa entrega por la pantalla de AmbarX móvil (que mandaría un
  * segundo email): solo guarda el PDF firmado como adjunto del documento.
  *
+ * Además atiende el botón «Reenviar email» de la oficina (entregas/<nº>/reenviar):
+ * manda el mismo justificante a los emails que se pongan allí.
+ *
  * Instalar: pegar este archivo en el proyecto del buzón y ejecutar una vez
  * instalarEnvioEntregas() (crea el activador de cada 5 minutos).
  */
@@ -50,6 +53,16 @@ function enviarEntregasSinAmbarx() {
       var ent = ee_fb('GET', f + '/entregas') || {}, docs = null;
       Object.keys(ent).forEach(function (k) {
         var e = ent[k] || {}, a = e.ambarx || {};
+        // Reenvío pedido desde la oficina
+        if (e.reenviar && !e.reenviar.hecho && !e.reenviar.error && e.firma) {
+          docs = docs || (ee_fb('GET', f + '/docs') || {});
+          try {
+            var pr = (e.reenviar.para || []).filter(function (x) { return x && /@/.test(x); });
+            if (!pr.length) throw new Error('sin destinatarios');
+            ee_enviar(docs[k] || {}, e, k, pr);
+            ee_fb('PATCH', f + '/entregas/' + k + '/reenviar', { hecho: ee_ahora() });
+          } catch (err) { ee_fb('PATCH', f + '/entregas/' + k + '/reenviar', { error: String(err && err.message || err) }); }
+        }
         if (e.estado !== 'entregado' || !e.firma || e.emailDirecto) return;
         if (a.firma === 'firmado' || a.firma === 'adjunto') return;           // AmbarX ya lo hizo (y mandó su email)
         var falla = a.firma === 'error';
@@ -60,14 +73,7 @@ function enviarEntregasSinAmbarx() {
         var para = (d.emails || []).filter(function (x) { return x && /@/.test(x); });
         if (!para.length) { ee_fb('PUT', f + '/entregas/' + k + '/emailDirecto', { estado: 'sinEmail', hora: ee_ahora() }); return; }
         try {
-          var pdf = ee_pdf(d, e, k);
-          var tipo = (e.tipo || d.tipo) === 'factura' ? 'Factura' : 'Albarán';
-          var num = e.num || d.num || k;
-          var fechaE = String(e.hora || '').slice(0, 10).split('-').reverse().join('/');
-          GmailApp.sendEmail(para.join(','), 'Rosas de Buscaflor · ' + tipo + ' ' + num + ' firmado (entrega ' + fechaE + ')',
-            'Buenos días:\n\nLe adjuntamos el justificante de entrega firmado del ' + tipo.toLowerCase() + ' ' + num + ', entregado el ' + fechaE +
-            ' a las ' + String(e.hora || '').slice(11, 16) + '.\n\nPara cualquier consulta, responda a este correo.\n\nUn saludo,\nRosas de Buscaflor La Mejor S.L.',
-            { attachments: [pdf], name: 'Rosas de Buscaflor', replyTo: EE_RESPONDER, bcc: EE_RESPONDER });
+          ee_enviar(d, e, k, para);
           ee_fb('PUT', f + '/entregas/' + k + '/emailDirecto', { estado: 'enviado', hora: ee_ahora(), para: para, motivo: falla ? 'AmbarX falló' : 'Sin pasar a AmbarX en ' + EE_MINUTOS + ' min' });
         } catch (err) {
           ee_fb('PUT', f + '/entregas/' + k + '/emailDirectoError', { hora: ee_ahora(), error: String(err && err.message || err) });
@@ -75,6 +81,17 @@ function enviarEntregasSinAmbarx() {
       });
     }
   } finally { lock.releaseLock(); }
+}
+
+function ee_enviar(d, e, k, para) {
+  var pdf = ee_pdf(d, e, k);
+  var tipo = (e.tipo || d.tipo) === 'factura' ? 'Factura' : 'Albarán';
+  var num = e.num || d.num || k;
+  var fechaE = String(e.hora || '').slice(0, 10).split('-').reverse().join('/');
+  GmailApp.sendEmail(para.join(','), 'Rosas de Buscaflor · ' + tipo + ' ' + num + ' firmado (entrega ' + fechaE + ')',
+    'Buenos días:\n\nLe adjuntamos el justificante de entrega firmado del ' + tipo.toLowerCase() + ' ' + num + ', entregado el ' + fechaE +
+    ' a las ' + String(e.hora || '').slice(11, 16) + '.\n\nPara cualquier consulta, responda a este correo.\n\nUn saludo,\nRosas de Buscaflor La Mejor S.L.',
+    { attachments: [pdf], name: 'Rosas de Buscaflor', replyTo: EE_RESPONDER, bcc: EE_RESPONDER });
 }
 
 // Justificante de entrega firmado (HTML → PDF)
