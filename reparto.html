@@ -334,7 +334,8 @@ function estadoAmbarx(e){
   if(e.firma) t += a.firma==='adjunto'||a.firma==='firmado'||a.firma==='yaFirmado' ? '<span class="tag ok">Firmado y guardado en AmbarX</span>' : a.firma==='error' ? '<span class="tag mal">Firma: error en AmbarX</span>' : '<span class="tag">Firma → AmbarX…</span>';
   var fc=(e.cobro||{}).forma;
   if((fc==='efectivo'||fc==='tarjeta') && (+(e.cobro||{}).importe||0)>0) t += a.cobro==='cobrado'||a.cobro==='yaCobrado' ? '<span class="tag ok">Cobrado en AmbarX</span>' : a.cobro==='error' ? '<span class="tag mal">Cobro: error en AmbarX</span>' : '<span class="tag">Cobro → AmbarX…</span>';
-  if(a.firma==='adjunto') t += a.email==='enviado' ? '<span class="tag ok">Email enviado</span>' : a.email==='sinEmail' ? '<span class="tag mal">Cliente sin email</span>' : a.email==='error' ? '<span class="tag mal">Email: error</span>' : '<span class="tag">Email → cliente…</span>';
+  if(e.emailDirecto&&e.emailDirecto.estado==='enviado') t += '<span class="tag ok">Email enviado desde el buzón</span>';
+  if(a.firma==='adjunto' && a.email!=='directo') t += a.email==='enviado' ? '<span class="tag ok">Email enviado</span>' : a.email==='sinEmail' ? '<span class="tag mal">Cliente sin email</span>' : a.email==='error' ? '<span class="tag mal">Email: error</span>' : '<span class="tag">Email → cliente…</span>';
   return t;
 }
 function textoCobro(c){ c=c||{}; var f=c.forma||'pendiente'; return f==='efectivo'?'Efectivo '+eur(c.importe):f==='tarjeta'?'Tarjeta '+eur(c.importe):f==='transferencia'?'Transferencia '+eur(c.importe):'Sin cobrar'; }

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.3
+// @version      0.9.4
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -502,7 +502,10 @@
         const nombrePdf = (tipo === 'factura' ? 'FV-' : 'AV-') + String(num).replace('-', '') + '_firmado.pdf';
         const correos = (d.emails || []).filter(Boolean);
         if (p.firma) await paso('firma', async () => {
-          if ((a.n.firma || 0) < 2) {
+          // Si el buzón ya mandó el email directo (AmbarX falló o el servidor estuvo parado), no se usa la pantalla móvil
+          // porque AmbarX mandaría un segundo email: solo se guarda el PDF firmado como adjunto.
+          const directo = e.emailDirecto && e.emailDirecto.estado === 'enviado';
+          if ((a.n.firma || 0) < 2 && !directo) {
             // Vía principal: la pantalla de firma de AmbarX (deja «Firmado», mete la firma en su PDF y manda el email)
             fase = 'Firmando ' + num + ' en AmbarX…'; pintar();
             const h = String(e.hora || '');
@@ -523,10 +526,10 @@
           a.pdf = 'ok'; a.pdfHora = ahoraISO();
           // Si el cliente tiene email, NO se adjunta aquí: al subir el PDF en «Enviar por email» AmbarX ya lo guarda
           // como adjunto del documento, y si ya estuviera adjunto lo mete otra vez en el email (salían dos PDF, 23-11)
-          if (!correos.length) {
+          if (!correos.length || directo) {
             fase = 'Guardando ' + num + ' firmado en AmbarX…'; pintar();
             await conMarco(doc => adjuntarEnAmbarx(doc, firmado, nombrePdf), ruta);
-            a.email = 'sinEmail'; a.emailHora = ahoraISO();
+            a.email = directo ? 'directo' : 'sinEmail'; a.emailHora = ahoraISO();
           }
           a.firma = 'adjunto'; a.firmaHora = ahoraISO(); a.nombrePdf = nombrePdf;
         });
