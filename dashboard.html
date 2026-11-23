@@ -294,7 +294,14 @@ function familiaDe(desc){ var d=String(desc||'').toUpperCase();
   if(/PORTE|TRANSPORTE|PALET|BOLSA|ALQUILER|COMUNIDAD|TIPSA|CAJA/.test(d)) return 'Otros'; return 'Otras flores'; }
 function datosPeriodo(r){
   var o={venta:0, docs:0, cli:{}, art:{}, fam:{}, dias:{}, entregas:0, firmadas:0, cobrado:{}, rosaBajo:0, rosaBajoN:0, clavelBajo:0, ceros:0, diasCon:0};
+  var VA=D.ventasAmbarx||{}, VD=VA.dias||{}, vHasta=VA.hasta||'';
+  Object.keys(VD).forEach(function(f){ if(f<r.desde||f>r.hasta) return; var d=VD[f]||{};
+    o.docs+=(+d.docs||0); o.venta+=(+d.v||0); o.dias[f]=(+d.v||0); o.diasCon++;
+    Object.keys(d.cli||{}).forEach(function(k){ o.cli[k]=(o.cli[k]||0)+d.cli[k]; });
+    Object.keys(d.art||{}).forEach(function(k){ o.art[k]=(o.art[k]||0)+d.art[k]; var fa=familiaDe(k); o.fam[fa]=(o.fam[fa]||0)+d.art[k]; });
+    o.rosaBajo+=(+d.rb||0); o.rosaBajoN+=(+d.rbn||0); o.clavelBajo+=(+d.cb||0); o.ceros+=(+d.z||0); });
   Object.keys(D.reparto||{}).forEach(function(f){ if(f<r.desde||f>r.hasta) return; var dia=D.reparto[f]||{}, docs=dia.docs||{}, vd=0;
+    if(f<=vHasta) docs={};
     Object.values(docs).forEach(function(doc){ if(doc.tipo==='factura' && doc.origen && doc.origen!=='Directa') return; o.docs++;
       var t=0; arr(doc.lineas).forEach(function(l){ var imp=l.t!=null?(+l.t||0):(+l.p||0)*(+l.u||0)*(1-(+l.dto||0)/100); t+=imp;
         var nm=String(l.d||l.c||'?').trim(); o.art[nm]=(o.art[nm]||0)+imp; var fa=familiaDe(nm); o.fam[fa]=(o.fam[fa]||0)+imp;
@@ -312,7 +319,7 @@ function pintarResumen(){
   var r=rango(PER.tipo, PER.off), ra=rango(PER.tipo, PER.tipo==='dia'?PER.off-7:PER.off-1), vsTxt=PER.tipo==='dia'?'vs mismo día semana pasada':PER.tipo==='semana'?'vs semana anterior':'vs mes anterior', o=datosPeriodo(r), oa=datosPeriodo(ra);
   document.getElementById('perEtq').textContent=r.etq.charAt(0).toUpperCase()+r.etq.slice(1);
   document.getElementById('perSig').disabled = PER.off>=0;
-  var repDias=Object.keys(D.reparto||{}).sort(), primero=repDias[0]||null, completo=!primero||primero<=r.desde, antCompleto=!primero||primero<=ra.desde;
+  var repDias=Object.keys(((D.ventasAmbarx||{}).dias)||{}).concat(Object.keys(D.reparto||{})).sort(), primero=repDias[0]||null, completo=!primero||primero<=r.desde, antCompleto=!primero||primero<=ra.desde;
   var ncli=Object.keys(o.cli).length, ticket=o.docs?o.venta/o.docs:null;
   var cob=Object.keys(o.cobrado).reduce(function(s,k){return s+o.cobrado[k];},0);
   // margen (control semanal / mensual)
@@ -358,7 +365,7 @@ function pintarResumen(){
   }
   if(av.some(function(a){return a[0]==='bad';})) tx.push('<span class="down">Hay avisos urgentes abajo.</span>');
   document.getElementById('rTexto').innerHTML = tx.map(function(t){return '<li>'+t+'</li>';}).join('');
-  document.getElementById('rNota').innerHTML = 'Ventas, clientes y productos salen de los albaranes y facturas directas que sube la oficina desde AmbarX (sin IVA; no cuentan las facturas que agrupan albaranes). Hay datos desde el '+(primero?primero.split('-').reverse().join('/'):'—')+'. El margen viene del control semanal de los lunes y del cierre mensual.';
+  document.getElementById('rNota').innerHTML = 'Ventas, clientes y productos salen del informe de ventas de AmbarX (facturas y albaranes, sin IVA) hasta el '+(((D.ventasAmbarx||{}).hasta)||'—').split('-').reverse().join('/')+'; los días posteriores, de los albaranes que sube la oficina. Hay datos desde el '+(primero?primero.split('-').reverse().join('/'):'—')+'. El margen viene del control semanal de los lunes y del cierre mensual.';
 }
 
 function pintar(){
@@ -479,6 +486,7 @@ oir('buscaflor/vuelos','vuelos', function(v){return v||{};});
 oir('buscaflor/pedidosClientes','pedidos', function(v){return v||{};});
 oir('buscaflor/etiquetas/documentos','etiq', function(v){return v||{};});
 oir('buscaflor/reparto','reparto', function(v){return v||{};});
+oir('buscaflor/ventasAmbarx','ventasAmbarx', function(v){return v||{};});
 oir('buscaflor/clientes/items','clientes', function(v){return v||{};});
 oir('buscaflor/articulos/items','articulos', function(v){return v||{};});
 oir('buscaflor/peticiones/agenteStock','agente');
