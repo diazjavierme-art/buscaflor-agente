@@ -19,83 +19,117 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
-:root{--navy:#1F344C;--navy-suave:#EEF1F4;--papel:#fff;--fondo:#F7F8F9;--tinta:#1B2229;--gris:#6E7680;--filo:#E3E6E9;--verde:#2F7D5C;--rojo:#C0463A;--oro:#C79A3E;}
+:root{--navy:#1F344C;--navy-2:#2B4766;--navy-suave:#EDF1F6;--papel:#fff;--fondo:#F3F5F8;--tinta:#16202B;--gris:#667085;--gris-2:#98A2B3;--filo:#E4E7EC;--verde:#1F7A55;--verde-suave:#E8F4EE;--rojo:#B42318;--rojo-suave:#FDEDEB;--oro:#B7862C;--oro-suave:#FBF4E6;--sombra:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);--r:12px;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{padding-bottom:calc(70px + env(safe-area-inset-bottom));font-family:'IBM Plex Sans',sans-serif;background:var(--fondo);color:var(--tinta);min-height:100vh;max-width:620px;margin:0 auto;font-size:14px;padding-bottom:70px;}
-header{background:var(--papel);padding:calc(12px + env(safe-area-inset-top)) 14px 12px;border-bottom:3px solid var(--navy);position:sticky;top:0;z-index:5;}
-header .fila{display:flex;align-items:center;justify-content:space-between;gap:8px;}
-header h1{font-size:16px;color:var(--navy);font-weight:600;}
-.fecha{display:flex;align-items:center;gap:6px;margin-top:8px;}
-.fecha button{border:1px solid var(--filo);background:var(--papel);border-radius:6px;width:36px;height:34px;font-size:16px;color:var(--navy);}
-.fecha .dia{flex:1;text-align:center;font-weight:600;color:var(--navy);}
-main{padding:12px;}
-.btn{padding:11px 12px;font-family:inherit;font-size:14px;font-weight:600;border:1px solid var(--navy);border-radius:8px;cursor:pointer;background:var(--papel);color:var(--navy);}
-.btn.primario{background:var(--navy);color:#fff;}
+body{font-family:'IBM Plex Sans',system-ui,sans-serif;background:var(--fondo);color:var(--tinta);min-height:100vh;max-width:640px;margin:0 auto;font-size:14px;line-height:1.4;padding-bottom:calc(40px + env(safe-area-inset-bottom));-webkit-font-smoothing:antialiased;}
+svg.i{width:18px;height:18px;flex:none;vertical-align:-4px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+header{background:var(--navy);color:#fff;padding:calc(12px + env(safe-area-inset-top)) 16px 14px;position:sticky;top:0;z-index:5;box-shadow:0 2px 8px rgba(16,24,40,.18);}
+header .fila{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.marca{display:flex;align-items:center;gap:10px;}
+.marca .logo{width:34px;height:34px;border-radius:9px;background:#fff;color:var(--navy);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:17px;letter-spacing:-.02em;}
+.marca .sub{font-size:11px;opacity:.7;letter-spacing:.06em;text-transform:uppercase;}
+header h1{font-size:16px;color:#fff;font-weight:600;line-height:1.2;}
+header #bMenu{background:rgba(255,255,255,.12);border:0;color:#fff;width:40px;height:40px;padding:0;border-radius:10px;font-size:20px;display:flex;align-items:center;justify-content:center;}
+.fecha{display:flex;align-items:center;gap:6px;margin-top:12px;background:rgba(255,255,255,.1);border-radius:10px;padding:4px;}
+.fecha button{border:0;background:transparent;border-radius:8px;width:38px;height:34px;font-size:18px;color:#fff;font-family:inherit;}
+.fecha button:active{background:rgba(255,255,255,.15);}
+.fecha .dia{flex:1;text-align:center;font-weight:600;color:#fff;font-size:14px;}
+.fecha #fHoy{width:auto;padding:0 12px;font-size:12.5px;font-weight:600;background:#fff;color:var(--navy);}
+main{padding:14px 14px 0;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:10px 14px;font-family:inherit;font-size:14px;font-weight:600;border:1px solid var(--filo);border-radius:10px;cursor:pointer;background:var(--papel);color:var(--navy);box-shadow:0 1px 2px rgba(16,24,40,.05);transition:background .12s,transform .08s;text-decoration:none;}
+.btn:active{transform:scale(.98);}
+.btn.primario{background:var(--navy);border-color:var(--navy);color:#fff;}
 .btn.verde{background:var(--verde);border-color:var(--verde);color:#fff;}
-.btn.peligro{border-color:var(--rojo);color:var(--rojo);}
-.btn.peq{padding:6px 10px;font-size:12px;border-radius:6px;}
+.btn.peligro{border-color:#F4C7C2;color:var(--rojo);background:#fff;}
+.btn.peq{min-height:38px;padding:7px 11px;font-size:13px;border-radius:9px;}
 .btn:disabled{opacity:.5;}
-.fila-btn{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;}
+.fila-btn{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;}
 .fila-btn .btn{flex:1 1 auto;}
-input,select,textarea{font-family:inherit;font-size:15px;border:1px solid var(--filo);border-radius:8px;padding:10px;background:var(--papel);color:var(--tinta);width:100%;}
-label{font-size:11.5px;font-weight:600;color:var(--gris);display:block;margin:12px 0 5px;text-transform:uppercase;letter-spacing:.03em;}
-.nota{font-size:12px;color:var(--gris);margin:6px 0;}
-.alerta{border:1px solid var(--oro);background:rgba(199,154,62,.08);border-radius:8px;padding:9px 11px;font-size:13px;margin:8px 0;}
-.alerta.ok{border-color:var(--verde);background:rgba(47,125,92,.07);}
-.alerta.mal{border-color:var(--rojo);background:rgba(192,70,58,.06);}
-.resumen{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
-.resumen div{background:var(--papel);border:1px solid var(--filo);border-radius:8px;padding:8px;text-align:center;}
-.resumen b{display:block;font-size:17px;color:var(--navy);font-family:'IBM Plex Mono',monospace;}
-.resumen span{font-size:11px;color:var(--gris);}
-.card{background:var(--papel);border:1px solid var(--filo);border-left:4px solid var(--oro);border-radius:8px;padding:11px 12px;margin-bottom:10px;}
-.card.hecha{border-left-color:var(--verde);opacity:.8;}
-.card.inc{border-left-color:var(--rojo);}
-.card .top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;}
-.card .cli{font-weight:600;font-size:15px;color:var(--navy);}
-.card .dir{font-size:12.5px;color:var(--gris);margin-top:2px;}
-.card .imp{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:15px;white-space:nowrap;}
-.card .acc{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap;}
-.card .acc a,.card .acc button{flex:1 1 auto;text-align:center;text-decoration:none;}
-.tag{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:10px;background:var(--navy-suave);color:var(--navy);margin-right:4px;}
-.tag.fac{background:#F3EAD6;color:#7A5A16;}
-.tag.ok{background:rgba(47,125,92,.12);color:var(--verde);}
-.tag.mal{background:rgba(192,70,58,.1);color:var(--rojo);}
-h2{font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 8px;display:flex;justify-content:space-between;align-items:center;}
-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}
-th{text-align:right;font-size:10.5px;color:var(--gris);font-weight:600;padding:4px;text-transform:uppercase;}
-td{padding:6px 4px;border-top:1px solid var(--filo);text-align:right;font-family:'IBM Plex Mono',monospace;}
+input,select,textarea{font-family:inherit;font-size:15px;border:1px solid #D0D5DD;border-radius:10px;padding:11px 12px;background:var(--papel);color:var(--tinta);width:100%;box-shadow:0 1px 2px rgba(16,24,40,.04);}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--navy-2);box-shadow:0 0 0 3px rgba(43,71,102,.15);}
+label{font-size:11.5px;font-weight:600;color:var(--gris);display:block;margin:16px 0 6px;text-transform:uppercase;letter-spacing:.05em;}
+.nota{font-size:12.5px;color:var(--gris);margin:6px 0;}
+.alerta{border:1px solid #F0DDB5;background:var(--oro-suave);border-radius:10px;padding:10px 12px;font-size:13px;margin:10px 0;color:#6B4E14;}
+.alerta.ok{border-color:#BFE0CF;background:var(--verde-suave);color:#14543A;}
+.alerta.mal{border-color:#F4C7C2;background:var(--rojo-suave);color:#7A1A12;}
+.resumen{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:4px 0 14px;background:var(--papel);border-radius:var(--r);box-shadow:var(--sombra);overflow:hidden;}
+.resumen div{padding:12px 8px;text-align:center;border-left:1px solid var(--filo);}
+.resumen div:first-child{border-left:0;}
+.resumen b{display:block;font-size:19px;color:var(--navy);font-family:'IBM Plex Mono',monospace;font-weight:600;}
+.resumen span{font-size:11px;color:var(--gris);text-transform:uppercase;letter-spacing:.04em;}
+.card{position:relative;background:var(--papel);border:1px solid var(--filo);border-radius:var(--r);padding:13px 14px 13px 18px;margin-bottom:10px;box-shadow:var(--sombra);overflow:hidden;}
+.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--oro);}
+.card.hecha::before{background:var(--verde);}
+.card.hecha{background:#FCFDFC;}
+.card.inc::before{background:var(--rojo);}
+.card .top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;cursor:pointer;}
+.card .cli{font-weight:600;font-size:15.5px;color:var(--tinta);}
+.card .dir{font-size:12.5px;color:var(--gris);margin-top:3px;}
+.card .imp{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:15px;white-space:nowrap;color:var(--navy);}
+.card .acc{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}
+.card .acc a{flex:1 1 0;white-space:nowrap;}
+.card .acc button[aria-label]{flex:0 0 46px;padding:0;}
+.card .acc .primario{flex:1 1 100%;min-height:46px;font-size:15px;}
+.card .acc a,.card .acc button{text-align:center;text-decoration:none;}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--navy-suave);color:var(--navy);margin:2px 4px 2px 0;}
+.tag.fac{background:var(--oro-suave);color:#7A5A16;}
+.tag.ok{background:var(--verde-suave);color:var(--verde);}
+.tag.mal{background:var(--rojo-suave);color:var(--rojo);}
+h2{font-size:12.5px;color:var(--navy);text-transform:uppercase;letter-spacing:.06em;margin:20px 0 6px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:600;}
+h2>span:first-child{cursor:pointer;}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;}
+th{text-align:right;font-size:10.5px;color:var(--gris);font-weight:600;padding:6px 4px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--filo);}
+td{padding:7px 4px;border-top:1px solid var(--filo);text-align:right;font-family:'IBM Plex Mono',monospace;}
 th:first-child,td:first-child{text-align:left;} td.txt{font-family:'IBM Plex Sans',sans-serif;text-align:left;}
-.velo{position:fixed;inset:0;background:rgba(20,30,40,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center;}
-.hoja{background:var(--papel);width:100%;max-width:620px;max-height:94vh;overflow:auto;border-radius:14px 14px 0 0;padding:16px 14px 24px;}
-.hoja h3{font-size:16px;color:var(--navy);margin-bottom:2px;}
-.chips{display:flex;gap:6px;flex-wrap:wrap;}
-.chips button{flex:1 1 40%;padding:12px 8px;border:1px solid var(--filo);border-radius:8px;background:var(--papel);font-family:inherit;font-size:14px;font-weight:600;color:var(--tinta);}
-.chips button.sel{border-color:var(--navy);background:var(--navy);color:#fff;}
-#cajaFirma{width:100%;height:150px;border:2px dashed var(--gris);border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;color:var(--gris);font-weight:600;font-size:15px;overflow:hidden;}
-#cajaFirma img{max-width:100%;max-height:100%;}
+tr:last-child td{border-top:2px solid var(--tinta);}
+.velo{position:fixed;inset:0;background:rgba(16,24,40,.5);z-index:20;display:flex;align-items:flex-end;justify-content:center;animation:fd .15s ease;}
+.hoja{background:var(--papel);width:100%;max-width:640px;max-height:94vh;overflow:auto;border-radius:18px 18px 0 0;padding:10px 18px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(16,24,40,.2);animation:su .2s ease;}
+.hoja::before{content:'';display:block;width:40px;height:4px;border-radius:4px;background:#D0D5DD;margin:0 auto 14px;}
+.hoja h3{font-size:18px;color:var(--tinta);margin-bottom:2px;font-weight:600;}
+@keyframes su{from{transform:translateY(30px);opacity:.6}to{transform:none;opacity:1}}
+@keyframes fd{from{opacity:0}to{opacity:1}}
+.paso{display:flex;align-items:center;gap:8px;margin:20px 0 8px;font-size:12px;font-weight:600;color:var(--navy);text-transform:uppercase;letter-spacing:.05em;}
+.paso i{font-style:normal;width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;}
+.doc-cab{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;padding:12px 14px;border:1px solid var(--filo);border-radius:var(--r);background:var(--fondo);margin-top:10px;}
+.doc-cab .t{font-size:12px;color:var(--gris);}
+.doc-cab .v{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:20px;color:var(--navy);}
+details summary{cursor:pointer;}
+.chips{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.chips button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:10px 8px;border:1px solid #D0D5DD;border-radius:10px;background:var(--papel);font-family:inherit;font-size:14px;font-weight:600;color:var(--tinta);}
+.chips button.sel{border-color:var(--navy);background:var(--navy);color:#fff;box-shadow:0 0 0 3px rgba(31,52,76,.15);}
+#cajaFirma{position:relative;width:100%;height:160px;border:1.5px dashed #98A2B3;border-radius:var(--r);background:#FCFCFD;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--gris);font-weight:600;font-size:14.5px;overflow:hidden;cursor:pointer;}
+#cajaFirma::after{content:'';position:absolute;left:10%;right:10%;bottom:34px;border-bottom:1px solid #D0D5DD;}
+#cajaFirma img{max-width:100%;max-height:100%;position:relative;z-index:1;}
 .pad{position:fixed;inset:0;background:#fff;z-index:40;display:flex;flex-direction:column;}
-.pad .cab{padding:calc(10px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid var(--filo);font-size:13px;color:var(--gris);}
-.pad .cab b{color:var(--navy);font-size:15px;}
-.pad .area{flex:1 1 0;min-height:0;position:relative;}
-.pad canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block;background:#fff;}
-.pad .linea-firma{position:absolute;left:8%;right:8%;bottom:22%;border-bottom:1px solid #bbb;pointer-events:none;}
-.pad .pie{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--filo);}
-.pad .pie .btn{flex:1;padding:14px 8px;font-size:15px;}
-.interr{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--filo);border-radius:8px;margin-top:8px;}
+.pad .cab{padding:calc(12px + env(safe-area-inset-top)) 16px 12px;background:var(--navy);color:rgba(255,255,255,.8);font-size:13px;}
+.pad .cab b{color:#fff;font-size:16px;}
+.pad .area{flex:1 1 0;min-height:0;position:relative;background:#fff;}
+.pad canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block;background:transparent;z-index:1;}
+.pad .linea-firma{position:absolute;left:8%;right:8%;bottom:22%;border-bottom:1.5px solid #98A2B3;pointer-events:none;}
+.pad .linea-firma::before{content:'Firma del cliente';position:absolute;left:0;top:8px;font-size:11px;color:#98A2B3;letter-spacing:.06em;text-transform:uppercase;}
+.pad .linea-firma::after{content:'×';position:absolute;left:-18px;bottom:0;font-size:22px;color:#98A2B3;}
+.pad .pie{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--filo);background:var(--fondo);}
+.pad .pie .btn{flex:1;min-height:50px;font-size:15px;}
+.pad .pie .verde{flex:2;}
+.interr{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--filo);border-radius:10px;margin-top:8px;}
 .interr input{width:22px;height:22px;flex:none;}
-.firma-img{max-width:100%;max-height:120px;border:1px solid var(--filo);border-radius:6px;background:#fff;}
-.toast{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:50;max-width:90vw;}
-.vacio{text-align:center;color:var(--gris);padding:30px 10px;}
+.firma-img{max-width:100%;max-height:130px;border:1px solid var(--filo);border-radius:10px;background:#fff;padding:6px;margin-top:6px;}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--tinta);color:#fff;padding:12px 18px;border-radius:12px;font-size:13.5px;z-index:50;max-width:90vw;box-shadow:0 8px 24px rgba(16,24,40,.25);animation:su .2s ease;}
+.vacio{text-align:center;color:var(--gris);padding:40px 16px;background:var(--papel);border-radius:var(--r);box-shadow:var(--sombra);}
 .mono{font-family:'IBM Plex Mono',monospace;}
-.instalar{display:none;margin:0 0 12px;padding:10px 12px;border:1px solid var(--navy);border-radius:10px;background:var(--navy-suave);font-size:13px;align-items:center;gap:10px;}
+.instalar{display:none;margin:0 0 12px;padding:10px 12px;border:1px solid var(--filo);border-radius:var(--r);background:var(--papel);box-shadow:var(--sombra);font-size:13px;align-items:center;gap:10px;}
 .instalar img{width:40px;height:40px;border-radius:9px;flex:none;}
 .instalar .t{flex:1;}
 .instalar button{flex:none;}
+#bfLogin{background:linear-gradient(180deg,var(--navy) 0 42%,var(--fondo) 42%) !important;font-family:'IBM Plex Sans',system-ui,sans-serif !important;}
+#bfLoginForm{border:0 !important;border-radius:16px !important;padding:28px 24px !important;box-shadow:0 12px 40px rgba(16,24,40,.18);width:min(360px,92vw) !important;}
+#bfLoginForm input{border-radius:10px !important;border:1px solid #D0D5DD !important;padding:12px !important;margin-bottom:10px !important;}
+#bfLoginForm button[type=submit]{background:var(--navy) !important;border-radius:10px !important;padding:13px !important;font-weight:600;font-family:inherit;}
 </style>
 </head>
 <body>
 <header>
-  <div class="fila"><h1 id="titulo">Reparto</h1><button class="btn peq" id="bMenu">⋯</button></div>
+  <div class="fila"><div class="marca"><div class="logo">B</div><div><div class="sub">Rosas de Buscaflor</div><h1 id="titulo">Reparto</h1></div></div><button id="bMenu" aria-label="Menú"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button></div>
   <div class="fecha"><button id="fAnt">‹</button><div class="dia" id="fDia"></div><button id="fSig">›</button><button id="fHoy" style="width:auto;padding:0 10px;font-size:13px">Hoy</button></div>
 </header>
 <div id="bInstalar" class="instalar" style="margin:12px 12px 0"></div>
@@ -103,7 +137,7 @@ th:first-child,td:first-child{text-align:left;} td.txt{font-family:'IBM Plex San
 
 <div id="bfLogin" style="display:none;position:fixed;inset:0;z-index:99999;background:#f4f4f4;align-items:center;justify-content:center;font-family:Arial,sans-serif">
   <form id="bfLoginForm" style="background:#fff;border:1px solid #ccc;border-radius:8px;padding:24px;width:min(320px,90vw)">
-    <div style="font-size:18px;font-weight:bold;margin-bottom:4px">Buscaflor · Reparto</div>
+    <div style="width:44px;height:44px;border-radius:11px;background:#1F344C;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:21px;margin-bottom:14px">B</div><div style="font-size:19px;font-weight:600;color:#16202B;margin-bottom:4px">Reparto · Rosas de Buscaflor</div>
     <div style="color:#666;font-size:13px;margin-bottom:16px">Inicia sesión para entrar</div>
     <input id="bfEmail" type="text" inputmode="email" autocomplete="username" placeholder="móvil (o email en la oficina)" required style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;font-size:15px">
     <input id="bfPass" type="password" autocomplete="current-password" placeholder="PIN (repartidores: déjalo vacío)" style="width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;font-size:15px">
@@ -157,6 +191,8 @@ function ahora(){ var d=new Date(); return hoyISO(d)+'T'+p2(d.getHours())+':'+p2
 function eur(n){ return (Math.round((+n||0)*100)/100).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' €'; }
 function num(n){ return (+n||0).toLocaleString('es-ES',{maximumFractionDigits:2}); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+var ICO={pin:'<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',tel:'<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/>',firma:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',ok:'<path d="M20 6 9 17l-5-5"/>',doc:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',lect:'<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',arr:'<path d="m18 15-6-6-6 6"/>',aba:'<path d="m6 9 6 6 6-6"/>',efe:'<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/>',tar:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',ban:'<path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M2 10l10-6 10 6"/>',no:'<circle cx="12" cy="12" r="9"/><path d="m15 9-6 6"/>'};
+function ico(n){ return '<svg class="i" viewBox="0 0 24 24">'+(ICO[n]||'')+'</svg>'; }
 function toast(t){ var e=document.createElement('div'); e.className='toast'; e.textContent=t; document.body.appendChild(e); setTimeout(function(){e.remove();},2600); }
 function fechaLarga(f){ var d=new Date(f+'T12:00:00'); var s=d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}); return (f===hoyISO()?'Hoy · ':'')+s.charAt(0).toUpperCase()+s.slice(1); }
 function moverDia(n){ var d=new Date(S.fecha+'T12:00:00'); d.setDate(d.getDate()+n); S.fecha=hoyISO(d); escuchar(); }
@@ -232,10 +268,10 @@ function tarjeta(d){
     '<div class="dir">'+esc(dir||'(sin dirección en AmbarX)')+'</div>'+
     '<div style="margin-top:5px"><span class="tag'+(d.tipo==='factura'?' fac':'')+'">'+(d.tipo==='factura'?'Factura ':'Albarán ')+esc(d.num)+'</span>'+estado+'</div></div>'+
     '<div class="imp">'+eur(d.total)+'</div></div>'+
-    (!esOficina() && !e ? '<div class="acc">'+(q?'<a class="btn peq" href="https://www.google.com/maps/dir/?api=1&destination='+q+'" target="_blank">📍 Ir</a>':'')+
-      (tel?'<a class="btn peq" href="tel:'+esc(tel)+'">📞 Llamar</a>':'')+
-      '<button class="btn peq" onclick="mover(\''+d.k+'\',-1)">↑</button><button class="btn peq" onclick="mover(\''+d.k+'\',1)">↓</button>'+
-      '<button class="btn peq primario" onclick="entregar(\''+d.k+'\')">✍️ Entregar</button></div>' : '')+
+    (!esOficina() && !e ? '<div class="acc">'+(q?'<a class="btn peq" href="https://www.google.com/maps/dir/?api=1&destination='+q+'" target="_blank">'+ico('pin')+' Cómo llegar</a>':'')+
+      (tel?'<a class="btn peq" href="tel:'+esc(tel)+'">'+ico('tel')+' Llamar</a>':'')+
+      '<button class="btn peq" onclick="mover(\''+d.k+'\',-1)" aria-label="Subir">'+ico('arr')+'</button><button class="btn peq" onclick="mover(\''+d.k+'\',1)" aria-label="Bajar">'+ico('aba')+'</button>'+
+      '<button class="btn peq primario" onclick="entregar(\''+d.k+'\')">'+ico('firma')+' Entregar y firmar</button></div>' : '')+
     '</div>';
 }
 function estadoAmbarx(e){
@@ -266,12 +302,12 @@ function pintarOficina(app, docs){
   var ag=S.ag||{}, minAg=ag.visto?(Date.now()-new Date(ag.visto).getTime())/60000:1e9;
   var aviso = minAg>3 ? 'El ordenador de AmbarX no responde'+(ag.visto?' desde las '+esc(String(ag.visto).slice(11,16)):'')+': las firmas y cobros no pasan a AmbarX. Tiene que estar encendido con Chrome y AmbarX abierto.'
             : (ag.ambarx==='login'||ag.ambarx==='caducada') ? 'AmbarX pide la contraseña en el ordenador de la oficina: hasta que alguien entre, las firmas y cobros no pasan a AmbarX.' : '';
-  var h=(aviso?'<div class="alerta mal">⚠ '+aviso+'</div>':'')+'<div class="fila-btn"><button class="btn primario" onclick="pedirLectura()">↻ Leer albaranes y facturas de AmbarX</button></div>'+
+  var h=(aviso?'<div class="alerta mal">'+aviso+'</div>':'')+'<div class="fila-btn"><button class="btn primario" onclick="pedirLectura()">'+ico('lect')+' Leer albaranes y facturas de AmbarX</button></div>'+
     '<div class="nota">'+(S.leido?'Leído de AmbarX a las '+esc(S.leido.slice(11,16)):'Sin leer todavía para este día')+(estadoPet?' · <b>'+estadoPet+'</b>':'')+'</div>';
   var t=totalesDe(docs);
   h+='<div class="resumen"><div><b>'+t.hechas+'/'+t.n+'</b><span>entregados</span></div><div><b>'+num(t.efectivo)+'</b><span>€ efectivo</span></div><div><b>'+num(t.tarjeta)+'</b><span>€ tarjeta</span></div></div>';
   if (!docs.length) h+='<div class="vacio">No hay albaranes ni facturas para este día.</div>';
-  if (grupos['']) h+='<div class="alerta mal">⚠ Hay '+grupos[''].length+' documento(s) sin repartidor en AmbarX: ningún repartidor los ve. Ábrelos y pulsa «Cambiar repartidor» (o «Recogen en la nave»).</div>';
+  if (grupos['']) h+='<div class="alerta mal">Hay '+grupos[''].length+' documento(s) sin repartidor en AmbarX: ningún repartidor los ve. Ábrelos y pulsa «Cambiar repartidor» (o «Recogen en la nave»).</div>';
   Object.keys(grupos).sort(function(a,b){ return a===''?-1:b===''?1:(+a)-(+b); }).forEach(function(c){
     var g=ordenar(grupos[c], c), tg=totalesDe(g), ab=S.filtroCom===c;
     h+='<h2><span onclick="S.filtroCom=S.filtroCom===\''+c+'\'?null:\''+c+'\';pintar()">'+(ab?'▾ ':'▸ ')+esc(nombreRep(c))+' · '+tg.hechas+'/'+tg.n+'</span>'+
@@ -308,7 +344,7 @@ function tablaLineas(d){
 function abrir(k){
   var d=S.docs[k]; if(!d) return; var e=S.ent[k];
   var h='<h3>'+esc(d.cliente)+'</h3><div class="nota">'+(d.tipo==='factura'?'Factura ':'Albarán ')+esc(d.num)+' · '+esc(nombreRep(comDe(d)))+'</div>'+
-    (function(){ var en=entrega(d); return '<div class="nota"><b>Entrega:</b> '+esc([en.nombre,en.direccion,en.poblacion].filter(Boolean).join(' · ')||'sin dirección')+(en.tel?' · 📞 '+esc(en.tel):'')+(en.reparto?'':' <i>(dirección fiscal de AmbarX)</i>')+(d.otraDireccion?' <b style="color:var(--rojo)">(en AmbarX tiene otra dirección de entrega)</b>':'')+'</div>'; })()+
+    (function(){ var en=entrega(d); return '<div class="nota"><b>Entrega:</b> '+esc([en.nombre,en.direccion,en.poblacion].filter(Boolean).join(' · ')||'sin dirección')+(en.tel?' · Tel. '+esc(en.tel):'')+(en.reparto?'':' <i>(dirección fiscal de AmbarX)</i>')+(d.otraDireccion?' <b style="color:var(--rojo)">(en AmbarX tiene otra dirección de entrega)</b>':'')+'</div>'; })()+
     tablaLineas(d);
   if (e) {
     h+='<label>Entrega</label><div class="nota">'+(e.estado==='incidencia'?'<b style="color:var(--rojo)">No entregado</b> · '+esc(e.motivo||''):'Entregado a las '+esc((e.hora||'').slice(11,16))+(e.recibe?' · recibe '+esc(e.recibe):'')+' · '+esc(textoCobro(e.cobro)))+(e.nota?'<br>Nota: '+esc(e.nota):'')+'<br>Por '+esc(e.por||'')+'</div>'+
@@ -316,8 +352,8 @@ function abrir(k){
       '<div style="margin-top:6px">'+estadoAmbarx(e)+'</div>'+((e.ambarx||{}).para&&(e.ambarx.para.length)?'<div class="nota">Enviado a '+esc(e.ambarx.para.join(', '))+'</div>':'')+((e.ambarx||{}).error?'<div class="nota" style="color:var(--rojo)">'+esc(e.ambarx.error)+'</div>':'')+
       (esOficina() && e.ambarx && (e.ambarx.firma==='error'||e.ambarx.email==='error'||e.ambarx.cobro==='error'||e.ambarx.pdf==='error') ? '<div class="fila-btn"><button class="btn peq" onclick="reintentarAmbarx(\''+k+'\')">Reintentar en AmbarX</button></div>':'');
   }
-  h+='<div class="fila-btn">'+(!e && !esOficina()?'<button class="btn primario" onclick="entregar(\''+k+'\')">✍️ Entregar y firmar</button>':'')+
-    (e && e.estado!=='incidencia'?'<button class="btn" onclick="pdfOficial(\''+k+'\')">📄 '+(d.tipo==='factura'?'Factura':'Albarán')+' firmado (AmbarX)</button>':'')+
+  h+='<div class="fila-btn">'+(!e && !esOficina()?'<button class="btn primario" onclick="entregar(\''+k+'\')">'+ico('firma')+' Entregar y firmar</button>':'')+
+    (e && e.estado!=='incidencia'?'<button class="btn" onclick="pdfOficial(\''+k+'\')">'+ico('doc')+' '+(d.tipo==='factura'?'Factura':'Albarán')+' firmado (AmbarX)</button>':'')+
     (e?'<button class="btn peligro" onclick="deshacer(\''+k+'\')">Deshacer entrega</button>':'')+
     (esOficina()?'<button class="btn" onclick="reasignar(\''+k+'\')">Cambiar repartidor</button><button class="btn" onclick="editarDir(\''+k+'\')">Dirección de entrega</button>':'')+
     '<button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
@@ -366,16 +402,17 @@ var F = null;
 function entregar(k){
   var d=S.docs[k];
   F={ k:k, forma:null, firma:null };
-  var h='<h3>'+esc(d.cliente)+'</h3><div class="nota">'+(d.tipo==='factura'?'Factura ':'Albarán ')+esc(d.num)+' · <b>'+eur(d.total)+'</b></div>'+
-    '<details style="margin:6px 0"><summary class="nota">Ver lo que lleva ('+(d.lineas||[]).length+' líneas)</summary>'+tablaLineas(d)+'</details>'+
-    '<label>Cobro</label><div class="chips" id="chCobro">'+
-      [['efectivo','💶 Efectivo'],['tarjeta','💳 Tarjeta'],['transferencia','🏦 Transferencia'],['pendiente','No cobra']].map(function(x){ return '<button data-f="'+x[0]+'">'+x[1]+'</button>'; }).join('')+'</div>'+
+  var h='<h3>'+esc(d.cliente)+'</h3>'+
+    '<div class="doc-cab"><div><div class="t">'+(d.tipo==='factura'?'Factura':'Albarán')+'</div><div style="font-weight:600">'+esc(d.num)+'</div></div><div style="text-align:right"><div class="t">Total con IVA</div><div class="v">'+eur(d.total)+'</div></div></div>'+
+    '<details style="margin:8px 0"><summary class="nota">Ver lo que lleva ('+(d.lineas||[]).length+' líneas)</summary>'+tablaLineas(d)+'</details>'+
+    '<div class="paso"><i>1</i>Cobro</div><div class="chips" id="chCobro">'+
+      [['efectivo',ico('efe')+' Efectivo'],['tarjeta',ico('tar')+' Tarjeta'],['transferencia',ico('ban')+' Transferencia'],['pendiente',ico('no')+' No cobra']].map(function(x){ return '<button data-f="'+x[0]+'">'+x[1]+'</button>'; }).join('')+'</div>'+
     '<div id="cajaImp" style="display:none"><label>Importe cobrado</label><input id="imp" type="number" inputmode="decimal" step="0.01" value="'+(+d.total||0).toFixed(2)+'"></div>'+
-    '<label>Firma del cliente</label><div id="cajaFirma" onclick="abrirPad()">✍️ Toca aquí para que firme el cliente</div>'+
+    '<div class="paso"><i>2</i>Firma del cliente</div><div id="cajaFirma" onclick="abrirPad()">'+ico('firma')+'<span>Toca para que firme el cliente</span></div>'+
     '<div class="nota" style="margin-top:6px">Al guardar, el '+(d.tipo==='factura'?'documento':'albarán')+' firmado se guarda en AmbarX y se le envía al cliente por email.</div>'+
-    '<label>Nombre de quien recibe (opcional)</label><input id="recibe" autocomplete="off">'+
+    '<div class="paso"><i>3</i>Datos de la entrega</div><label style="margin-top:4px">Nombre de quien recibe (opcional)</label><input id="recibe" autocomplete="off">'+
     '<label>Nota (opcional)</label><input id="notaE" autocomplete="off" placeholder="Ej.: dejado en la trastienda">'+
-    '<div class="fila-btn"><button class="btn verde" onclick="guardarEntrega()">✔ Guardar entrega</button></div>'+
+    '<div class="fila-btn" style="margin-top:20px"><button class="btn verde" style="min-height:52px;font-size:16px" onclick="guardarEntrega()">'+ico('ok')+' Guardar entrega</button></div>'+
     '<div class="fila-btn"><button class="btn peligro" onclick="noEntregado()">No se ha podido entregar</button><button class="btn" onclick="cerrarVelo()">Cancelar</button></div>';
   velo(h);
   document.querySelectorAll('#chCobro button').forEach(function(b){ b.onclick=function(){
@@ -388,9 +425,9 @@ var P=null;
 function abrirPad(){
   var d=S.docs[F.k];
   var v=document.createElement('div'); v.className='pad'; v.id='pad';
-  v.innerHTML='<div class="cab"><b>'+esc(d.cliente)+'</b><br>'+(d.tipo==='factura'?'Factura ':'Albarán ')+esc(d.num)+' · '+eur(d.total)+' · Firme con el dedo en la zona blanca</div>'+
+  v.innerHTML='<div class="cab"><b>'+esc(d.cliente)+'</b><br>'+(d.tipo==='factura'?'Factura ':'Albarán ')+esc(d.num)+' · '+eur(d.total)+' · Firme con el dedo sobre la línea</div>'+
     '<div class="area"><canvas id="lienzo"></canvas><div class="linea-firma"></div></div>'+
-    '<div class="pie"><button class="btn" onclick="cerrarPad()">Cancelar</button><button class="btn" onclick="limpiarPad()">Borrar</button><button class="btn verde" onclick="aceptarPad()">✔ Listo</button></div>';
+    '<div class="pie"><button class="btn" onclick="cerrarPad()">Cancelar</button><button class="btn" onclick="limpiarPad()">Borrar</button><button class="btn verde" onclick="aceptarPad()">'+ico('ok')+' Firma lista</button></div>';
   document.body.appendChild(v);
   try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function(){}); }catch(e){}
   setTimeout(iniciarLienzo,60);
@@ -440,7 +477,7 @@ function guardarEntrega(){
 function ofrecerPdf(k, e0){
   var d=S.docs[k];
   var e=e0||S.ent[k]||{};
-  velo('<h3>Entrega guardada ✔</h3><div class="nota">'+esc(d.cliente)+' · '+esc(d.num)+'</div>'+(e.firma?'<div class="alerta ok">En un par de minutos el '+(d.tipo==='factura'?'documento':'albarán')+' firmado queda guardado en AmbarX y se le envía al cliente por email.</div>':'')+'<div class="nota">Cuando salga «Firmado en AmbarX» podrás mandar el '+(d.tipo==='factura'?'documento':'albarán')+' oficial por WhatsApp desde la entrega (botón 📄).</div><div class="fila-btn"><button class="btn" onclick="cerrarVelo()">Seguir con el reparto</button></div>');
+  velo('<h3>'+ico('ok')+' Entrega guardada</h3><div class="nota">'+esc(d.cliente)+' · '+esc(d.num)+'</div>'+(e.firma?'<div class="alerta ok">En un par de minutos el '+(d.tipo==='factura'?'documento':'albarán')+' firmado queda guardado en AmbarX y se le envía al cliente por email.</div>':'')+'<div class="nota">Cuando salga «Firmado en AmbarX» podrás mandar el '+(d.tipo==='factura'?'documento':'albarán')+' oficial por WhatsApp desde la entrega (botón 📄).</div><div class="fila-btn"><button class="btn" onclick="cerrarVelo()">Seguir con el reparto</button></div>');
 }
 function noEntregado(){
   var m=prompt('¿Por qué no se ha entregado? (cerrado, no está, rechaza…)'); if(m===null) return;
@@ -504,9 +541,9 @@ function hojaRuta(c){
 // ---------- menú ----------
 function menu(){
   var h='<h3>'+esc(nombreYo())+'</h3><div class="fila-btn" style="flex-direction:column">'+
-    '<button class="btn primario" onclick="elegirQuien()">👤 Cambiar de repartidor</button>'+
-    (esOficina()?'<button class="btn" onclick="caja()">Caja del día por repartidor</button><a class="btn" style="text-align:center;text-decoration:none" href="pedidos.html">Ir a la app de pedidos</a>':'<button class="btn" onclick="pedirLectura();cerrarVelo()">↻ Pedir lectura de AmbarX</button>')+
-    (esApp()?'':'<button class="btn" onclick="try{localStorage.removeItem(\'bf_rep_noinst\')}catch(e){};cerrarVelo();pintarInstalar()">📲 Instalar como app</button>')+
+    '<button class="btn primario" onclick="elegirQuien()">Cambiar de repartidor</button>'+
+    (esOficina()?'<button class="btn" onclick="caja()">Caja del día por repartidor</button><a class="btn" style="text-align:center;text-decoration:none" href="pedidos.html">Ir a la app de pedidos</a>':'<button class="btn" onclick="pedirLectura();cerrarVelo()">'+ico('lect')+' Pedir lectura de AmbarX</button>')+
+    (esApp()?'':'<button class="btn" onclick="try{localStorage.removeItem(\'bf_rep_noinst\')}catch(e){};cerrarVelo();pintarInstalar()">Instalar como app</button>')+
     '<button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
   velo(h);
 }
@@ -589,8 +626,8 @@ function elegirQuien(){
   var r=reps();
   var h='<h3>¿Quién eres?</h3><div class="nota">Elige tu nombre para ver tus entregas. El móvil lo recordará.</div><div class="fila-btn" style="flex-direction:column">'+
     Object.keys(r).sort(function(a,b){return a-b;}).map(function(c){
-      return '<button class="btn'+(quien()===c?' primario':'')+'" style="padding:15px;font-size:16px" onclick="ponerQuien(\''+c+'\')">'+(r[c].nave?'🏬 ':'🚚 ')+esc(r[c].nombre)+(r[c].nave?' (almacén)':'')+'</button>'; }).join('')+
-    '<button class="btn'+(quien()==='oficina'?' primario':'')+'" style="padding:15px;font-size:16px" onclick="ponerQuien(\'oficina\')">🏢 Oficina (ver todos)</button></div>';
+      return '<button class="btn'+(quien()===c?' primario':'')+'" style="padding:15px;font-size:16px" onclick="ponerQuien(\''+c+'\')">'+''+esc(r[c].nombre)+(r[c].nave?' (almacén)':'')+'</button>'; }).join('')+
+    '<button class="btn'+(quien()==='oficina'?' primario':'')+'" style="padding:15px;font-size:16px" onclick="ponerQuien(\'oficina\')">Oficina (ver todos)</button></div>';
   velo(h);
   var v=document.getElementById('velo'); if(v) v.onclick=null; // no se cierra tocando fuera
 }
