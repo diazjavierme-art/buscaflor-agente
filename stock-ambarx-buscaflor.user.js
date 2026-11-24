@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.6
+// @version      0.9.7
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -418,8 +418,8 @@
     return { email: 'enviado', para };
   }
 
-  // Cobro en AmbarX (botón € del documento › Gestión de cobros): efectivo = EF, tarjeta = TP
-  const FORMA_AMBARX = { efectivo: 'EF', tarjeta: 'TP' };
+  // Cobro en AmbarX (botón € del documento › Gestión de cobros): efectivo = EF, tarjeta = TPV (Javier, 24-11-2026)
+  const FORMA_AMBARX = { efectivo: 'EF', tarjeta: 'TPV' };
   async function cobrarEnAmbarx(doc, codigo, importe) {
     const W = doc.defaultView;
     const eur = await hastaQue(() => hondo(doc, 'vaadin-button').find(b => { const i = b.querySelector('vaadin-icon'); return i && i.getAttribute('icon') === 'vaadin:euro'; }), 40000);
