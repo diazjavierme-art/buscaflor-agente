@@ -116,7 +116,7 @@ async function sesion() {
   const page = (await browser.pages())[0] || await browser.newPage();
   await page.evaluateOnNewDocument(c => { if (window.top === window.self) { try { (0, eval)(c); } catch (e) { console.error('[bf-robot] script', e); } } }, codigo);
   page.on('console', m => { const t = m.text(); if (/\[bf-|Error/i.test(t)) log('página:', t.slice(0, 300)); });
-  page.on('dialog', d => { log('Diálogo:', d.message().slice(0, 200)); d.dismiss().catch(() => {}); });
+  page.on('dialog', d => { if (d.type() === 'beforeunload') { d.accept().catch(() => {}); return; } log('Diálogo (' + d.type() + '):', d.message().slice(0, 200)); d.dismiss().catch(() => {}); });
   await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }).catch(e => log('goto:', e.message));
   let ultimaRevisionScript = Date.now(), fallos = 0;
   let primera = true;
