@@ -67,6 +67,28 @@ async function entrarSiHaceFalta(page) {
   return true;
 }
 
+
+// Pantalla «Elegir empresa» tras iniciar sesión: elige la de Buscaflor
+async function elegirEmpresaSiHaceFalta(page) {
+  const r = await page.evaluate((emp) => {
+    const hondo = (raiz, sel) => { const out = []; const w = n => { if (!n || !n.querySelectorAll) return; n.querySelectorAll(sel).forEach(e => out.push(e)); n.querySelectorAll('*').forEach(e => { if (e.shadowRoot) w(e.shadowRoot); }); }; w(raiz); return out; };
+    const txt = (document.body && document.body.innerText) || '';
+    if (!/(elegir|elija|seleccion[ae]r?|seleccione)\s+(la\s+|una\s+)?empresa/i.test(txt) && !/\/empresa|seleccion-empresa|elegir-empresa/i.test(location.pathname)) return 'no';
+    const re = new RegExp(emp, 'i');
+    const cand = hondo(document, 'vaadin-grid-cell-content, vaadin-item, vaadin-select-item, vaadin-combo-box-item, vaadin-button, button, a, li, div, span')
+      .filter(e => re.test(e.textContent || '') && (e.textContent || '').length < 120)
+      .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length);
+    const el = cand[0]; if (!el) return 'sinEmpresa';
+    for (const t of ['mousedown', 'mouseup', 'click', 'dblclick']) el.dispatchEvent(new MouseEvent(t, { bubbles: true, composed: true }));
+    setTimeout(() => { const b = hondo(document, 'vaadin-button, button').find(x => /^(Aceptar|Entrar|Acceder|Seleccionar|Continuar)$/i.test((x.textContent || '').trim())); if (b) b.click(); }, 1500);
+    return 'elegida';
+  }, CFG.empresa || 'BUSCAFLOR').catch(() => 'no');
+  if (r === 'no') return false;
+  log(r === 'elegida' ? 'Elegida la empresa de Buscaflor' : 'Pantalla de elegir empresa, pero no encuentro Buscaflor');
+  await espera(6000);
+  return true;
+}
+
 async function sesion() {
   await bajarScript();
   log('Arrancando Chrome' + (VISIBLE ? ' visible' : ' invisible') + ' con el script ' + version);
@@ -86,6 +108,7 @@ async function sesion() {
   while (browser.isConnected()) {
     await espera(30000);
     try {
+      if (await elegirEmpresaSiHaceFalta(page)) continue;
       if (await entrarSiHaceFalta(page)) { await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }).catch(() => {}); continue; }
       const vivo = await page.evaluate(() => !!window.__bfRobot && !/sesión ha caducado|session expired/i.test(document.body ? document.body.innerText.slice(0, 3000) : '')).catch(() => false);
       if (!vivo) { if (++fallos >= 3) { log('La página no responde: recargando'); fallos = 0; await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }).catch(() => {}); } }
