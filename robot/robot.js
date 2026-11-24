@@ -53,13 +53,17 @@ async function entrarSiHaceFalta(page) {
   log('AmbarX pide iniciar sesión: entrando con el usuario del robot');
   const ok = await page.evaluate((u, c) => {
     const hondo = (raiz, sel) => { const out = []; const w = n => { if (!n || !n.querySelectorAll) return; n.querySelectorAll(sel).forEach(e => out.push(e)); n.querySelectorAll('*').forEach(e => { if (e.shadowRoot) w(e.shadowRoot); }); }; w(raiz); return out; };
-    const us = hondo(document, 'vaadin-text-field[name="username"], input[name="username"], input[autocomplete="username"]')[0];
-    const pw = hondo(document, 'vaadin-password-field[name="password"], input[name="password"], input[type="password"]')[0];
+    const vis = e => e && e.getBoundingClientRect().width > 0;
+    const us = hondo(document, 'vaadin-text-field[name="username"], input[name="username"], input[autocomplete="username"]')[0]
+      || hondo(document, 'vaadin-text-field, vaadin-email-field').find(f => vis(f) && /usuario|correo|user/i.test(f.label || f.getAttribute('aria-label') || ''))
+      || hondo(document, 'input[type="text"], input[type="email"]').find(vis);
+    const pw = hondo(document, 'vaadin-password-field, input[name="password"], input[type="password"]').find(vis);
     if (!us || !pw) return false;
-    for (const [el, v] of [[us, u], [pw, c]]) { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }
-    const btn = hondo(document, 'vaadin-button[theme~="submit"], vaadin-button[part="submit"], button[type="submit"]')[0];
+    for (const [el, v] of [[us, u], [pw, c]]) { el.focus && el.focus(); el.value = v; const inp = el.inputElement || (el.querySelector && el.querySelector('input')); if (inp && inp !== el) { inp.value = v; inp.dispatchEvent(new Event('input', { bubbles: true })); } el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }
+    const btn = hondo(document, 'vaadin-button[theme~="submit"], vaadin-button[part="submit"], button[type="submit"]')[0]
+      || hondo(document, 'vaadin-button, button').find(b => /iniciar sesi[oó]n|entrar|acceder/i.test((b.textContent || '').trim()));
     const form = hondo(document, 'vaadin-login-form')[0];
-    if (btn) btn.click(); else if (form && form.submit) form.submit();
+    setTimeout(() => { if (btn) btn.click(); else if (form && form.submit) form.submit(); }, 500);
     return true;
   }, CFG.usuario, CFG.clave).catch(() => false);
   if (!ok) { log('No encuentro los campos de usuario y contraseña de AmbarX'); return true; }
@@ -105,8 +109,9 @@ async function sesion() {
   page.on('dialog', d => { log('Diálogo:', d.message().slice(0, 200)); d.dismiss().catch(() => {}); });
   await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }).catch(e => log('goto:', e.message));
   let ultimaRevisionScript = Date.now(), fallos = 0;
+  let primera = true;
   while (browser.isConnected()) {
-    await espera(30000);
+    await espera(primera ? 8000 : 30000); primera = false;
     try {
       if (await elegirEmpresaSiHaceFalta(page)) continue;
       if (await entrarSiHaceFalta(page)) { await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }).catch(() => {}); continue; }
