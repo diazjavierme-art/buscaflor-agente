@@ -72,19 +72,23 @@ async function entrarSiHaceFalta(page) {
 }
 
 
-// Pantalla «Elegir empresa» tras iniciar sesión: elige la de Buscaflor
+// Pantalla de elegir empresa tras iniciar sesión (rejilla «Buscar empresa...»): elige la de Buscaflor
 async function elegirEmpresaSiHaceFalta(page) {
   const r = await page.evaluate((emp) => {
     const hondo = (raiz, sel) => { const out = []; const w = n => { if (!n || !n.querySelectorAll) return; n.querySelectorAll(sel).forEach(e => out.push(e)); n.querySelectorAll('*').forEach(e => { if (e.shadowRoot) w(e.shadowRoot); }); }; w(raiz); return out; };
+    const buscar = hondo(document, 'vaadin-text-field, input').find(f => /buscar empresa/i.test(f.placeholder || f.getAttribute('placeholder') || ''));
     const txt = (document.body && document.body.innerText) || '';
-    if (!/(elegir|elija|seleccion[ae]r?|seleccione)\s+(la\s+|una\s+)?empresa/i.test(txt) && !/\/empresa|seleccion-empresa|elegir-empresa/i.test(location.pathname)) return 'no';
+    if (!buscar && !/(elegir|elija|seleccione)\s+(la\s+|una\s+)?empresa/i.test(txt)) return 'no';
     const re = new RegExp(emp, 'i');
-    const cand = hondo(document, 'vaadin-grid-cell-content, vaadin-item, vaadin-select-item, vaadin-combo-box-item, vaadin-button, button, a, li, div, span')
-      .filter(e => re.test(e.textContent || '') && (e.textContent || '').length < 120)
-      .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length);
-    const el = cand[0]; if (!el) return 'sinEmpresa';
-    for (const t of ['mousedown', 'mouseup', 'click', 'dblclick']) el.dispatchEvent(new MouseEvent(t, { bubbles: true, composed: true }));
-    setTimeout(() => { const b = hondo(document, 'vaadin-button, button').find(x => /^(Aceptar|Entrar|Acceder|Seleccionar|Continuar)$/i.test((x.textContent || '').trim())); if (b) b.click(); }, 1500);
+    const celda = hondo(document, 'vaadin-grid-cell-content').find(c => re.test(c.textContent || ''));
+    if (!celda) return 'sinEmpresa';
+    const clic = el => { for (const t of ['mousedown', 'mouseup', 'click']) el.dispatchEvent(new MouseEvent(t, { bubbles: true, composed: true })); };
+    let hecho = false;
+    try {
+      const tr = celda.assignedSlot && celda.assignedSlot.parentElement && celda.assignedSlot.parentElement.parentElement;
+      if (tr) for (const td of tr.children) { const sl = td.querySelector('slot'); const c = sl && sl.assignedNodes()[0]; if (!c || c === celda) continue; const boton = c.querySelector && (c.querySelector('vaadin-button, button, vaadin-icon, a') || c); if (boton) { clic(boton); hecho = true; break; } }
+    } catch (e) {}
+    if (!hecho) { clic(celda); celda.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, composed: true })); }
     return 'elegida';
   }, CFG.empresa || 'BUSCAFLOR').catch(() => 'no');
   if (r === 'no') return false;
