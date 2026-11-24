@@ -322,6 +322,100 @@ async function grabarVerdnatura(browser) {
   } finally { await page.close().catch(() => {}); }
 }
 
+// ---------------- Cobros pendientes de clientes (informe de AmbarX, formato detallado por cliente) ----------------
+// Cada mañana (7:00, lunes a sábado) y cuando se pide desde la app: informe de todos los clientes -> buscaflor/cobros/resumen (+ PDF).
+// Por cliente: buscaflor/cobros/envios/<id> {cliente, para, estado:'pedido'} -> el robot genera el PDF de ese cliente (estado 'pdfListo')
+// y el buzón (Apps Script) lo envía por email. buscaflor/cobros/pdf/<cliente> {estado:'pedido'} -> solo genera el PDF para verlo.
+async function informeCobros(page, cliente) {
+  await irAmbarx(page, 'articulos'); await irAmbarx(page, 'informe/cobrospendientesclientes');
+  if (cliente !== undefined && cliente !== null && cliente !== '') {
+    const ok = await page.evaluate(new Function(HONDO + "const y=t=>{const e=hondo(document,'label,span').find(e=>vis(e)&&(e.textContent||'').trim()===t); return e?e.getBoundingClientRect().y:null}; const y1=y('Cliente'), y2=y('Comercial'); if(y1===null||y2===null) return 0; window.__bfCf=hondo(document,'vaadin-text-field').filter(f=>vis(f)&&f.getBoundingClientRect().y>y1&&f.getBoundingClientRect().y<y2); return window.__bfCf.length;"));
+    if (ok < 2) throw new Error('no encuentro los campos de cliente del informe');
+    for (const i of [0, 1]) {
+      await page.evaluate(i => { window.__bfCf[i].inputElement.focus(); window.__bfCf[i].inputElement.select(); }, i);
+      await page.keyboard.type(String(cliente)); await espera(700);
+    }
+    await page.evaluate(() => window.__bfCf[1].inputElement.blur()); await espera(1000);
+  }
+  const src0 = await page.evaluate(new Function(HONDO + "const s=hondo(document,'vaadin-select').find(x=>x.label==='Formato'); if(!s) return 'NOSEL'; s.value='3'; const v=hondo(document,'vcf-pdf-viewer')[0]; return v?v.src||'':'';"));
+  if (src0 === 'NOSEL') throw new Error('no encuentro el formato del informe');
+  await espera(800);
+  await page.evaluate(new Function(HONDO + "hondo(document,'vaadin-button').find(b=>/Generar informe/.test(b.innerText||'')).click();"));
+  for (let i = 0; i < 60; i++) {
+    await espera(1000);
+    const r = await page.evaluate(new Function('src0', HONDO + `const v=hondo(document,'vcf-pdf-viewer')[0];
+      if(!v||!v.src||v.src===src0||!v.__viewer||!v.__viewer.pdfDocument) return null;
+      return (async()=>{ const doc=v.__viewer.pdfDocument; const pags=[]; for(let p=1;p<=doc.numPages;p++){ const pg=await doc.getPage(p); const tc=await pg.getTextContent(); pags.push(tc.items.map(i=>i.str).filter(s=>s.trim()).join('|')); }
+        const b=new Uint8Array(await (await fetch(v.src,{credentials:'include'})).arrayBuffer()); let s=''; for(let i=0;i<b.length;i+=8192) s+=String.fromCharCode.apply(null,b.subarray(i,i+8192));
+        return {texto:pags.join('|'), pdf64:btoa(s), bytes:b.length}; })();`), src0).catch(() => null);
+    if (r) return r;
+  }
+  throw new Error('AmbarX no generó el informe de cobros pendientes');
+}
+function leerCobros(texto) {
+  const n = s => parseFloat(String(s).replace(/\./g, '').replace(',', '.')) || 0;
+  const tk = texto.split('|'), clientes = {}; let cli = null;
+  const esDoc = x => /^(Factura|Albarán|Albaran|Pedido|Efecto|Recibo|Abono|Talón|Pagaré|Letra)/.test(x);
+  for (let i = 0; i < tk.length; i++) {
+    if (tk[i] === 'Cliente:' && tk[i + 1]) { const m = /^(\S+)\s*\/\s*(.+)$/.exec(tk[i + 1].trim()); if (m) { cli = m[1]; clientes[cli] = clientes[cli] || { codigo: cli, nombre: m[2].trim(), docs: [], pendiente: 0, total: 0, pagado: 0, masAntiguo: 0 }; } continue; }
+    if (cli && esDoc(tk[i])) {
+      const seq = []; let j = i + 1;
+      while (j < tk.length && !esDoc(tk[j]) && !/^(TOTALES|Cliente:|AmbarX)/.test(tk[j])) { seq.push(tk[j]); j++; }
+      if (seq.length < 4) continue;
+      const m = /^(.*?)\s+(\S+)$/.exec(tk[i].trim());
+      const d = { tipo: /^Albar/.test(tk[i]) ? 'albaran' : /^Factura/.test(tk[i]) ? 'factura' : (m ? m[1] : tk[i]).toLowerCase(), numero: m ? m[2] : tk[i], fecha: seq[0], total: n(seq[seq.length - 1]), dias: parseInt(seq[seq.length - 2], 10) || 0 };
+      if (seq.length === 4) { d.pagado = 0; d.pendiente = n(seq[1]); } else { d.pagado = n(seq[1]); d.pendiente = n(seq[2]); if (/\d+\/\d+\/\d+/.test(seq[3])) d.ultimoCobro = seq[3]; }
+      const c = clientes[cli]; c.docs.push(d); c.pendiente += d.pendiente; c.total += d.total; c.pagado += d.pagado; c.masAntiguo = Math.max(c.masAntiguo, d.dias);
+    }
+  }
+  const lista = Object.values(clientes).map(c => ({ ...c, pendiente: Math.round(c.pendiente * 100) / 100, total: Math.round(c.total * 100) / 100, pagado: Math.round(c.pagado * 100) / 100 }));
+  const res = { clientes: {}, pendiente: 0, total: 0, documentos: 0 };
+  for (const c of lista) { res.clientes[c.codigo.replace(/[.#$\/\[\]]/g, '-')] = c; res.pendiente += c.pendiente; res.total += c.total; res.documentos += c.docs.length; }
+  res.pendiente = Math.round(res.pendiente * 100) / 100; res.total = Math.round(res.total * 100) / 100;
+  const tot = /PENDIENTE\|([\d.,]+)\s*€/.exec(texto); res.pendienteInforme = tot ? n(tot[1]) : null;
+  return res;
+}
+let cobUltimoDia = '', cobOcupado = false;
+async function vigilarCobros(browser) {
+  if (cobOcupado) return; cobOcupado = true;
+  let page = null;
+  try {
+    const h = new Date(), hoy = ahoraLocal().slice(0, 10);
+    const pet = await fb('GET', 'buscaflor/peticiones/cobros').catch(() => null);
+    const general = (h.getDay() !== 0 && h.getHours() === 7 && cobUltimoDia !== hoy) || (pet && pet.estado === 'pedida');
+    const envios = (await fb('GET', 'buscaflor/cobros/envios').catch(() => null)) || {};
+    const pdfs = (await fb('GET', 'buscaflor/cobros/pdf').catch(() => null)) || {};
+    const pendEnv = Object.entries(envios).filter(([, e]) => e && e.estado === 'pedido');
+    const pendPdf = Object.entries(pdfs).filter(([, e]) => e && e.estado === 'pedido');
+    if (!general && !pendEnv.length && !pendPdf.length) return;
+    page = await browser.newPage();
+    await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }); await espera(6000);
+    if (general) {
+      cobUltimoDia = hoy;
+      if (pet && pet.estado === 'pedida') await fb('PATCH', 'buscaflor/peticiones/cobros', { estado: 'enCurso' }).catch(() => {});
+      try {
+        const r = await informeCobros(page, null);
+        const res = leerCobros(r.texto);
+        await fb('PUT', 'buscaflor/cobros/resumen', { ...res, leido: ahoraLocal() });
+        await fb('PUT', 'buscaflor/cobros/pdfGeneral', { fecha: ahoraLocal(), pdf64: r.pdf64, bytes: r.bytes });
+        log('Cobros pendientes: ' + Object.keys(res.clientes).length + ' clientes, ' + res.documentos + ' documentos, ' + res.pendiente + ' € pendientes' + (res.pendienteInforme !== null && Math.abs(res.pendienteInforme - res.pendiente) > 0.05 ? ' (OJO: el informe dice ' + res.pendienteInforme + ')' : ''));
+        if (pet && pet.estado === 'pedida') await fb('PATCH', 'buscaflor/peticiones/cobros', { estado: 'hecha', hecho: ahoraLocal(), error: null }).catch(() => {});
+      } catch (e) { log('Cobros pendientes: error', e.message); if (pet && pet.estado === 'pedida') await fb('PATCH', 'buscaflor/peticiones/cobros', { estado: 'error', error: e.message }).catch(() => {}); }
+    }
+    for (const [id, e] of pendEnv.concat(pendPdf.map(([c, e]) => ['pdf:' + c, { ...e, cliente: c }]))) {
+      const esPdf = id.startsWith('pdf:'), ruta = esPdf ? 'buscaflor/cobros/pdf/' + id.slice(4) : 'buscaflor/cobros/envios/' + id;
+      try {
+        await fb('PATCH', ruta, { estado: 'generando' });
+        const r = await informeCobros(page, e.cliente);
+        const res = leerCobros(r.texto);
+        const c = Object.values(res.clientes)[0] || null;
+        await fb('PATCH', ruta, { estado: esPdf ? 'listo' : 'pdfListo', pdf64: r.pdf64, bytes: r.bytes, generado: ahoraLocal(), pendiente: c ? c.pendiente : 0, documentos: c ? c.docs.length : 0, nombre: c ? c.nombre : (e.nombre || '') });
+        log('Cobros pendientes: PDF del cliente ' + e.cliente + (esPdf ? ' para ver' : ' para enviar a ' + (e.para || '?')) + ' (' + (c ? c.pendiente : 0) + ' €)');
+      } catch (err) { log('Cobros pendientes: error con el cliente ' + e.cliente + ': ' + err.message); await fb('PATCH', ruta, { estado: 'error', error: err.message }).catch(() => {}); }
+    }
+  } finally { cobOcupado = false; if (page) await page.close().catch(() => {}); }
+}
+
 async function vigilarVerdnatura(browser) {
   const h = new Date(), hoy = ahoraLocal().slice(0, 10);
   if (h.getDay() !== 0 && h.getHours() === 15 && vnUltimoDia !== hoy) { vnUltimoDia = hoy; await leerVerdnatura(browser, '15:00'); await grabarVerdnatura(browser); return; }
@@ -362,6 +456,7 @@ async function sesion() {
       if (!vivo) { if (++fallos >= 3) { log('La página no responde: recargando'); fallos = 0; await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }).catch(() => {}); } }
       else fallos = 0;
       if (!VISIBLE) await vigilarVerdnatura(browser).catch(e => log('Verdnatura:', e.message));
+      if (!VISIBLE) vigilarCobros(browser).catch(e => log('Cobros:', e.message));
       if (Date.now() - ultimaRevisionScript > 30 * 60000) {
         ultimaRevisionScript = Date.now();
         if (await bajarScript()) { log('Hay versión nueva del script (' + version + '): reiniciando'); await browser.close().catch(() => {}); return; }
