@@ -39,7 +39,7 @@ try {
   $cfg = [ordered]@{ ambarxUrl = 'http://localhost:9070/AmbarX/'; usuario = $u; clave = $c; chrome = $chrome; perfil = (Join-Path $dir 'perfil'); visible = $false }
   $cfgPath = Join-Path $dir 'config.json'
   ($cfg | ConvertTo-Json) | Out-File -Encoding utf8 $cfgPath
-  icacls $cfgPath /inheritance:r /grant:r "*S-1-5-18:F" "*S-1-5-32-544:F" | Out-Null   # solo SYSTEM y Administradores
+  icacls $cfgPath /inheritance:r /grant:r "*S-1-5-18:F" "*S-1-5-32-544:F" "$($env:USERNAME):R" | Out-Null   # solo SYSTEM y Administradores
   New-Item -ItemType Directory -Force (Join-Path $dir 'perfil') | Out-Null
 
   Paso "Creando la tarea de Windows 'Buscaflor Robot AmbarX'"
