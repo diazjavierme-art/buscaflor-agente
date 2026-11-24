@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.12
+// @version      0.9.13
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -453,7 +453,9 @@
       // Para saber qué enseña AmbarX: valores de los campos de la ventana y textos de listas abiertas
       const vals = [...caja.querySelectorAll('vaadin-custom-field,vaadin-text-field,vaadin-combo-box')].map(x => (x.label || '?') + '=' + String(x.value || '')).join(' | ');
       const pops = hondo(doc, 'vaadin-grid-cell-content,vaadin-combo-box-item,vaadin-item').map(x => (x.textContent || '').trim()).filter(t => /\bT[A-Z]*\b/.test(t)).slice(0, 15).join(' ; ');
-      cancelar(); throw new Error('AmbarX no reconoce la forma de pago ' + codigo + ' · campos: ' + vals.slice(0, 400) + ' · listas: ' + pops.slice(0, 400));
+      const cf = [...caja.querySelectorAll('vaadin-custom-field')].map(x => (x.label || x.getAttribute('label') || '?') + ':' + [...x.querySelectorAll('vaadin-text-field')].map(t => t.value).join('/')).join(' | ');
+      const txt = (dlg || caja).innerText.replace(/\s+/g, ' ').slice(0, 700);
+      cancelar(); throw new Error('AmbarX no reconoce la forma de pago ' + codigo + ' · campos: ' + vals.slice(0, 300) + ' · grupos: ' + cf.slice(0, 300) + ' · texto: ' + txt + ' · listas: ' + pops.slice(0, 200));
     }
     const imp = tfs.find(t => t.label === 'Importe contado');
     imp.value = String(importe.toFixed(2)).replace('.', ','); imp.dispatchEvent(new W.CustomEvent('change', { bubbles: true }));
