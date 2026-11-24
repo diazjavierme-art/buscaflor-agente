@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.5
+// @version      0.9.6
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -862,7 +862,13 @@
       const hoyC = ahoraISO().slice(0, 10), mC = new Date().getHours() * 60 + new Date().getMinutes();
       if (pc && pc.pedido && pc.estado === 'pedido' && (!pc.atendido || pc.pedido > pc.atendido)) { await subirCatalogo(pc.pedido); return; }
       if (mC >= CAT_DESDE && (!pc || !pc.hecho || String(pc.hecho).slice(0, 10) < hoyC) && !(pc && pc.estado === 'error' && String(pc.atendido || '').slice(0, 10) === hoyC && Date.now() - new Date(pc.atendido).getTime() < 3600000)) { await subirCatalogo(null); return; }
-      const h = new Date(), min = h.getHours() * 60 + h.getMinutes();
+      const h = new Date(), min = h.getHours() * 60 + h.getMinutes(), hoyR = ahoraISO().slice(0, 10);
+      // Ventas del día: repaso de noche (20:00) para coger lo hecho por la tarde, y repaso del día anterior a primera hora (6:15)
+      if (h.getDay() !== 0 && min >= 20 * 60 && localStorage.getItem('bf_rep_noche') !== hoyR) { localStorage.setItem('bf_rep_noche', hoyR); await subirReparto(hoyR, null, false); return; }
+      if (h.getDay() !== 0 && min >= 375 && localStorage.getItem('bf_rep_ayer') !== hoyR) {
+        localStorage.setItem('bf_rep_ayer', hoyR);
+        const a = new Date(h.getFullYear(), h.getMonth(), h.getDate() - (h.getDay() === 1 ? 2 : 1), 12);
+        await subirReparto(a.getFullYear() + '-' + String(a.getMonth() + 1).padStart(2, '0') + '-' + String(a.getDate()).padStart(2, '0'), null, false); return; }
       if (h.getDay() !== 0 && min >= 390 && min <= 900 && Date.now() - ultimoAutoRep > REP_AUTO_MIN * 60000) { ultimoAutoRep = Date.now(); await subirReparto(null, null, false); }
     } catch (e) { errSesion = String(e.message || e); pintar(); }
   }
