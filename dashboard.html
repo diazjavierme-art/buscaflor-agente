@@ -108,6 +108,7 @@ th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
     <button role="tab" data-s="ratios" aria-selected="false">Ratios</button>
     <button role="tab" data-s="hist" aria-selected="false">Histórico</button>
     <button role="tab" data-s="clientes" aria-selected="false">Clientes</button>
+    <button role="tab" data-s="equipo" aria-selected="false">Equipo</button>
     <button role="tab" data-s="fincas" aria-selected="false">Fincas</button>
   </nav>
 </div></header>
@@ -180,6 +181,13 @@ th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
     <div class="tiles" id="tCli"></div>
     <div class="card"><h3>Clientes vigilados por margen bajo</h3><div class="sub" id="vigEtq"></div><div class="scroll" id="tVig"></div></div>
     <div class="card"><h3>Clientes del reparto</h3><div class="sub" id="topEtq"></div><div class="scroll" id="tTopCli"></div></div>
+  </section>
+  <section id="s-equipo">
+    <div><h2>Equipo · fichaje</h2><div class="sub">Datos de la app de fichar (Equipo). Se actualizan cada 2 minutos.</div></div>
+    <div class="tiles" id="eTiles"></div>
+    <div class="card"><h3>Hoy</h3><div class="scroll" id="eHoy"></div></div>
+    <div class="card"><h3>Horas por persona</h3><div class="scroll" id="eHoras"></div></div>
+    <div class="card"><h3>Vacaciones y sábados</h3><div class="scroll" id="eVac"></div></div>
   </section>
   <section id="s-fincas">
     <div><h2>Fincas · estados de cuenta</h2></div>
@@ -394,6 +402,7 @@ function pintarFincas(){
 function pintar(){
   try{ pintarResumen(); }catch(e){ console.error(e); }
   try{ pintarFincas(); }catch(e){ console.error(e); }
+  try{ pintarEquipo(); }catch(e){ console.error(e); }
   var dash=D.dash||{};
   document.getElementById('upd').textContent = 'Cifras financieras actualizadas el '+(dash.actualizado?dash.actualizado.slice(0,10).split('-').reverse().join('/'):'—')+' · operativa en vivo';
 
@@ -510,6 +519,38 @@ oir('buscaflor/vuelos','vuelos', function(v){return v||{};});
 oir('buscaflor/pedidosClientes','pedidos', function(v){return v||{};});
 oir('buscaflor/etiquetas/documentos','etiq', function(v){return v||{};});
 oir('buscaflor/reparto','reparto', function(v){return v||{};});
+
+function fd(f){ return f? f.slice(8,10)+'/'+f.slice(5,7) : ''; }
+var SB_URL='https://fgkbkpdqwhpyunzbdpue.supabase.co/rest/v1/', SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZna2JrcGRxd2hweXVuemJkcHVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5NzMyOTksImV4cCI6MjA5MzU0OTI5OX0.UIRHQQRfn2U3xrn77Ij8YG4dXp57dsaaeFUhbNkmwJc';
+var EQ_NOM={javier:'Admin',juan:'Juan',carlos:'Carlos',paco:'Paco',javier_emp:'Javier',jonathan:'Jonathan'};
+function sbGet(q){ return fetch(SB_URL+q,{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}}).then(function(r){return r.json();}); }
+function cargarEquipo(){
+  var d=new Date(); d.setDate(d.getDate()-62); var desde=hoyISO(d);
+  Promise.all([sbGet('jornadas?select=*&date=gte.'+desde), sbGet('vacaciones?select=*&end_date=gte.'+hoyISO(new Date())), sbGet('findes?select=*&weekend_key=gte.'+hoyISO(new Date()))])
+    .then(function(r){ D.eq={j:r[0]||[],v:r[1]||[],f:r[2]||[]}; try{pintarEquipo();}catch(e){console.error(e);} }).catch(function(e){ D.eq={error:String(e)}; });
+}
+function pintarEquipo(){
+  var E=D.eq; if(!E) return; if(E.error){ document.getElementById('eHoy').innerHTML='<div class="vacio">No se pudo leer el fichaje: '+esc(E.error)+'</div>'; return; }
+  var hoy=hoyISO(new Date()), nm=function(u){return EQ_NOM[u]||u;}, J=arr(E.j).filter(function(j){return j.user_id!=='javier';});
+  var sem=rango('semana',0), mes=rango('mes',0), mesA=rango('mes',-1);
+  var h=function(r,u){ return J.filter(function(j){return j.date>=r.desde&&j.date<=r.hasta&&(!u||j.user_id===u);}).reduce(function(s,j){return s+(+j.hours||0);},0); };
+  var hoyJ=J.filter(function(j){return j.date===hoy;});
+  var dentro=hoyJ.filter(function(j){return !j.check_out;});
+  var hMes=h(mes), vMes=datosPeriodo({desde:mes.desde,hasta:hoy}).venta;
+  var pend=arr(E.v).filter(function(v){return v.status==='pending';}).length + J.filter(function(j){return j.status==='pending';}).length;
+  document.getElementById('eTiles').innerHTML=tile('Trabajando ahora',num(dentro.length),dentro.map(function(j){return nm(j.user_id);}).join(', ')||'Nadie')+
+    tile('Horas esta semana',num(Math.round(h(sem))),'')+tile('Horas este mes',num(Math.round(hMes)),'Mes pasado '+num(Math.round(h(mesA))))+
+    tile('Venta por hora trabajada',hMes?eur(vMes/hMes):'—','Venta del mes sin IVA ÷ horas fichadas')+tile('Pendiente de aprobar',num(pend),'Jornadas y vacaciones', pend?chip('warn','revisar'):chip('ok','al día'));
+  document.getElementById('eHoy').innerHTML=hoyJ.length?'<table><tr><th>Persona</th><th>Entrada</th><th>Salida</th><th>Horas</th></tr>'+hoyJ.map(function(j){return '<tr><td>'+esc(nm(j.user_id))+'</td><td>'+esc(j.check_in||'')+'</td><td>'+(j.check_out?esc(j.check_out):'<b>trabajando</b>')+'</td><td>'+(j.hours?num(Math.round(j.hours*10)/10):'')+'</td></tr>';}).join('')+'</table>':'<div class="vacio">Nadie ha fichado hoy.</div>';
+  var us=Object.keys(J.reduce(function(o,j){o[j.user_id]=1;return o;},{}));
+  document.getElementById('eHoras').innerHTML=us.length?'<table><tr><th>Persona</th><th>Semana</th><th>Mes</th><th>Mes pasado</th><th>Días fichados (mes)</th><th>Sábados (mes)</th></tr>'+us.map(function(u){ var jm=J.filter(function(j){return j.user_id===u&&j.date>=mes.desde&&j.date<=mes.hasta;});
+    return '<tr><td>'+esc(nm(u))+'</td><td>'+num(Math.round(h(sem,u)*10)/10)+'</td><td>'+num(Math.round(h(mes,u)*10)/10)+'</td><td>'+num(Math.round(h(mesA,u)*10)/10)+'</td><td>'+jm.length+'</td><td>'+jm.filter(function(j){return new Date(j.date+'T12:00').getDay()===6;}).length+'</td></tr>'; }).join('')+'</table>':'<div class="vacio">Sin fichajes.</div>';
+  var vv=arr(E.v).sort(function(a,b){return a.start_date<b.start_date?-1:1;}), ff=arr(E.f).filter(function(f){return (f.not_available||[]).length;});
+  document.getElementById('eVac').innerHTML=(vv.length?'<table><tr><th>Persona</th><th>Vacaciones</th><th>Días</th><th>Estado</th></tr>'+vv.map(function(v){return '<tr><td>'+esc(nm(v.user_id))+'</td><td>'+fd(v.start_date)+' – '+fd(v.end_date)+'</td><td>'+(v.workdays||'')+'</td><td>'+(v.status==='approved'?'aprobadas':v.status==='pending'?'<b>pendiente</b>':esc(v.status))+'</td></tr>';}).join('')+'</table>':'<div class="vacio">Sin vacaciones próximas.</div>')+
+    (ff.length?'<table style="margin-top:10px"><tr><th>Persona</th><th>Fin de semana sin disponibilidad</th><th>Motivo</th></tr>'+ff.map(function(f){return '<tr><td>'+esc(nm(f.user_id))+'</td><td>'+fd(f.weekend_key)+' ('+(f.not_available||[]).map(function(x){return x==='sat'?'sábado':'domingo';}).join(' y ')+')</td><td>'+esc(f.note||'')+'</td></tr>';}).join('')+'</table>':'');
+}
+cargarEquipo(); setInterval(cargarEquipo,120000);
+
 oir('buscaflor/fincas','fincas', function(v){return v||{};});
 oir('buscaflor/ventasAmbarx','ventasAmbarx', function(v){return v||{};});
 oir('buscaflor/clientes/items','clientes', function(v){return v||{};});
