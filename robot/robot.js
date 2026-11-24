@@ -146,6 +146,7 @@ async function leerVerdnatura(browser, motivo) {
       if (ya[it.n]) continue;
       const entregaLista = fechaEs(it.t);
       if (!entregaLista || entregaLista < VN_DESDE) continue;
+      await page.goto('about:blank').catch(() => {});
       await page.goto('https://shop.verdnatura.es/#/ecomerce/ticket/' + it.n, { waitUntil: 'networkidle2', timeout: 90000 });
       let d = null;
       for (let i = 0; i < 15; i++) {
