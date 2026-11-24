@@ -110,7 +110,7 @@ async function sesion() {
     executablePath: CFG.chrome || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
     headless: VISIBLE ? false : 'new',
     userDataDir: PERFIL,
-    defaultViewport: { width: 1400, height: 900 },
+    defaultViewport: VISIBLE ? null : { width: 1400, height: 900 },
     args: ['--no-sandbox', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--no-first-run', '--no-default-browser-check', '--window-size=1400,900'],
   });
   const page = (await browser.pages())[0] || await browser.newPage();
