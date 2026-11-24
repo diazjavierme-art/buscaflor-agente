@@ -48,6 +48,7 @@ h2{font-size:16px;margin:6px 0 0}
 .tile .d{font-size:12px;color:var(--muted);margin-top:2px}
 .chip{white-space:nowrap;display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px}
 .chip.ok{background:var(--ok-soft);color:var(--ok)} .chip.warn{background:var(--warn-soft);color:var(--warn)} .chip.bad{background:var(--bad-soft);color:var(--bad)}
+.btnF{font:600 13px Inter,sans-serif;padding:7px 12px;border:1px solid var(--accent);border-radius:8px;background:var(--panel);color:var(--accent);cursor:pointer}.btnF:disabled{opacity:.5}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
 .card h3{margin:0 0 2px;font-size:14.5px}
 .grid2{display:grid;grid-template-columns:1fr;gap:16px}
@@ -107,6 +108,7 @@ th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
     <button role="tab" data-s="ratios" aria-selected="false">Ratios</button>
     <button role="tab" data-s="hist" aria-selected="false">Histórico</button>
     <button role="tab" data-s="clientes" aria-selected="false">Clientes</button>
+    <button role="tab" data-s="fincas" aria-selected="false">Fincas</button>
   </nav>
 </div></header>
 
@@ -178,6 +180,11 @@ th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
     <div class="tiles" id="tCli"></div>
     <div class="card"><h3>Clientes vigilados por margen bajo</h3><div class="sub" id="vigEtq"></div><div class="scroll" id="tVig"></div></div>
     <div class="card"><h3>Clientes del reparto</h3><div class="sub" id="topEtq"></div><div class="scroll" id="tTopCli"></div></div>
+  </section>
+  <section id="s-fincas">
+    <div><h2>Fincas · estados de cuenta</h2></div>
+    <div class="card"><h3>Pedir estado de cuenta</h3><div class="sub">El email sale del buzón de la empresa en unos 5 minutos y la respuesta llega a expansion@, donde el buzón la cruza con las facturas. El día 1 de cada mes se pide solo a todas las activas.</div>
+      <div style="margin:10px 0"><button class="btnF" id="fTodas">Pedir a todas</button></div><div class="scroll" id="tFincas"></div></div>
   </section>
 </main>
 
@@ -372,8 +379,21 @@ function pintarResumen(){
   document.getElementById('rNota').innerHTML = 'Ventas, clientes y productos salen del informe de ventas de AmbarX (facturas y albaranes, sin IVA) hasta el '+(((D.ventasAmbarx||{}).hasta)||'—').split('-').reverse().join('/')+'; los días posteriores, de los albaranes que sube la oficina. Hay datos desde el '+(primero?primero.split('-').reverse().join('/'):'—')+'. El margen viene del control semanal de los lunes y del cierre mensual.';
 }
 
+
+function pedirFinca(k){ return db.ref('buscaflor/fincas/peticiones').push({finca:k, pedido:new Date().toISOString(), por:'app'}); }
+function pintarFincas(){
+  var F=D.fincas||{}, C=F.contactos||{}, P=F.peticiones||{}, ult={};
+  Object.keys(P).forEach(function(id){ var p=P[id]||{}; if(!ult[p.finca]||String(p.pedido)>String(ult[p.finca].pedido)) ult[p.finca]=p; });
+  var ks=Object.keys(C).sort(function(a,b){ return (C[a].origen||'').localeCompare(C[b].origen||'')||a.localeCompare(b); });
+  document.getElementById('tFincas').innerHTML='<table><tr><th>Finca</th><th>Origen</th><th>Email</th><th>Última petición</th><th></th></tr>'+ks.map(function(k){ var c=C[k]||{}, u=ult[k];
+    var est=!u?'—':u.error?'<span class="down">Error: '+esc(u.error)+'</span>':u.enviado?'Enviado '+String(u.enviado).slice(0,16).replace('T',' '):'Pendiente de enviar…';
+    return '<tr><td>'+esc(c.nombre||k)+(c.revisar?' <span class="sub">(revisar email)</span>':'')+'</td><td>'+esc(c.origen||'')+'</td><td>'+esc((c.para||[]).join(', '))+'</td><td>'+est+'</td><td><button class="btnF" data-f="'+esc(k)+'">Pedir</button></td></tr>'; }).join('')+'</table>';
+  [].forEach.call(document.querySelectorAll('#tFincas [data-f]'),function(b){ b.onclick=function(){ b.disabled=true; b.textContent='Pedido'; pedirFinca(b.dataset.f); }; });
+  var bt=document.getElementById('fTodas'); bt.onclick=function(){ if(!confirm('¿Pedir el estado de cuenta a todas las fincas activas?')) return; bt.disabled=true; ks.forEach(function(k){ if((C[k]||{}).activo) pedirFinca(k); }); setTimeout(function(){bt.disabled=false;},5000); };
+}
 function pintar(){
   try{ pintarResumen(); }catch(e){ console.error(e); }
+  try{ pintarFincas(); }catch(e){ console.error(e); }
   var dash=D.dash||{};
   document.getElementById('upd').textContent = 'Cifras financieras actualizadas el '+(dash.actualizado?dash.actualizado.slice(0,10).split('-').reverse().join('/'):'—')+' · operativa en vivo';
 
@@ -490,6 +510,7 @@ oir('buscaflor/vuelos','vuelos', function(v){return v||{};});
 oir('buscaflor/pedidosClientes','pedidos', function(v){return v||{};});
 oir('buscaflor/etiquetas/documentos','etiq', function(v){return v||{};});
 oir('buscaflor/reparto','reparto', function(v){return v||{};});
+oir('buscaflor/fincas','fincas', function(v){return v||{};});
 oir('buscaflor/ventasAmbarx','ventasAmbarx', function(v){return v||{};});
 oir('buscaflor/clientes/items','clientes', function(v){return v||{};});
 oir('buscaflor/articulos/items','articulos', function(v){return v||{};});
