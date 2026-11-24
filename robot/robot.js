@@ -72,28 +72,30 @@ async function entrarSiHaceFalta(page) {
 }
 
 
-// Pantalla de elegir empresa tras iniciar sesión (rejilla «Buscar empresa...»): elige la de Buscaflor
+// Pantalla de elegir empresa tras iniciar sesión (rejilla «Empresa»): pulsa la fila de Buscaflor con el ratón de verdad
 async function elegirEmpresaSiHaceFalta(page) {
-  const r = await page.evaluate((emp) => {
-    const hondo = (raiz, sel) => { const out = []; const w = n => { if (!n || !n.querySelectorAll) return; n.querySelectorAll(sel).forEach(e => out.push(e)); n.querySelectorAll('*').forEach(e => { if (e.shadowRoot) w(e.shadowRoot); }); }; w(raiz); return out; };
-    const buscar = hondo(document, 'vaadin-text-field, input').find(f => /buscar empresa/i.test(f.placeholder || f.getAttribute('placeholder') || ''));
-    const txt = (document.body && document.body.innerText) || '';
-    if (!buscar && !/(elegir|elija|seleccione)\s+(la\s+|una\s+)?empresa/i.test(txt)) return 'no';
-    const re = new RegExp(emp, 'i');
-    const celda = hondo(document, 'vaadin-grid-cell-content').find(c => re.test(c.textContent || ''));
-    if (!celda) return 'sinEmpresa';
-    const clic = el => { for (const t of ['mousedown', 'mouseup', 'click']) el.dispatchEvent(new MouseEvent(t, { bubbles: true, composed: true })); };
-    let hecho = false;
-    try {
-      const tr = celda.assignedSlot && celda.assignedSlot.parentElement && celda.assignedSlot.parentElement.parentElement;
-      if (tr) for (const td of tr.children) { const sl = td.querySelector('slot'); const c = sl && sl.assignedNodes()[0]; if (!c || c === celda) continue; const boton = c.querySelector && (c.querySelector('vaadin-button, button, vaadin-icon, a') || c); if (boton) { clic(boton); hecho = true; break; } }
-    } catch (e) {}
-    if (!hecho) { clic(celda); celda.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, composed: true })); }
-    return 'elegida';
-  }, CFG.empresa || 'BUSCAFLOR').catch(() => 'no');
-  if (r === 'no') return false;
-  log(r === 'elegida' ? 'Elegida la empresa de Buscaflor' : 'Pantalla de elegir empresa, pero no encuentro Buscaflor');
-  await espera(6000);
+  for (let intento = 0; intento < 3; intento++) {
+    const pos = await page.evaluate((emp) => {
+      const hondo = (raiz, sel) => { const out = []; const w = n => { if (!n || !n.querySelectorAll) return; n.querySelectorAll(sel).forEach(e => out.push(e)); n.querySelectorAll('*').forEach(e => { if (e.shadowRoot) w(e.shadowRoot); }); }; w(raiz); return out; };
+      const re = new RegExp(emp, 'i');
+      const celda = hondo(document, 'vaadin-grid-cell-content').find(c => re.test(c.textContent || '') && c.getBoundingClientRect().width > 0);
+      if (!celda) return null;
+      const r = celda.getBoundingClientRect();
+      let mano = null;
+      try {
+        const td = celda.assignedSlot && celda.assignedSlot.parentElement; const tr = td && td.parentElement;
+        if (tr && tr.firstElementChild && tr.firstElementChild !== td) { const q = tr.firstElementChild.getBoundingClientRect(); if (q.width > 0) mano = { x: q.x + q.width / 2, y: q.y + q.height / 2 }; }
+      } catch (e) {}
+      return { x: r.x + Math.min(40, r.width / 2), y: r.y + r.height / 2, mano, texto: (celda.textContent || '').trim() };
+    }, CFG.empresa || 'BUSCAFLOR').catch(() => null);
+    if (!pos) return intento > 0;
+    log('Pantalla de elegir empresa: pulsando «' + pos.texto + '»');
+    if (pos.mano) { await page.mouse.click(pos.mano.x, pos.mano.y); await espera(4000); }
+    else { await page.mouse.click(pos.x, pos.y); await espera(1500); }
+    if (await page.evaluate(() => !/Buscar empresa/i.test(document.body ? document.body.innerHTML.slice(0, 200000) : '')).catch(() => false)) break;
+    await page.mouse.click(pos.x, pos.y, { clickCount: 2 }); await espera(4000);
+    await page.keyboard.press('Enter').catch(() => {}); await espera(4000);
+  }
   return true;
 }
 
@@ -118,7 +120,7 @@ async function sesion() {
     await espera(primera ? 8000 : 30000); primera = false;
     try {
       if (await elegirEmpresaSiHaceFalta(page)) continue;
-      if (await entrarSiHaceFalta(page)) { await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }).catch(() => {}); continue; }
+      if (await entrarSiHaceFalta(page)) { await espera(6000); await elegirEmpresaSiHaceFalta(page); continue; }
       const vivo = await page.evaluate(() => !!window.__bfRobot && !/sesión ha caducado|session expired/i.test(document.body ? document.body.innerText.slice(0, 3000) : '')).catch(() => false);
       if (!vivo) { if (++fallos >= 3) { log('La página no responde: recargando'); fallos = 0; await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }).catch(() => {}); } }
       else fallos = 0;
