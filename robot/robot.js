@@ -72,30 +72,34 @@ async function entrarSiHaceFalta(page) {
 }
 
 
-// Pantalla de elegir empresa tras iniciar sesión (rejilla «Empresa»): pulsa la fila de Buscaflor con el ratón de verdad
-async function elegirEmpresaSiHaceFalta(page) {
-  for (let intento = 0; intento < 3; intento++) {
-    const pos = await page.evaluate((emp) => {
-      const hondo = (raiz, sel) => { const out = []; const w = n => { if (!n || !n.querySelectorAll) return; n.querySelectorAll(sel).forEach(e => out.push(e)); n.querySelectorAll('*').forEach(e => { if (e.shadowRoot) w(e.shadowRoot); }); }; w(raiz); return out; };
-      const re = new RegExp(emp, 'i');
-      const celda = hondo(document, 'vaadin-grid-cell-content').find(c => re.test(c.textContent || '') && c.getBoundingClientRect().width > 0);
-      if (!celda) return null;
-      const r = celda.getBoundingClientRect();
-      let mano = null;
-      try {
-        const td = celda.assignedSlot && celda.assignedSlot.parentElement; const tr = td && td.parentElement;
-        if (tr && tr.firstElementChild && tr.firstElementChild !== td) { const q = tr.firstElementChild.getBoundingClientRect(); if (q.width > 0) mano = { x: q.x + q.width / 2, y: q.y + q.height / 2 }; }
-      } catch (e) {}
-      return { x: r.x + Math.min(40, r.width / 2), y: r.y + r.height / 2, mano, texto: (celda.textContent || '').trim() };
-    }, CFG.empresa || 'BUSCAFLOR').catch(() => null);
-    if (!pos) return intento > 0;
-    log('Pantalla de elegir empresa: pulsando «' + pos.texto + '»');
-    if (pos.mano) { await page.mouse.click(pos.mano.x, pos.mano.y); await espera(4000); }
-    else { await page.mouse.click(pos.x, pos.y); await espera(1500); }
-    if (await page.evaluate(() => !/Buscar empresa/i.test(document.body ? document.body.innerHTML.slice(0, 200000) : '')).catch(() => false)) break;
-    await page.mouse.click(pos.x, pos.y, { clickCount: 2 }); await espera(4000);
-    await page.keyboard.press('Enter').catch(() => {}); await espera(4000);
-  }
+// Pantalla de elegir empresa tras iniciar sesión: busca el texto BUSCAFLOR en cualquier elemento visible y lo pulsa con el ratón
+async function buscarEmpresa(page) {
+  return page.evaluate((emp) => {
+    const re = new RegExp(emp, 'i');
+    const todos = []; const w = n => { if (!n || !n.querySelectorAll) return; n.querySelectorAll('*').forEach(e => { todos.push(e); if (e.shadowRoot) w(e.shadowRoot); }); }; w(document);
+    let mejor = null, area = 1e12;
+    for (const e of todos) {
+      if (/^(SCRIPT|STYLE|HTML|BODY|TITLE)$/.test(e.tagName)) continue;
+      const t = e.textContent || ''; if (!re.test(t) || t.length > 200) continue;
+      const r = e.getBoundingClientRect(); if (r.width < 5 || r.height < 5) continue;
+      const a = r.width * r.height; if (a < area) { area = a; mejor = { x: r.x + r.width / 2, y: r.y + r.height / 2, izq: r.x, tag: e.tagName, texto: t.trim().slice(0, 60) }; }
+    }
+    if (!mejor && re.test(document.body ? document.body.innerText : '')) return { invisible: true };
+    return mejor;
+  }, CFG.empresa || 'BUSCAFLOR').catch(e => ({ error: e.message }));
+}
+async function elegirEmpresaSiHaceFalta(page, esperar) {
+  let pos = null;
+  for (let i = 0; i < (esperar ? 10 : 1); i++) { pos = await buscarEmpresa(page); if (pos && pos.x) break; if (esperar) await espera(1500); }
+  if (!pos) return false;
+  if (!pos.x) { log('Elegir empresa: no puedo pulsarla', JSON.stringify(pos)); return false; }
+  log('Pantalla de elegir empresa: pulsando «' + pos.texto + '» (' + pos.tag + ')');
+  await page.mouse.click(pos.x, pos.y); await espera(2500);
+  let p2 = await buscarEmpresa(page);
+  if (p2 && p2.x) { await page.mouse.click(p2.x, p2.y, { clickCount: 2 }); await espera(2500); p2 = await buscarEmpresa(page); }
+  if (p2 && p2.x) { await page.mouse.click(Math.max(5, p2.izq - 40), p2.y); await espera(2500); p2 = await buscarEmpresa(page); }
+  if (p2 && p2.x) { await page.keyboard.press('Enter').catch(() => {}); await espera(3000); p2 = await buscarEmpresa(page); }
+  log(p2 && p2.x ? 'La empresa sigue sin elegirse' : 'Empresa elegida');
   return true;
 }
 
@@ -120,7 +124,7 @@ async function sesion() {
     await espera(primera ? 8000 : 30000); primera = false;
     try {
       if (await elegirEmpresaSiHaceFalta(page)) continue;
-      if (await entrarSiHaceFalta(page)) { await espera(6000); await elegirEmpresaSiHaceFalta(page); continue; }
+      if (await entrarSiHaceFalta(page)) { await elegirEmpresaSiHaceFalta(page, true); continue; }
       const vivo = await page.evaluate(() => !!window.__bfRobot && !/sesión ha caducado|session expired/i.test(document.body ? document.body.innerText.slice(0, 3000) : '')).catch(() => false);
       if (!vivo) { if (++fallos >= 3) { log('La página no responde: recargando'); fallos = 0; await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }).catch(() => {}); } }
       else fallos = 0;
