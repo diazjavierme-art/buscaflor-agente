@@ -77,7 +77,7 @@ async function buscarEmpresa(page) {
   return page.evaluate((emp) => {
     const re = new RegExp(emp, 'i');
     const htmlTodo = []; const w0 = n => { if (!n || !n.querySelectorAll) return; n.querySelectorAll('input').forEach(e => htmlTodo.push(e)); n.querySelectorAll('*').forEach(e => { if (e.shadowRoot) w0(e.shadowRoot); }); }; w0(document);
-    const enElegir = /\/login/i.test(location.pathname) || htmlTodo.some(i => /buscar empresa/i.test(i.placeholder || ''));
+    const enElegir = htmlTodo.some(i => /buscar empresa/i.test(i.placeholder || '') && i.getBoundingClientRect().width > 0);
     if (!enElegir) return null;
     const todos = []; const w = n => { if (!n || !n.querySelectorAll) return; n.querySelectorAll('*').forEach(e => { todos.push(e); if (e.shadowRoot) w(e.shadowRoot); }); }; w(document);
     let mejor = null, area = 1e12;
