@@ -3,7 +3,7 @@
  *
  * - Botón en la app (Resumen › Fincas): deja buscaflor/fincas/peticiones/<id> = {finca, pedido, por}.
  *   Cada 5 minutos este script manda el email y marca la petición como enviada.
- * - Automático: el día 1 de cada mes a las 9:00 pide el estado de cuenta a todas las fincas activas.
+ * - (Desactivado el 24-11-2026: ya no se pide solo el día 1 de cada mes.)
  * Envía desde esta cuenta (facturasbuscaflor@gmail.com), responder a expansion@rosasdebuscaflor.com
  * (copia oculta a expansion@), así la respuesta con el PDF entra al buzón y se cruza sola.
  *
@@ -22,7 +22,7 @@ function instalarEstadosCuenta() {
     if (h === 'atenderEstadosCuenta' || h === 'pedirEstadosCuentaMes') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('atenderEstadosCuenta').timeBased().everyMinutes(5).create();
-  ScriptApp.newTrigger('pedirEstadosCuentaMes').timeBased().onMonthDay(1).atHour(9).inTimezone(EC_ZONA).create();
+  // Sin petición automática el día 1 (Javier, 24-11-2026): a las fincas solo se les pide con el botón.
 }
 
 function ec_fb(metodo, ruta, datos) {
