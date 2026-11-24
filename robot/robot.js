@@ -332,7 +332,9 @@ async function informeCobros(page, cliente) {
     const ok = await page.evaluate(new Function(HONDO + "const y=t=>{const e=hondo(document,'label,span').find(e=>vis(e)&&(e.textContent||'').trim()===t); return e?e.getBoundingClientRect().y:null}; const y1=y('Cliente'), y2=y('Comercial'); if(y1===null||y2===null) return 0; window.__bfCf=hondo(document,'vaadin-text-field').filter(f=>vis(f)&&f.getBoundingClientRect().y>y1&&f.getBoundingClientRect().y<y2); return window.__bfCf.length;"));
     if (ok < 2) throw new Error('no encuentro los campos de cliente del informe');
     for (const i of [0, 1]) {
-      await page.evaluate(i => { window.__bfCf[i].inputElement.focus(); window.__bfCf[i].inputElement.select(); }, i);
+      await page.evaluate(i => { window.__bfCf[i].inputElement.focus(); }, i);
+      await page.keyboard.down('Control'); await page.keyboard.press('KeyA'); await page.keyboard.up('Control'); await page.keyboard.press('Backspace');
+      await page.evaluate(i => { const f = window.__bfCf[i]; f.value = ''; f.inputElement.value = ''; }, i);
       await page.keyboard.type(String(cliente)); await espera(700);
     }
     await page.evaluate(() => window.__bfCf[1].inputElement.blur()); await espera(1000);
@@ -408,7 +410,10 @@ async function vigilarCobros(browser) {
         await fb('PATCH', ruta, { estado: 'generando' });
         const r = await informeCobros(page, e.cliente);
         const res = leerCobros(r.texto);
-        const c = Object.values(res.clientes)[0] || null;
+        const cs = Object.values(res.clientes).filter(Boolean);
+        const c = cs.find(x => String(x.codigo) === String(e.cliente)) || null;
+        if (cs.length > 1 || (cs.length === 1 && !c)) throw new Error('el informe salió de otro cliente (' + cs.map(x => x.codigo + ' ' + x.nombre).join(', ') + '); no se envía');
+        if (!new RegExp('Cliente igual a ' + String(e.cliente) + '\\b').test(r.texto)) throw new Error('el filtro del informe no es el cliente ' + e.cliente + '; no se envía');
         await fb('PATCH', ruta, { estado: esPdf ? 'listo' : 'pdfListo', pdf64: r.pdf64, bytes: r.bytes, generado: ahoraLocal(), pendiente: c ? c.pendiente : 0, documentos: c ? c.docs.length : 0, nombre: c ? c.nombre : (e.nombre || '') });
         log('Cobros pendientes: PDF del cliente ' + e.cliente + (esPdf ? ' para ver' : ' para enviar a ' + (e.para || '?')) + ' (' + (c ? c.pendiente : 0) + ' €)');
       } catch (err) { log('Cobros pendientes: error con el cliente ' + e.cliente + ': ' + err.message); await fb('PATCH', ruta, { estado: 'error', error: err.message }).catch(() => {}); }
