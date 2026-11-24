@@ -181,7 +181,7 @@ async function vigilarVerdnatura(browser) {
   const h = new Date(), hoy = ahoraLocal().slice(0, 10);
   if (h.getDay() !== 0 && h.getHours() === 15 && vnUltimoDia !== hoy) { vnUltimoDia = hoy; await leerVerdnatura(browser, '15:00'); return; }
   const p = await fb('GET', 'buscaflor/peticiones/verdnatura', undefined).catch(() => null);
-  if (p && p.estado === 'pedida') { await fb('PATCH', 'buscaflor/peticiones/verdnatura', { estado: 'enCurso' }).catch(() => {}); await leerVerdnatura(browser, 'pedido desde la app'); await fb('PATCH', 'buscaflor/peticiones/verdnatura', { estado: 'hecha', hecho: ahoraLocal() }).catch(() => {}); }
+  if (p && p.estado === 'pedida') { log('Verdnatura: petición desde la app'); await fb('PATCH', 'buscaflor/peticiones/verdnatura', { estado: 'enCurso' }).catch(() => {}); await leerVerdnatura(browser, 'pedido desde la app'); await fb('PATCH', 'buscaflor/peticiones/verdnatura', { estado: 'hecha', hecho: ahoraLocal() }).catch(() => {}); }
 }
 
 async function sesion() {
@@ -200,12 +200,19 @@ async function sesion() {
   page.on('dialog', d => { if (d.type() === 'beforeunload') { d.accept().catch(() => {}); return; } log('Diálogo (' + d.type() + '):', d.message().slice(0, 200)); d.dismiss().catch(() => {}); });
   await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }).catch(e => log('goto:', e.message));
   let ultimaRevisionScript = Date.now(), fallos = 0;
-  let primera = true;
+  let primera = true, vueltas = 0;
   while (browser.isConnected()) {
     await espera(primera ? 8000 : 30000); primera = false;
+    if (++vueltas % 20 === 0) log('Sigo en marcha (' + page.url().slice(0, 80) + ')');
     try {
-      if (await elegirEmpresaSiHaceFalta(page)) continue;
-      if (await entrarSiHaceFalta(page)) { await elegirEmpresaSiHaceFalta(page, true); continue; }
+      await Promise.race([vuelta(), espera(180000).then(() => { throw new Error('una vuelta tarda más de 3 min'); })]);
+    } catch (e) { log('Error vigilando:', e.message); if (/3 min/.test(e.message)) await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }).catch(() => {}); }
+    if (reiniciarYa) { log('robot.js ha cambiado: reinicio para coger la versión nueva'); await browser.close().catch(() => {}); process.exit(1); }
+  }
+  log('Chrome se ha cerrado');
+  async function vuelta() {
+      if (await elegirEmpresaSiHaceFalta(page)) return;
+      if (await entrarSiHaceFalta(page)) { await elegirEmpresaSiHaceFalta(page, true); return; }
       const vivo = await page.evaluate(() => !!window.__bfRobot && !/sesión ha caducado|session expired/i.test(document.body ? document.body.innerText.slice(0, 3000) : '')).catch(() => false);
       if (!vivo) { if (++fallos >= 3) { log('La página no responde: recargando'); fallos = 0; await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }).catch(() => {}); } }
       else fallos = 0;
@@ -214,11 +221,11 @@ async function sesion() {
         ultimaRevisionScript = Date.now();
         if (await bajarScript()) { log('Hay versión nueva del script (' + version + '): reiniciando'); await browser.close().catch(() => {}); return; }
       }
-    } catch (e) { log('Error vigilando:', e.message); }
   }
-  log('Chrome se ha cerrado');
 }
 
+let reiniciarYa = false;
+try { const m0 = fs.statSync(__filename).mtimeMs; setInterval(() => { try { if (fs.statSync(__filename).mtimeMs !== m0) reiniciarYa = true; } catch (e) {} }, 60000); } catch (e) {}
 (async () => {
   log('Robot de Buscaflor iniciado');
   for (;;) {
