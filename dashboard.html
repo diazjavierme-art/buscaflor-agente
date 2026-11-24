@@ -522,7 +522,7 @@ oir('buscaflor/reparto','reparto', function(v){return v||{};});
 
 function fd(f){ return f? f.slice(8,10)+'/'+f.slice(5,7) : ''; }
 var SB_URL='https://fgkbkpdqwhpyunzbdpue.supabase.co/rest/v1/', SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZna2JrcGRxd2hweXVuemJkcHVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5NzMyOTksImV4cCI6MjA5MzU0OTI5OX0.UIRHQQRfn2U3xrn77Ij8YG4dXp57dsaaeFUhbNkmwJc';
-var EQ_NOM={javier:'Admin',juan:'Juan',carlos:'Carlos',paco:'Paco',javier_emp:'Javier',jonathan:'Jonathan'};
+var EQ_NOM={javier:'Admin',juan:'Juan',carlos:'Carlos',paco:'Paco',javier_emp:'Javier',jonathan:'Jonathan',alvaro:'Álvaro'};
 function sbGet(q){ return fetch(SB_URL+q,{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}}).then(function(r){return r.json();}); }
 function cargarEquipo(){
   var d=new Date(); d.setDate(d.getDate()-62); var desde=hoyISO(d);
