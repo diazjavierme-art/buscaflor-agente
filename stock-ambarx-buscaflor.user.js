@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.7
+// @version      0.9.8
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -265,6 +265,13 @@
     return { r: 'firmado', email: em || 'noConsta' };
   }
 
+  // Firmado por la pantalla móvil pero AmbarX no confirma el email (24-11: A-12225 no llegó): el robot lo manda
+  // él con «Enviar por email» del documento, que ya lleva la firma. Solo firmas desde EMAIL_REPARO_DESDE, o las
+  // marcadas a mano con ambarx.reenviarAmbarx = true. 'yaFirmado' no entra (lo firmó otro y pudo mandarlo).
+  const EMAIL_REPARO_DESDE = '2026-11-24T14:40:00';
+  const reenvioAmbarx = a => a.firma === 'firmado' && a.firmaAmbarx === 'firmado' && (a.email === 'noConsta' || a.email === 'error') &&
+    (String(a.firmaHora || '') >= EMAIL_REPARO_DESDE || a.reenviarAmbarx === true);
+
   // Abre el documento y lo envía por email con el formato habitual y los correos del cliente
   async function emailDesdeAmbarx(doc, esperados) {
     const env = await hastaQue(() => hondo(doc, 'vaadin-button').find(b => { const i = b.querySelector('vaadin-icon'); return i && i.getAttribute('icon') === 'vaadin:envelope'; }), 40000);
@@ -468,7 +475,7 @@
       return {
         firma: !!e.firma && !a.firma && (n.firma || 0) < 3,
         cobro: !!FORMA_AMBARX[c.forma] && (+c.importe || 0) > 0 && !a.cobro && (n.cobro || 0) < 3,
-        email: a.firma === 'adjunto' && !a.email && (n.email || 0) < 3,
+        email: (a.firma === 'adjunto' && !a.email || reenvioAmbarx(a)) && (n.email || 0) < 3,
         pdf: !a.pdf && (n.pdf || 0) < 3 && (a.firma === 'firmado' || a.firma === 'error' || !e.firma)
       }; };
     const yaPasados = new Set(); // documentos que ya se firmaron en AmbarX desde un día posterior: no se repiten (ni firma ni email)
@@ -543,6 +550,12 @@
         p = pasos(Object.assign({}, e, { ambarx: a }));
         if (p.email) await paso('email', async () => {
           fase = 'Enviando ' + num + ' firmado por email…'; pintar();
+          if (a.firma === 'firmado') {
+            if (!correos.length) { a.email = 'sinEmail'; return; }
+            const r = await conMarco(doc => emailDesdeAmbarx(doc, correos), ruta);
+            a.email = r.email; a.para = r.para; a.emailHora = ahoraISO(); a.emailVia = 'robot'; delete a.reenviarAmbarx;
+            return;
+          }
           const pdf = await fb('GET', RUTA_REP + '/' + f + '/pdfs/' + k);
           if (!pdf) throw new Error('No encuentro el PDF firmado');
           try {
