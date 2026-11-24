@@ -116,7 +116,7 @@ const MESES = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, jul
 const fechaEs = t => { const m = /(\d{1,2}) de ([a-záéíóú]+) de (\d{4})/i.exec(t || ''); return m && MESES[m[2].toLowerCase()] ? m[3] + '-' + String(MESES[m[2].toLowerCase()]).padStart(2, '0') + '-' + m[1].padStart(2, '0') : null; };
 const num = t => { const v = parseFloat(String(t || '').replace(/[^\d.,-]/g, '').replace(',', '.')); return isNaN(v) ? null : v; };
 async function fb(metodo, ruta, datos) {
-  const r = await fetch(DB + '/' + ruta + '.json', { method: metodo, headers: { 'Content-Type': 'application/json' }, body: datos === undefined ? undefined : JSON.stringify(datos) });
+  const r = await fetch(DB + '/' + ruta + '.json', { signal: AbortSignal.timeout(30000), method: metodo, headers: { 'Content-Type': 'application/json' }, body: datos === undefined ? undefined : JSON.stringify(datos) });
   if (!r.ok) throw new Error('Firebase ' + r.status);
   return r.json();
 }
@@ -433,6 +433,7 @@ async function sesion() {
     defaultViewport: VISIBLE ? null : { width: 1400, height: 900 },
     args: ['--no-sandbox', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--no-first-run', '--no-default-browser-check', '--window-size=1400,900'],
   });
+  NAVEGADOR = browser; ultimaVuelta = Date.now();
   const page = (await browser.pages())[0] || await browser.newPage();
   await page.evaluateOnNewDocument(c => { if (window.top === window.self) { try { (0, eval)(c); } catch (e) { console.error('[bf-robot] script', e); } } }, codigo);
   page.on('console', m => { const t = m.text(); if (/\[bf-|Error/i.test(t)) log('página:', t.slice(0, 300)); });
@@ -441,7 +442,7 @@ async function sesion() {
   let ultimaRevisionScript = Date.now(), fallos = 0;
   let primera = true, vueltas = 0;
   while (browser.isConnected()) {
-    await espera(primera ? 8000 : 30000); primera = false;
+    await espera(primera ? 8000 : 30000); primera = false; ultimaVuelta = Date.now();
     if (++vueltas % 20 === 0) log('Sigo en marcha (' + page.url().slice(0, 80) + ')');
     try {
       await Promise.race([vuelta(), espera(180000).then(() => { throw new Error('una vuelta tarda más de 3 min'); })]);
@@ -464,8 +465,19 @@ async function sesion() {
   }
 }
 
-let reiniciarYa = false;
-try { const m0 = fs.statSync(__filename).mtimeMs; setInterval(() => { try { if (fs.statSync(__filename).mtimeMs !== m0) reiniciarYa = true; } catch (e) {} }, 60000); } catch (e) {}
+let reiniciarYa = false, NAVEGADOR = null, ultimaVuelta = Date.now();
+function salir(motivo) {
+  log(motivo);
+  try { const p = NAVEGADOR && NAVEGADOR.process(); if (p) p.kill('SIGKILL'); } catch (e) {}
+  setTimeout(() => process.exit(1), 1500);
+}
+try {
+  const m0 = fs.statSync(__filename).mtimeMs;
+  setInterval(() => {
+    try { if (fs.statSync(__filename).mtimeMs !== m0) { salir('robot.js ha cambiado: reinicio para coger la versión nueva'); return; } } catch (e) {}
+    if (!VISIBLE && Date.now() - ultimaVuelta > 6 * 60000) salir('El robot lleva más de 6 minutos parado: reinicio');
+  }, 60000);
+} catch (e) {}
 (async () => {
   log('Robot de Buscaflor iniciado');
   for (;;) {

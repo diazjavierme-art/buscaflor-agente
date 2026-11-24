@@ -83,6 +83,7 @@ th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
 .alerta{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;padding:7px 0;border-bottom:1px solid var(--line)}
 .alerta:last-child{border-bottom:0}
 .up{color:var(--ok);font-weight:600} .down{color:var(--bad);font-weight:600}
+table.mini{font-size:12px;margin:4px 0 8px 12px}table.mini td,table.mini th{padding:3px 8px}
 </style>
 </head>
 <body>
@@ -110,6 +111,7 @@ th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
     <button role="tab" data-s="clientes" aria-selected="false">Clientes</button>
     <button role="tab" data-s="equipo" aria-selected="false">Equipo</button>
     <button role="tab" data-s="fincas" aria-selected="false">Fincas</button>
+    <button role="tab" data-s="cobros" aria-selected="false">Cobros</button>
   </nav>
 </div></header>
 
@@ -193,6 +195,13 @@ th{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;
     <div><h2>Fincas · estados de cuenta</h2></div>
     <div class="card"><h3>Pedir estado de cuenta</h3><div class="sub">El email sale del buzón de la empresa en unos 5 minutos y la respuesta llega a expansion@, donde el buzón la cruza con las facturas. El día 1 de cada mes se pide solo a todas las activas.</div>
       <div style="margin:10px 0"><button class="btnF" id="fTodas">Pedir a todas</button></div><div class="scroll" id="tFincas"></div></div>
+  </section>
+  <section id="s-cobros">
+    <div><h2>Cobros pendientes de clientes</h2><div class="sub" id="cNota">Del informe de AmbarX «Cobros pendientes por cliente» (formato detallado por cliente). El robot lo lee cada mañana a las 7:00.</div></div>
+    <div class="tiles" id="cTiles"></div>
+    <div class="card"><h3>Por cliente</h3><div class="sub">Pulsa en un cliente para ver sus facturas y albaranes. «PDF» saca de AmbarX su estado de cuenta; «Enviar» se lo manda por email desde el buzón (unos 5 minutos).</div>
+      <div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btnF" id="cAct">Leer ahora de AmbarX</button><input id="cBus" placeholder="Buscar cliente…" style="padding:7px 9px;border:1px solid #ccc;border-radius:6px;min-width:180px"><span class="sub" id="cEst"></span></div>
+      <div class="scroll" id="tCobros"></div></div>
   </section>
 </main>
 
@@ -399,8 +408,38 @@ function pintarFincas(){
   [].forEach.call(document.querySelectorAll('#tFincas [data-f]'),function(b){ b.onclick=function(){ b.disabled=true; b.textContent='Pedido'; pedirFinca(b.dataset.f); }; });
   var bt=document.getElementById('fTodas'); bt.onclick=function(){ if(!confirm('¿Pedir el estado de cuenta a todas las fincas activas?')) return; bt.disabled=true; ks.forEach(function(k){ if((C[k]||{}).activo) pedirFinca(k); }); setTimeout(function(){bt.disabled=false;},5000); };
 }
+
+/* ---------- COBROS PENDIENTES ---------- */
+var cobAbierto={};
+function eur2(x){ return (Math.round((+x||0)*100)/100).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
+function pedirCobrosPdf(cod){ return db.ref('buscaflor/cobros/pdf/'+cod).set({estado:'pedido', pedido:new Date().toISOString()}); }
+function abrirPdf64(b64, nombre){ var bin=atob(b64), u=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); var url=URL.createObjectURL(new Blob([u],{type:'application/pdf'})); var a=document.createElement('a'); a.href=url; a.target='_blank'; a.download=nombre||'cobros.pdf'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(url);},60000); }
+function pintarCobros(){
+  var C={resumen:D.cobRes||{}, pdf:D.cobPdf||{}, envios:D.cobEnv||{}}, R=C.resumen||{}, cl=R.clientes||{}, con=D.contactos||{}, pdfs=C.pdf||{}, env=C.envios||{};
+  var lista=(Array.isArray(cl)?cl.filter(Boolean):Object.values(cl)).filter(function(c){return c&&c.codigo!==undefined;});
+  var bus=((document.getElementById('cBus')||{}).value||'').toLowerCase();
+  lista.sort(function(a,b){return (b.pendiente||0)-(a.pendiente||0);});
+  var m60=0,m30=0; lista.forEach(function(c){ (c.docs||[]).forEach(function(d){ if(d.dias>60) m60+=d.pendiente||0; else if(d.dias>30) m30+=d.pendiente||0; }); });
+  document.getElementById('cTiles').innerHTML = tile('Pendiente de cobro', eur(R.pendiente||0), num(lista.length)+' clientes · '+num(R.documentos||0)+' documentos') + tile('Más de 60 días', eur(m60), 'Vencido hace más de 2 meses') + tile('De 31 a 60 días', eur(m30), '') + tile('Leído de AmbarX', R.leido? String(R.leido).slice(0,16).replace('T',' ').split(' ').map(function(x,i){return i?x:x.split('-').reverse().join('/');}).join(' '):'—', '');
+  var pet=(D.petCobros||{}); document.getElementById('cEst').textContent = pet.estado==='pedida'||pet.estado==='enCurso' ? 'El robot está leyendo el informe…' : pet.estado==='error' ? 'Error: '+(pet.error||'') : '';
+  var ultEnv={}; Object.keys(env).forEach(function(id){ var e=env[id]||{}; if(!ultEnv[e.cliente]||String(e.pedido)>String(ultEnv[e.cliente].pedido)) ultEnv[e.cliente]=e; });
+  var filas=lista.filter(function(c){ return !bus || (String(c.nombre||'').toLowerCase().indexOf(bus)>=0) || String(c.codigo)===bus; }).map(function(c){
+    var k=String(c.codigo), em=(con[k]||{}).email||'', p=pdfs[k]||{}, e=ultEnv[k];
+    var pe=p.estado==='pedido'||p.estado==='generando'?'<span class="sub">Generando…</span>':p.estado==='listo'?'<button class="btnF" data-ver="'+esc(k)+'">Abrir PDF</button>':'<button class="btnF" data-pdf="'+esc(k)+'">PDF</button>';
+    var ee=!e?'':e.estado==='enviado'?'<div class="sub">Enviado '+String(e.enviado||'').slice(0,16).replace('T',' ')+'</div>':e.estado==='error'?'<div class="down">Error: '+esc(e.error||'')+'</div>':'<div class="sub">Enviando…</div>';
+    var det=cobAbierto[k]?'<tr><td colspan="6"><table class="mini"><tr><th>Documento</th><th>Fecha</th><th>Total</th><th>Pagado</th><th>Pendiente</th><th>Días</th></tr>'+(c.docs||[]).map(function(d){ return '<tr><td>'+(d.tipo==='albaran'?'Albarán ':'Factura ')+esc(d.numero)+'</td><td>'+esc(d.fecha)+'</td><td>'+eur2(d.total)+'</td><td>'+(d.pagado?eur2(d.pagado):'')+'</td><td><b>'+eur2(d.pendiente)+'</b></td><td'+(d.dias>60?' class="down"':'')+'>'+d.dias+'</td></tr>'; }).join('')+'</table></td></tr>':'';
+    return '<tr data-cli="'+esc(k)+'" style="cursor:pointer"><td>'+esc(k)+' · '+esc(c.nombre||'')+'</td><td><b>'+eur2(c.pendiente)+'</b></td><td>'+(c.docs||[]).length+'</td><td'+(c.masAntiguo>60?' class="down"':'')+'>'+(c.masAntiguo||0)+' días</td><td>'+esc(em||'sin email')+'</td><td style="white-space:nowrap">'+pe+' '+(em?'<button class="btnF" data-env="'+esc(k)+'">Enviar</button>':'')+ee+'</td></tr>'+det; });
+  document.getElementById('tCobros').innerHTML = lista.length? '<table><tr><th>Cliente</th><th>Pendiente</th><th>Docs</th><th>Más antiguo</th><th>Email</th><th></th></tr>'+filas.join('')+'</table>' : '<div class="sub">Todavía no hay datos: pulsa «Leer ahora de AmbarX».</div>';
+  [].forEach.call(document.querySelectorAll('#tCobros tr[data-cli]'),function(tr){ tr.onclick=function(ev){ if(ev.target.closest('button')) return; var k=tr.dataset.cli; cobAbierto[k]=!cobAbierto[k]; pintarCobros(); }; });
+  [].forEach.call(document.querySelectorAll('#tCobros [data-pdf]'),function(b){ b.onclick=function(){ b.disabled=true; pedirCobrosPdf(b.dataset.pdf); }; });
+  [].forEach.call(document.querySelectorAll('#tCobros [data-ver]'),function(b){ b.onclick=function(){ var k=b.dataset.ver, p=(C.pdf||{})[k]||{}; if(p.pdf64) abrirPdf64(p.pdf64,'Cobros pendientes '+k+'.pdf'); }; });
+  [].forEach.call(document.querySelectorAll('#tCobros [data-env]'),function(b){ b.onclick=function(){ var k=b.dataset.env, c=lista.find(function(x){return String(x.codigo)===k;})||{}, em=(con[k]||{}).email||''; if(!confirm('¿Enviar a '+(c.nombre||k)+' ('+em+') su estado de cuenta con '+eur2(c.pendiente)+' pendientes?')) return; b.disabled=true; db.ref('buscaflor/cobros/envios').push({cliente:k, nombre:c.nombre||'', para:em, pendiente:c.pendiente||0, estado:'pedido', pedido:new Date().toISOString(), por:'app'}); }; });
+  var ba=document.getElementById('cAct'); ba.onclick=function(){ ba.disabled=true; db.ref('buscaflor/peticiones/cobros').set({estado:'pedida', pedido:new Date().toISOString(), por:'app'}); setTimeout(function(){ba.disabled=false;},10000); };
+  var ib=document.getElementById('cBus'); if(!ib.__on){ ib.__on=1; ib.oninput=function(){ pintarCobros(); }; }
+}
 function pintar(){
   try{ pintarResumen(); }catch(e){ console.error(e); }
+  try{ pintarCobros(); }catch(e){ console.error(e); }
   try{ pintarFincas(); }catch(e){ console.error(e); }
   try{ pintarEquipo(); }catch(e){ console.error(e); }
   var dash=D.dash||{};
@@ -552,6 +591,11 @@ function pintarEquipo(){
 cargarEquipo(); setInterval(cargarEquipo,120000);
 
 oir('buscaflor/fincas','fincas', function(v){return v||{};});
+oir('buscaflor/cobros/resumen','cobRes');
+oir('buscaflor/cobros/pdf','cobPdf');
+oir('buscaflor/cobros/envios','cobEnv');
+oir('buscaflor/peticiones/cobros','petCobros');
+if(!D.contactos) oir('buscaflor/contactos','contactos', function(v){ var o={}; if(Array.isArray(v)) v.forEach(function(x,i){ if(x) o[i]=x; }); else if(v) o=v; return o; });
 oir('buscaflor/ventasAmbarx','ventasAmbarx', function(v){return v||{};});
 oir('buscaflor/clientes/items','clientes', function(v){return v||{};});
 oir('buscaflor/articulos/items','articulos', function(v){return v||{};});
