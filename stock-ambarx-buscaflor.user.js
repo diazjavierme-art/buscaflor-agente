@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.14
+// @version      0.9.15
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -446,12 +446,15 @@
     if (e0 && e0[1] > 0 && e0[0] >= e0[1] - 0.005) { cancelar(); return 'yaCobrado'; }
     const tfs = [...caja.querySelectorAll('vaadin-text-field')];
     if (banco) {
-      const fb0 = tfs[0];
-      if (!fb0) { cancelar(); throw new Error('No encuentro «Banco» en la ventana de cobro'); }
-      fb0.focus(); fb0.value = banco; fb0.dispatchEvent(new W.CustomEvent('change', { bubbles: true }));
-      const ib = fb0.inputElement || fb0.querySelector('input'); if (ib) { ib.dispatchEvent(new W.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); ib.blur(); }
-      const okB = await hastaQue(() => [...caja.querySelectorAll('vaadin-custom-field')].some(x => String(x.value || '').indexOf(banco + ' - ') === 0), 8000);
-      if (!okB) { const v = [...caja.querySelectorAll('vaadin-custom-field')].map(x => String(x.value || '')).join(' | '); cancelar(); throw new Error('AmbarX no reconoce el banco ' + banco + ' (' + v + ')'); }
+      // El banco solo se resuelve con eventos del input nativo y al perder el foco (probado en AmbarX, 24-11)
+      const fb0 = tfs[0], ib = fb0 && (fb0.inputElement || fb0.querySelector('input'));
+      if (!ib) { cancelar(); throw new Error('No encuentro «Banco» en la ventana de cobro'); }
+      ib.focus(); ib.value = banco;
+      ib.dispatchEvent(new W.InputEvent('input', { bubbles: true, composed: true }));
+      ib.dispatchEvent(new W.Event('change', { bubbles: true, composed: true }));
+      ib.dispatchEvent(new W.FocusEvent('blur')); ib.dispatchEvent(new W.FocusEvent('focusout', { bubbles: true, composed: true }));
+      const okB = await hastaQue(() => String(fb0.value || '').indexOf(banco + ' - ') === 0, 8000);
+      if (!okB) { cancelar(); throw new Error('AmbarX no reconoce el banco ' + banco + ' (' + fb0.value + ')'); }
       await espera(600);
     }
     const fp = tfs[1];
