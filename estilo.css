@@ -1,0 +1,129 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Coral system, blue signal (by request) · redesign: restyle
+ * nav: kept per page · signature: the navy lead card · states: kept as each app writes them
+ * axes: light/grotesk-sans/cool · posture: restrained · contrast: pass · v2.0.0 */
+/* Hallmark · answered: one shared look for Pedidos, Reparto, Stock and the shell; the user asked to return to the brand blue · copy: verbatim */
+
+/* Estilo común de Buscaflor. Se carga después del estilo propio de cada página
+   y solo cambia colores, tipografía, bordes y sombras: no toca la lógica. */
+:root{
+  /* paleta azul de la marca */
+  --b-paper: oklch(97.4% 0.005 250);
+  --b-paper-2: oklch(95% 0.008 250);
+  --b-paper-3: oklch(92% 0.011 250);
+  --b-cotton: oklch(99.6% 0.002 250);
+  --b-ink: oklch(22% 0.03 255);
+  --b-ink-2: oklch(30% 0.035 255);
+  --b-muted: oklch(50% 0.02 255);
+  --b-rule: oklch(90.5% 0.008 255);
+  --b-rule-2: oklch(84% 0.012 255);
+  --b-navy: oklch(31% 0.05 255);
+  --b-navy-2: oklch(38% 0.07 255);
+  --b-blue: oklch(54% 0.15 258);
+  --b-blue-hi: oklch(66% 0.12 248);
+  --b-blue-soft: oklch(94.5% 0.025 255);
+  --b-on-navy: oklch(98% 0.005 250);
+  --b-on-navy-2: oklch(84% 0.03 250);
+  --b-green: oklch(50% 0.11 155); --b-green-soft: oklch(95% 0.035 155);
+  --b-red: oklch(52% 0.18 27); --b-red-soft: oklch(95% 0.03 27);
+  --b-gold: oklch(62% 0.12 75); --b-gold-soft: oklch(96% 0.04 85);
+  --b-focus: oklch(54% 0.15 258);
+  --b-shade: 30% 0.04 255; --b-lit: 100% 0 0;
+  --b-edge: inset 0 1px 0 oklch(var(--b-lit) / 0.9), 0 0 0 0.5px oklch(var(--b-shade) / 0.16), 0 1px 0 oklch(var(--b-shade) / 0.08);
+  --b-cast: 6px 6px 14px -8px oklch(var(--b-shade) / 0.28);
+  --b-cast-lift: 10px 12px 22px -10px oklch(var(--b-shade) / 0.32);
+  --b-lead: 0 14px 30px -14px oklch(38% 0.1 258 / 0.55);
+  --b-font: "General Sans", ui-sans-serif, system-ui, sans-serif;
+  --b-mono: "Geist Mono", ui-monospace, monospace;
+  --b-r: 16px; --b-r-ctl: 10px; --b-s1: 4px; --b-s2: 8px; --b-on-navy-glass: oklch(100% 0 0 / 0.12);
+  --b-dur: 140ms; --b-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* nombres que ya usan las páginas */
+  --navy: var(--b-navy); --navy-dark: var(--b-ink); --navy-2: var(--b-navy-2); --navy-suave: var(--b-blue-soft);
+  --papel: var(--b-cotton); --fondo: var(--b-paper); --tinta: var(--b-ink); --gris: var(--b-muted); --gris-2: var(--b-rule-2);
+  --filo: var(--b-rule); --verde: var(--b-green); --verde-suave: var(--b-green-soft); --rojo: var(--b-red); --rojo-suave: var(--b-red-soft);
+  --oro: var(--b-gold); --oro-suave: var(--b-gold-soft);
+  --bg: var(--b-paper); --line: var(--b-rule); --muted: var(--b-muted); --soft: var(--b-blue-soft);
+  --r: var(--b-r); --sombra: var(--b-edge), var(--b-cast);
+}
+html, body { overflow-x: clip; }
+body { background: var(--b-paper); color: var(--b-ink); font-family: var(--b-font); -webkit-font-smoothing: antialiased; }
+body, button, input, select, textarea { font-family: var(--b-font); }
+:focus-visible { outline: 2px solid var(--b-focus); outline-offset: 2px; }
+::selection { background: var(--b-blue-soft); color: var(--b-ink); }
+
+/* cifras en columna */
+td, .imp, .cod, .f-cant, .resumen b { font-family: var(--b-mono); font-variant-numeric: tabular-nums; }
+td:first-child, td.txt { font-family: var(--b-font); }
+
+/* títulos y etiquetas: frase normal, sin mayúsculas espaciadas */
+h1, h2, h3, .h-title, .cult-nombre { font-family: var(--b-font); font-weight: 600; letter-spacing: -0.02em; text-wrap: balance; }
+th, label, .proy-lbl, .h-sub, .marca .sub, .resumen span, h2 { text-transform: none; letter-spacing: 0; }
+
+/* cabeceras claras (Stock y Pedidos) */
+header:not(.azul) { background: var(--b-cotton); border-bottom: 1px solid var(--b-rule); }
+header:not(.azul) h1, .h-title { color: var(--b-ink); }
+header.azul { background: radial-gradient(120% 160% at 0% 0%, var(--b-navy-2), var(--b-navy) 55%, var(--b-ink)); box-shadow: var(--b-lead); border-radius: 0 0 22px 22px; }
+.h-sub { background: var(--b-blue-soft); color: var(--b-navy); font-weight: 500; }
+
+/* pestañas tipo píldora */
+.tabs { background: var(--b-cotton); border-bottom: 1px solid var(--b-rule); gap: var(--b-s1); padding: var(--b-s2); }
+.tab { border-bottom: 0; border-radius: var(--b-r-ctl); color: var(--b-muted); font-weight: 500; transition: background-color var(--b-dur) var(--b-ease), color var(--b-dur) var(--b-ease); }
+.tab:hover { background: var(--b-paper-2); color: var(--b-ink); }
+.tab.activa { background: var(--b-navy); color: var(--b-on-navy); border-bottom: 0; }
+
+/* botones */
+.btn { border-radius: var(--b-r-ctl); border: 0; background: var(--b-cotton); color: var(--b-navy); font-weight: 500; box-shadow: var(--b-edge), var(--b-cast); transition: transform var(--b-dur) var(--b-ease), box-shadow var(--b-dur) var(--b-ease), background-color var(--b-dur) var(--b-ease); }
+.btn:hover { transform: translateY(-1px); box-shadow: var(--b-edge), var(--b-cast-lift); }
+.btn:active { transform: translateY(1px); box-shadow: var(--b-edge); }
+.btn.primario { background: var(--b-navy); color: var(--b-on-navy); box-shadow: var(--b-cast); }
+.btn.primario:hover { background: var(--b-navy-2); }
+.btn.verde { background: var(--b-green); color: var(--b-on-navy); box-shadow: var(--b-cast); }
+.btn.peligro { background: var(--b-cotton); color: var(--b-red); }
+.btn.destacado { background: var(--b-blue); color: var(--b-on-navy); }
+.btn:disabled, .btn[disabled] { background: var(--b-paper-3); color: var(--b-muted); box-shadow: none; transform: none; cursor: not-allowed; opacity: 1; }
+
+/* tarjetas */
+.card, .pa-card, .linea, .resumen, .hoja-cuerpo .card { border: 0; border-radius: var(--b-r); background: var(--b-cotton); box-shadow: var(--b-edge), var(--b-cast); }
+.linea { border-radius: 12px; }
+.linea.duda { box-shadow: 0 0 0 1.5px var(--b-gold), var(--b-cast); }
+.card-head b { color: var(--b-ink); }
+
+/* campos */
+input, select, textarea, .busca, .proy-custom { border: 1px solid var(--b-rule-2); border-radius: var(--b-r-ctl); background: var(--b-cotton); color: var(--b-ink); box-shadow: none; }
+input:focus, select:focus, textarea:focus, .busca:focus { outline: none; box-shadow: none; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, .busca:focus-visible { outline: 2px solid var(--b-focus); outline-offset: 1px; }
+
+/* tablas */
+th { color: var(--b-muted); font-weight: 500; }
+td { border-top-color: var(--b-rule); }
+
+/* avisos y etiquetas */
+.alerta { border-radius: 12px; }
+.tag { border-radius: 999px; font-weight: 500; }
+.tag.ab { background: var(--b-blue-soft); color: var(--b-navy); }
+.toast { background: var(--b-ink); color: var(--b-on-navy); border-radius: 12px; box-shadow: var(--b-cast-lift); }
+.dd { border-radius: 12px; box-shadow: var(--b-cast-lift); }
+.hoja { border-radius: 22px 22px 0 0; }
+.modal .hoja, .sd { border-radius: var(--b-r); }
+.barra { background: var(--b-blue-soft); }
+.pa-ultima { background: linear-gradient(135deg, var(--b-navy), var(--b-blue)); color: var(--b-on-navy); border-radius: var(--b-r); box-shadow: var(--b-lead); }
+
+/* Reparto: la cabecera es la tarjeta azul principal */
+header.azul .fecha { background: var(--b-on-navy-glass); }
+header .marca .logo { background: var(--b-on-navy); color: var(--b-navy); }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+@media print { body { background: none; } .card, .pa-card, .linea, .resumen, .btn { box-shadow: none; border: 1px solid var(--b-rule); } .pa-ultima { background: none; color: var(--b-ink); box-shadow: none; } }
+
+/* Marco de la app (app.html): barra de navegación igual que el cuadro de mando */
+#nav { background: var(--b-cotton); border-color: var(--b-rule); }
+#nav button { font-weight: 500; color: var(--b-muted); transition: background-color var(--b-dur) var(--b-ease), color var(--b-dur) var(--b-ease); }
+#nav button:hover { color: var(--b-ink); }
+#nav button.on { color: var(--b-navy); }
+#nav button.on svg { background: var(--b-blue-soft); }
+#nav .marca { background: radial-gradient(120% 140% at 0% 0%, var(--b-blue-hi), var(--b-navy) 70%); color: var(--b-on-navy); font-weight: 600; box-shadow: var(--b-lead); }
+@media (min-width: 900px) {
+  #nav button { border-radius: 14px; }
+  #nav button.on { background: var(--b-navy); color: var(--b-on-navy); }
+  #nav button.on svg { background: none; stroke: var(--b-blue-hi); }
+}
