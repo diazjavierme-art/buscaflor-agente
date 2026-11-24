@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.4
+// @version      0.9.5
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -851,7 +851,7 @@
       const p = await fb('GET', RUTA_PET);
       if (p && p.pedido && p.estado === 'pedido' && (!p.atendido || p.pedido > p.atendido)) { await subirStock(p.pedido); return; }
       const r = await fb('GET', RUTA_PET_REP);
-      if (r && r.pedido && r.estado === 'pedido' && (!r.atendido || r.pedido > r.atendido)) { ultimoAutoRep = Date.now(); await subirReparto(r.fecha, r.pedido, true); return; }
+      if (r && r.pedido && (r.estado === 'pedido' || (r.estado === 'enCurso' && Date.now() - new Date(r.empezado || 0).getTime() > 20 * 60000)) && (!r.atendido || r.pedido > r.atendido)) { ultimoAutoRep = Date.now(); await subirReparto(r.fecha, r.pedido, true); return; }
       await pasarEntregas(); if (ocupado) return;
       { const d = new Date(), manana = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1), mF = d.getHours() * 60 + d.getMinutes();
         if (manana.getDate() === 1 && mF >= 20 * 60 && mF <= 23 * 60 + 50) {
