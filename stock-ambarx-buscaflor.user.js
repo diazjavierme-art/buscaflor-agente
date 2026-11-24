@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.8
+// @version      0.9.9
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además sube los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -27,7 +27,7 @@
   const CADA = 15000;                               // cada cuánto mira si hay peticiones
   const RUTA_PET_REP = 'buscaflor/peticiones/reparto'; // {pedido, fecha, por, estado, hecho, docs, error}
   const RUTA_REP = 'buscaflor/reparto';                // /<YYYY-MM-DD>/docs/<nº>
-  const REP_AUTO_MIN = 10;                             // de 6:30 a 15:00 refresca solo cada 10 min
+  const REP_AUTO_MIN = 1;                              // de 6:30 a 15:00 refresca solo cada minuto (antes 10; Javier, 24-11)
 
   const pad = n => String(n).padStart(2, '0');
   const ahoraISO = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
