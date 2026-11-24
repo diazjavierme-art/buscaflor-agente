@@ -178,11 +178,155 @@ async function leerVerdnatura(browser, motivo) {
   } catch (e) { log('Verdnatura: error', e.message); }
   finally { vnOcupado = false; await page.close().catch(() => {}); }
 }
+
+// ---------------- Verdnatura: grabar en AmbarX los tickets leídos (AC serie E, plantilla Excel) ----------------
+const zlib = require('zlib');
+const CRC_T = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = b => { let c = 0xFFFFFFFF; for (const x of b) c = CRC_T[(c ^ x) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function zip(archivos) { // [{nombre, datos(Buffer)}] -> Buffer
+  const partes = [], central = []; let off = 0;
+  for (const f of archivos) {
+    const nom = Buffer.from(f.nombre), comp = zlib.deflateRawSync(f.datos), crc = crc32(f.datos);
+    const h = Buffer.alloc(30); h.writeUInt32LE(0x04034b50, 0); h.writeUInt16LE(20, 4); h.writeUInt16LE(0, 6); h.writeUInt16LE(8, 8); h.writeUInt32LE(0, 10);
+    h.writeUInt32LE(crc, 14); h.writeUInt32LE(comp.length, 18); h.writeUInt32LE(f.datos.length, 22); h.writeUInt16LE(nom.length, 26); h.writeUInt16LE(0, 28);
+    partes.push(h, nom, comp);
+    const c = Buffer.alloc(46); c.writeUInt32LE(0x02014b50, 0); c.writeUInt16LE(20, 4); c.writeUInt16LE(20, 6); c.writeUInt16LE(0, 8); c.writeUInt16LE(8, 10); c.writeUInt32LE(0, 12);
+    c.writeUInt32LE(crc, 16); c.writeUInt32LE(comp.length, 20); c.writeUInt32LE(f.datos.length, 24); c.writeUInt16LE(nom.length, 28); c.writeUInt32LE(off, 42);
+    central.push(c, nom); off += 30 + nom.length + comp.length;
+  }
+  const cd = Buffer.concat(central), fin = Buffer.alloc(22); fin.writeUInt32LE(0x06054b50, 0); fin.writeUInt16LE(archivos.length, 8); fin.writeUInt16LE(archivos.length, 10);
+  fin.writeUInt32LE(cd.length, 12); fin.writeUInt32LE(off, 16);
+  return Buffer.concat([...partes, cd, fin]);
+}
+const xmlEsc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function xlsx(filas) { // filas: array de arrays; Date -> fecha dd/mm/yyyy; número -> número; resto texto
+  const col = i => { let s = ''; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+  const serie = d => (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(1899, 11, 30)) / 86400000;
+  const hoja = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' +
+    filas.map((f, r) => '<row r="' + (r + 1) + '">' + f.map((v, c) => { const ref = col(c) + (r + 1);
+      if (v === null || v === undefined || v === '') return '';
+      if (v instanceof Date) return '<c r="' + ref + '" s="1"><v>' + serie(v) + '</v></c>';
+      if (typeof v === 'number') return '<c r="' + ref + '"><v>' + v + '</v></c>';
+      return '<c r="' + ref + '" t="inlineStr"><is><t>' + xmlEsc(v) + '</t></is></c>'; }).join('') + '</row>').join('') + '</sheetData></worksheet>';
+  const A = (n, t) => ({ nombre: n, datos: Buffer.from(t) });
+  return zip([
+    A('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'),
+    A('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'),
+    A('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Documentos" sheetId="1" r:id="rId1"/></sheets></workbook>'),
+    A('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'),
+    A('xl/styles.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/></numFmts><fonts count="1"><font><sz val="11"/><name val="Arial"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf numFmtId="164" applyNumberFormat="1"/></cellXfs></styleSheet>'),
+    A('xl/worksheets/sheet1.xml', hoja),
+  ]);
+}
+
+const sinAcentos = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+const COLORES = { RED: 'ROJO', WHITE: 'BLANCO', PINK: 'ROSA', 'LIGHT PINK': 'ROSA', YELLOW: 'AMARILLO', ORANGE: 'NARANJA', PURPLE: 'MORADO', CARAMEL: 'CARAMELO', BURGUNDY: 'BURGUNDY', FUCHSIA: 'FUCSIA', FUCSIA: 'FUCSIA', 'DARK PINK': 'FUCSIA', BICOLOR: 'BICOLOR', MIX: 'MIXTO', MIXED: 'MIXTO' };
+const GENERICOS = [[/^CALA\b/, '868'], [/^LO\b|^LILIUM ORIENTAL/, '352'], [/^HC\b|^HYPERICUM|^HIPERICUM/, '587'], [/^TANACETUM|^MANZANILLA/, '298'], [/^EUCALIPTO/, '903']];
+function buscarIgual(nombre, medida, cat) {
+  const n = sinAcentos(nombre), porDesc = d => Object.values(cat).find(a => sinAcentos(a.descripcion) === d);
+  let m = /^CL (.+?) (FCY|FANCY|SEL|SELECT)\b/.exec(n);
+  if (m) { const col = COLORES[m[1]]; if (col) { const f = /^F/.test(m[2]); const a = porDesc(f ? 'CLAVEL FCY ' + col : 'CLAVEL SELECT ' + col) || (f ? porDesc('CLAVEL FANCY ' + col) : porDesc('CLAVEL ' + col + ' SELECT')); if (a) return { codigo: a.codigo, factor: 1, desc: a.descripcion }; } return null; }
+  m = /^ALS\b.*\b(FCY|SEL|SUP)\b/.exec(n);
+  if (m) return { FCY: { codigo: '367', factor: 10, desc: 'ALSTROEMERIAS 60CM FANCY' }, SEL: { codigo: '245', factor: 10, desc: 'ALSTROEMERIAS SELECT' }, SUP: { codigo: '454', factor: 10, desc: 'ALSTROEMERIAS SUPER SELECT' } }[m[1]];
+  m = /^RS (.+?) (SEL|SUP|FCY|PRE|EXT)?\s*$/.exec(n);
+  if (m && medida) { const v = m[1].replace(/\s+/g, ''); const a = Object.values(cat).find(x => x.variedad && sinAcentos(x.variedad).replace(/\s+/g, '') === v && Number(x.medida) === Number(medida)); if (a) return { codigo: a.codigo, factor: 25, desc: a.descripcion }; return null; }
+  for (const [re, cod] of GENERICOS) if (re.test(n) && cat[cod]) return { codigo: cod, factor: 1, desc: cat[cod].descripcion };
+  return null;
+}
+async function irAmbarx(page, ruta) {
+  if (!/\/AmbarX\//.test(page.url())) { await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }); await espera(5000); }
+  await page.evaluate(r => { const a = document.createElement('a'); a.href = r; a.setAttribute('router-link', ''); document.body.appendChild(a); a.click(); a.remove(); }, ruta);
+  await espera(4000);
+}
+const HONDO = `const hondo=(r,s)=>{const o=[];const w=n=>{if(!n||!n.querySelectorAll)return;n.querySelectorAll(s).forEach(e=>o.push(e));n.querySelectorAll('*').forEach(e=>{if(e.shadowRoot)w(e.shadowRoot)})};w(r);return o};const vis=e=>e.getBoundingClientRect().width>0;`;
+async function crearArticulo(page, codigo, descripcion) {
+  await irAmbarx(page, 'articulos/nuevo');
+  for (const [lab, val] of [['Código', codigo], ['Descripción', descripcion]]) {
+    const ok = await page.evaluate(new Function('lab', HONDO + "const f=hondo(document,'vaadin-text-field').find(x=>x.label===lab&&vis(x)); if(!f) return false; f.inputElement.focus(); f.inputElement.select(); return true;"), lab);
+    if (!ok) throw new Error('no encuentro el campo ' + lab + ' en el alta de artículo');
+    await page.keyboard.type(String(val)); await page.keyboard.press('Tab'); await espera(600);
+  }
+  await page.evaluate(new Function(HONDO + "hondo(document,'vaadin-button').find(b=>vis(b)&&(b.querySelector('vaadin-icon')||{}).icon==='vaadin:check').click();"));
+  for (let i = 0; i < 15; i++) {
+    await espera(1000);
+    const t = await page.evaluate(new Function(HONDO + "return hondo(document,'vaadin-notification-card').map(n=>n.innerText).join(' | ');")).catch(() => '');
+    if (/creado/i.test(t)) return true;
+    if (/error|existe|no se puede/i.test(t)) throw new Error('alta de artículo: ' + t.slice(0, 150));
+  }
+  throw new Error('el alta del artículo ' + codigo + ' no se confirmó');
+}
+async function importarPlantilla(page, ruta) {
+  await irAmbarx(page, 'utilidades/importacion-documentos');
+  const input = await page.evaluateHandle(new Function(HONDO + "return hondo(document,'input[type=file]')[0];"));
+  if (!input || !input.asElement()) throw new Error('no encuentro el botón de subir ficheros');
+  await input.asElement().uploadFile(ruta);
+  await espera(4000);
+  await page.evaluate(new Function(HONDO + "const b=hondo(document,'vaadin-button').find(b=>vis(b)&&/^Leer \\d+ documento/.test((b.innerText||'').trim())); if(b) b.click();"));
+  const nombre = path.basename(ruta);
+  for (let i = 0; i < 40; i++) {
+    await espera(1500);
+    const t = await page.evaluate(n => (document.body.innerText.split('\n').filter(l => l.startsWith(n + ':') && !/100%$/.test(l)).pop() || ''), nombre).catch(() => '');
+    if (/grabado/i.test(t)) return t;
+    if (/error|no se ha|rechaz/i.test(t)) throw new Error(t.slice(0, 200));
+  }
+  throw new Error('AmbarX no confirmó la importación de ' + nombre);
+}
+async function grabarVerdnatura(browser) {
+  const tickets = (await fb('GET', 'buscaflor/verdnatura/tickets').catch(() => null)) || {};
+  const pend = Object.values(tickets).filter(t => t.estado === 'pendiente' || (t.estado === 'error' && (t.intentos || 0) < 3)).sort((a, b) => String(a.numero).localeCompare(String(b.numero)));
+  if (!pend.length) return;
+  const cat = (await fb('GET', 'buscaflor/articulos/items').catch(() => null)) || {};
+  const equiv = (await fb('GET', 'buscaflor/verdnatura/equivalencias').catch(() => null)) || {};
+  const page = await browser.newPage();
+  try {
+    for (const t of pend) {
+      try {
+        const filas = [['DOC', 'TIPO', 'SERIE', 'FECHA', 'CLIENTE', 'PROVEEDOR', 'REFERENCIA', 'FECHA_REFERENCIA', 'ALMACEN', 'OBSERVACIONES', 'ARTICULO', 'DESCRIPCION', 'CANTIDAD', 'PRECIO', 'DTO1', 'DTO2', 'DTO3', 'IVA%', 'LOTE', 'CADUCIDAD']];
+        const [y, mo, d] = String(t.entrega).split('-').map(Number); const fecha = new Date(y, mo - 1, d);
+        const codigos = [], nuevos = [], usados = [];
+        for (const l of t.lineas || []) {
+          const medida = ((/(\d+)\s*cm/i.exec(l.detalle || '') || [])[1]) || '';
+          const clave = (l.nombre + '|' + medida).replace(/[.#$\/\[\]]/g, '-');
+          let e = equiv[clave];
+          if (!e) {
+            e = buscarIgual(l.nombre, medida, cat);
+            if (e) { e = { ...e, origen: 'busqueda' }; usados.push(l.nombre + ' ' + medida + ' → ' + e.codigo + ' ' + e.desc); }
+            else {
+              const max = Math.max(...Object.keys(cat).filter(c => /^\d+$/.test(c)).map(Number), 0);
+              const codigo = String(max + 1), desc = sinAcentos(l.nombre + (medida ? ' ' + medida + 'CM' : '')).replace(/[.#$\/\[\]]/g, '-').slice(0, 60);
+              await crearArticulo(page, codigo, desc);
+              cat[codigo] = { codigo, descripcion: desc };
+              e = { codigo, factor: 1, desc, origen: 'nuevo' }; nuevos.push(codigo + ' ' + desc);
+              log('Verdnatura: artículo nuevo ' + codigo + ' ' + desc);
+            }
+            equiv[clave] = e; await fb('PUT', 'buscaflor/verdnatura/equivalencias/' + encodeURIComponent(clave), e).catch(() => {});
+          }
+          const f = Number(e.factor) || 1;
+          let cant = Math.round((Number(l.cantidad) / f) * 1000) / 1000, precio = Math.round(Number(l.precio) * f * 10000) / 10000;
+          if (t.abono && cant > 0) cant = -cant;
+          codigos.push(e.codigo);
+          filas.push(['VN-' + t.numero, 'AC', 'E', fecha, null, '149', String(t.numero), fecha, null, 'Verdnatura ' + (t.abono ? 'abono ' + t.numero + (t.abonoDe ? ' del ticket ' + t.abonoDe : '') : 'ticket ' + t.numero), String(e.codigo), (l.nombre + ' · ' + (l.detalle || '')).slice(0, 100), cant, precio, null, null, null, 10, null, null]);
+        }
+        const dirTmp = path.join(DIR, 'tmp'); fs.mkdirSync(dirTmp, { recursive: true });
+        const ruta = path.join(dirTmp, 'VN-' + t.numero + '.xlsx'); fs.writeFileSync(ruta, xlsx(filas));
+        const res = await importarPlantilla(page, ruta);
+        const ac = ((/(AC\s+[A-Z]-\d+)/.exec(res) || [])[1]) || res;
+        await fb('PATCH', 'buscaflor/verdnatura/tickets/' + t.numero, { estado: 'grabado', ambarx: ac, grabado: ahoraLocal(), por: 'robot', codigos, error: null });
+        if (nuevos.length || usados.length) await fb('POST', 'buscaflor/verdnatura/avisos', { fecha: ahoraLocal(), ticket: t.numero, ambarx: ac, articulosNuevos: nuevos, equivalenciasNuevas: usados, visto: false }).catch(() => {});
+        log('Verdnatura: ticket ' + t.numero + ' grabado en AmbarX como ' + ac + (nuevos.length ? ' (artículos nuevos: ' + nuevos.join(', ') + ')' : ''));
+      } catch (e) {
+        log('Verdnatura: no se pudo grabar el ticket ' + t.numero + ': ' + e.message);
+        await fb('PATCH', 'buscaflor/verdnatura/tickets/' + t.numero, { estado: 'error', error: e.message.slice(0, 300), intentos: (t.intentos || 0) + 1 }).catch(() => {});
+      }
+    }
+  } finally { await page.close().catch(() => {}); }
+}
+
 async function vigilarVerdnatura(browser) {
   const h = new Date(), hoy = ahoraLocal().slice(0, 10);
-  if (h.getDay() !== 0 && h.getHours() === 15 && vnUltimoDia !== hoy) { vnUltimoDia = hoy; await leerVerdnatura(browser, '15:00'); return; }
+  if (h.getDay() !== 0 && h.getHours() === 15 && vnUltimoDia !== hoy) { vnUltimoDia = hoy; await leerVerdnatura(browser, '15:00'); await grabarVerdnatura(browser); return; }
   const p = await fb('GET', 'buscaflor/peticiones/verdnatura', undefined).catch(() => null);
-  if (p && p.estado === 'pedida') { log('Verdnatura: petición desde la app'); await fb('PATCH', 'buscaflor/peticiones/verdnatura', { estado: 'enCurso' }).catch(() => {}); await leerVerdnatura(browser, 'pedido desde la app'); await fb('PATCH', 'buscaflor/peticiones/verdnatura', { estado: 'hecha', hecho: ahoraLocal() }).catch(() => {}); }
+  if (p && p.estado === 'pedida') { log('Verdnatura: petición desde la app'); await fb('PATCH', 'buscaflor/peticiones/verdnatura', { estado: 'enCurso' }).catch(() => {}); await leerVerdnatura(browser, 'pedido desde la app'); await grabarVerdnatura(browser); await fb('PATCH', 'buscaflor/peticiones/verdnatura', { estado: 'hecha', hecho: ahoraLocal() }).catch(() => {}); }
 }
 
 async function sesion() {
