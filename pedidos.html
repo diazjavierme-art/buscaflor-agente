@@ -1660,7 +1660,7 @@ verTab(window.innerWidth>=900 ? 'pantalla' : 'abiertos');
   }
   firebase.auth().onAuthStateChanged(function(u){
     if (u && /@reparto\.rosasdebuscaflor\.com$/i.test(u.email || '')) { location.replace('reparto.html'); return; }
-    if (u) { caja.style.display = 'none'; salir.textContent = 'Salir (' + u.email + ')'; salir.style.display = 'block'; arrancar(); }
+    if (u) { try{ var _sr=/^facturasbuscaflor@gmail\.com$/i.test(u.email||''); localStorage.setItem('bf_sin_resumen', _sr?'1':''); if(window.top!==window.self) window.parent.postMessage({bf:'usuario', sinResumen:_sr}, '*'); }catch(e){} caja.style.display = 'none'; salir.textContent = 'Salir (' + u.email + ')'; salir.style.display = 'block'; arrancar(); }
     else if (arrancada) { location.reload(); }
     else { caja.style.display = 'flex'; salir.style.display = 'none'; document.getElementById('bfEmail').focus(); }
   });

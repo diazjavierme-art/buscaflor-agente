@@ -62,7 +62,14 @@ nav .marca{display:none;align-items:center;justify-content:center;width:44px;hei
     document.title='Buscaflor · '+b.textContent.trim();
   }
   botones.forEach(function(b){ b.onclick=function(){ if(b.classList.contains('on') && abiertos[b.dataset.t]){ try{ abiertos[b.dataset.t].contentWindow.location.reload(); }catch(e){} } else ir(b.dataset.t); }; });
-  var ini=(location.hash||'').slice(1); try{ ini=ini||localStorage.getItem('bf_app_tab')||'dashboard'; }catch(e){ ini=ini||'dashboard'; }
+  // Usuarios sin resumen (cuenta compartida de los repartidores): se oculta la pestaña Resumen
+  var bRes=botones.filter(function(x){return x.dataset.t==='dashboard';})[0];
+  function sinResumen(si){ bRes.style.display=si?'none':''; if(si){ botones=botones.filter(function(x){return x!==bRes;}); if(abiertos.dashboard){ abiertos.dashboard.remove(); delete abiertos.dashboard; ir('pedidos'); } } }
+  window.addEventListener('message', function(ev){ var d=ev.data||{}; if(d.bf==='usuario'){ if(d.sinResumen) sinResumen(true); else if(bRes.style.display==='none'){ location.reload(); } } });
+  var oculto=false; try{ oculto=localStorage.getItem('bf_sin_resumen')==='1'; }catch(e){}
+  if(oculto) sinResumen(true);
+  var ini=(location.hash||'').slice(1); try{ ini=ini||localStorage.getItem('bf_app_tab')||(oculto?'pedidos':'dashboard'); }catch(e){ ini=ini||'dashboard'; }
+  if(oculto && ini==='dashboard') ini='pedidos';
   ir(ini);
 })();
 </script>
