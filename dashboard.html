@@ -573,7 +573,7 @@ function pintar(){
   try{ pintarFincas(); }catch(e){ console.error(e); }
   try{ pintarEquipo(); }catch(e){ console.error(e); }
   var dash=D.dash||{};
-  document.getElementById('upd').textContent = 'Cifras financieras actualizadas el '+(dash.actualizado?dash.actualizado.slice(0,10).split('-').reverse().join('/'):'—')+' · operativa en vivo';
+  var _ua=[dash.actualizado, dash.acumuladoDiario&&dash.acumuladoDiario.actualizado].filter(Boolean).sort().pop(); document.getElementById('upd').textContent = 'Cifras financieras actualizadas el '+(_ua?_ua.slice(0,10).split('-').reverse().join('/')+(_ua.length>15?' '+_ua.slice(11,16):''):'—')+' · operativa en vivo';
 
   /* HOY */
   var st=D.stock||{}, items=st.items||{}, refs=Object.keys(items).length, uds=Object.values(items).reduce(function(s,x){return s+(+x.q||0);},0);
@@ -611,11 +611,17 @@ function pintar(){
 
   /* AÑO */
   var acu=dash.acumulado||{}, mens=dash.mensual||{}, obj=dash.objetivos||{}, objMB=obj.margenBrutoPct;
+  // Margen del día (tarea de las 15:30 y 21:00): suma al acumulado oficial los días posteriores, con coste de los inventarios
+  var ad=dash.acumuladoDiario, aprox='';
+  if(ad && ad.baseHasta===acu.hasta && ad.hasta>(acu.hasta||'')){
+    acu=Object.assign({}, acu, {ventaAmbarx:ad.ventaAmbarx, costeFlor:ad.costeFlor, margenAmbarx:ad.margenAmbarx, margenAmbarxPct:ad.margenAmbarxPct, ventaTotal:ad.ventaTotal, margenTotal:ad.margenTotal, margenTotalPct:ad.margenTotalPct, etiqueta:ad.etiqueta||acu.etiqueta});
+    aprox=' Del '+String(acu.hasta||'').split('-').reverse().join('/')+' en adelante es aproximado (albaranes del día y coste de los inventarios), actualizado '+String(ad.actualizado||'').slice(11,16)+'.';
+  }
   var vA=acu.ventaAmbarx!=null?acu.ventaAmbarx:(acu.venta? acu.venta/1.1 : null);
   var mA=acu.margenAmbarx!=null?acu.margenAmbarx:null, pA=acu.margenAmbarxPct!=null?acu.margenAmbarxPct:(vA&&mA!=null?mA/vA*100:null);
   var vT=acu.ventaTotal!=null?acu.ventaTotal:acu.venta, mT=acu.margenTotal!=null?acu.margenTotal:acu.margenBruto, pT=acu.margenTotalPct!=null?acu.margenTotalPct:acu.margenPct;
   var estr=(acu.gastos||0)+(acu.nave||0)+(acu.personal||0), contr=acu.estructuraContrastada===true;
-  document.getElementById('acuEtq').textContent = (acu.etiqueta||'')+' · Margen bruto = venta − coste de la flor puesta en el cliente (incluye palet y transporte a Sevilla y Chipiona).';
+  document.getElementById('acuEtq').textContent = (acu.etiqueta||'')+' · Margen bruto = venta − coste de la flor puesta en el cliente (incluye palet y transporte a Sevilla y Chipiona).'+aprox;
   document.getElementById('tAcu').innerHTML =
     tile('Venta AmbarX', eur(vA), acu.etiqueta||'') +
     tile('Margen bruto (venta AmbarX)', pct(pA), eur(mA)+' · coste flor '+eur(acu.costeFlor), objMB==null?'':(pA>=objMB?chip('ok','sobre objetivo '+pct(objMB,0)):chip('warn','bajo objetivo '+pct(objMB,0)))) +
