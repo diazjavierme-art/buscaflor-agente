@@ -16,8 +16,8 @@
   --b-muted: oklch(50% 0.02 255);
   --b-rule: oklch(90.5% 0.008 255);
   --b-rule-2: oklch(84% 0.012 255);
-  --b-navy: oklch(31% 0.05 255);
-  --b-navy-2: oklch(38% 0.07 255);
+  --b-navy: oklch(42% 0.075 255);
+  --b-navy-2: oklch(49% 0.085 255);
   --b-blue: oklch(54% 0.15 258);
   --b-blue-hi: oklch(66% 0.12 248);
   --b-blue-soft: oklch(94.5% 0.025 255);
@@ -31,7 +31,7 @@
   --b-edge: inset 0 1px 0 oklch(var(--b-lit) / 0.9), 0 0 0 0.5px oklch(var(--b-shade) / 0.16), 0 1px 0 oklch(var(--b-shade) / 0.08);
   --b-cast: 6px 6px 14px -8px oklch(var(--b-shade) / 0.28);
   --b-cast-lift: 10px 12px 22px -10px oklch(var(--b-shade) / 0.32);
-  --b-lead: 0 14px 30px -14px oklch(38% 0.1 258 / 0.55);
+  --b-lead: 0 14px 30px -14px oklch(42% 0.1 258 / 0.45);
   --b-font: "General Sans", ui-sans-serif, system-ui, sans-serif;
   --b-mono: "Geist Mono", ui-monospace, monospace;
   --b-r: 16px; --b-r-ctl: 10px; --b-s1: 4px; --b-s2: 8px; --b-on-navy-glass: oklch(100% 0 0 / 0.12);
@@ -62,7 +62,7 @@ th, label, .proy-lbl, .h-sub, .marca .sub, .resumen span, h2 { text-transform: n
 /* cabeceras claras (Stock y Pedidos) */
 header:not(.azul) { background: var(--b-cotton); border-bottom: 1px solid var(--b-rule); }
 header:not(.azul) h1, .h-title { color: var(--b-ink); }
-header.azul { background: radial-gradient(120% 160% at 0% 0%, var(--b-navy-2), var(--b-navy) 55%, var(--b-ink)); box-shadow: var(--b-lead); border-radius: 0 0 22px 22px; }
+header.azul { background: radial-gradient(120% 160% at 0% 0%, var(--b-navy-2), var(--b-navy) 70%); box-shadow: var(--b-lead); border-radius: 0 0 22px 22px; }
 .h-sub { background: var(--b-blue-soft); color: var(--b-navy); font-weight: 500; }
 
 /* pestañas tipo píldora */
