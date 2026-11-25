@@ -805,7 +805,10 @@ firebase.auth().onAuthStateChanged(function(u){
   caja.style.display='none'; arrancado=true;
   db.ref('buscaflor/configPedidos/direccionesReparto').on('value', function(s){ S.dirs=s.val()||{}; pintar(); });
   db.ref('buscaflor/configPedidos/coords').on('value', function(s){ S.coords=s.val()||{}; pintar(); });
-  db.ref('buscaflor/configPedidos/repartidores').on('value', function(s){ S.rep=s.val()||{}; aplicarQuien(); pintar(); }, function(e){ pintarError(e); });
+  var primeraVez=true;
+  db.ref('buscaflor/configPedidos/repartidores').on('value', function(s){ S.rep=s.val()||{}; aplicarQuien(); pintar();
+    // cuenta de oficina compartida: la primera vez en cada móvil se elige quién es (se recuerda)
+    if(primeraVez){ primeraVez=false; if(!S.esRep && !quien()) elegirQuien(); } }, function(e){ pintarError(e); });
   escuchar();
 });
 document.getElementById('bfLoginForm').onsubmit=function(e){
