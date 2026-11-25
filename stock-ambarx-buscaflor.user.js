@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.16
+// @version      0.9.17
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además lee el stock solo de lunes a sábado: cada 5 minutos de 7:00 a 15:00 y cada 45 minutos de 15:00 a 21:00. Sube también los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -629,6 +629,7 @@
     } catch (e) { return true; }
   }
 
+  let ultimoStock = '';
   async function subirStock(pedidoISO) {
     if (ocupado || !cogerCerrojo()) return;
     ocupado = true; ultimoErr = ''; fase = 'Empezando…'; pintar();
@@ -638,7 +639,7 @@
       fase = 'Subiendo a la app…'; pintar();
       await fb('PUT', RUTA_STOCK, s);
       await fb('PATCH', RUTA_PET, { estado: 'hecho', hecho: ahoraISO(), atendido: pedidoISO || ahoraISO(), leido: s.leido, registros: s.registros, total: s.total, error: null });
-      ultimo = { hora: ahoraISO(), n: s.registros, total: s.total, que: 'art.' };
+      ultimo = { hora: ahoraISO(), n: s.registros, total: s.total, que: 'art.' }; ultimoStock = ultimo.hora;
     } catch (e) {
       ultimoErr = String(e.message || e);
       try { await fb('PATCH', RUTA_PET, { estado: 'error', error: ultimoErr, atendido: pedidoISO || ahoraISO(), hecho: ahoraISO() }); } catch (e2) {}
@@ -929,7 +930,7 @@
     }
     badge.style.background = !sesion ? '#e67e22' : (ultimoErr ? '#c0392b' : (ocupado ? '#1f3a5f' : '#2e7d32'));
     badge.textContent = 'AmbarX → app: ' + (!sesion ? 'SIN SESIÓN (pulsa aquí)' : ocupado ? (fase || 'trabajando…') :
-      ultimoErr ? 'ERROR · ' + ultimoErr : ultimo ? 'subido ' + ultimo.hora.slice(11, 16) + ' (' + ultimo.n + ' ' + (ultimo.que || 'art.') + ')' : 'esperando peticiones') + (errSesion && sesion ? ' · ' + errSesion : '');
+      ultimoErr ? 'ERROR · ' + ultimoErr : ultimo ? 'subido ' + ultimo.hora.slice(11, 16) + ' (' + ultimo.n + ' ' + (ultimo.que || 'art.') + ')' : 'esperando peticiones') + (ultimoStock ? ' · stock ' + ultimoStock.slice(11, 16) : '') + ' · v' + ((typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '?') + (errSesion && sesion ? ' · ' + errSesion : '');
   }
   function menu() {
     if (document.getElementById('bf-stock-menu')) return;
