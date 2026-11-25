@@ -220,9 +220,12 @@ function leerDocumentoVuelo_(file, tipo, kgGuia, textoExcel) {
     'paquetes × tallos_paquete × usd_tallo = importe de la línea, y que la suma de todas las líneas da el total de tallos y el total USD. ' +
     'Cargos que NO son flor (documentos, cajas, handling…): una línea tipo OTROS con variedad = el concepto, paquetes 1, tallos_paquete 1 y ' +
     'usd_tallo = su importe; no los cuentes en "tallos". Si la factura no dice los tallos por ramo, en rosas son 25.' +
-    (textoExcel ? '\n\nLa factura viene en una HOJA DE CÁLCULO. Este es su contenido, fila a fila (celdas separadas por " | "):\n' + textoExcel : '');
+    (textoExcel ? '\n\nLa factura viene en una HOJA DE CÁLCULO. Este es su contenido, fila a fila (celdas separadas por " | "):\n' + textoExcel : '') +
+    pistaFarmKN_(file);                                   // copia del FARM INVOICES de K+N: solo la factura de esa finca
   let r = iaJson_(prompt, blob, 'application/pdf', 8000, VUELOS.MODELO_FACTURAS);
   if (!r) return null;
+  // Copia del FARM INVOICES en la que no está la finca: queda anotada como "otro documento" y no se vuelve a leer
+  if (RX_FARM_KN.test(file.getName()) && !r.numero && !(Number(r.total_usd) > 0)) { r._tipo = 'DOC'; return r; }
   repararFactura_(r);
   let c = cuadreFactura_(r);
   if (!c.ok) {
@@ -382,6 +385,9 @@ function probarExcel() {
 
 function evaluarVuelo_(awb, carpeta, semana, docs) {
   const mios = Object.keys(docs).filter(id => docs[id].awb === awb).map(id => Object.assign({ id: id }, docs[id]));
+  // FARM INVOICES de K+N (FarmInvoicesKN.gs): si la factura de la finca ya llegó por su cuenta, manda esa y la copia no cuenta
+  quitarCopiasFarmKN_(awb, mios);
+  const notaFarm = notaFarmKN_(mios);
   // Master: si hay varias (K+N manda varios informes), manda el Consolidation Report (CR). Los pre-alert ya vienen como PREALERT.
   const esCR = d => /(^|[_ ])CR[_ ]|consolidation/i.test(d.nombre || '');
   const esAWB = d => /(^|[_ ])AWB[_ ]/i.test(d.nombre || '') && !/DOCAWB/i.test(d.nombre || '');
@@ -498,6 +504,12 @@ function evaluarVuelo_(awb, carpeta, semana, docs) {
     if (!faltan.some(f => normHawb_(f.hawb) === normHawb_(a.hawb))) faltan.push({ finca: a.finca, hawb: a.hawb, piezas: a.piezas });
   });
   if (faltan.length) {
+    // Kuehne+Nagel: antes de avisar, las que faltan se sacan del FARM INVOICES del correo de K+N (Invos la manda tarde).
+    // Se leen en la próxima pasada; si con ellas ya están todas, sale el inventario.
+    if (guiaLlegada && esVueloKN_(carpeta, mios) && sacarDeFarmInvoicesKN_(awb, carpeta, faltan) > 0) {
+      actualizarVuelo_(hv, fila, awb, 'FACTURAS SACADAS DEL FARM INVOICES DE K+N (se leen en la próxima pasada)', '', '');
+      return;
+    }
     // Sin inventario hasta que estén todas. Un solo aviso, cuando llega la guía; después, silencio hasta que esté listo.
     avisarFaltan_(hv, fila, awb, semana, 'FALTAN: ' + faltan.map(f => corto_(f.finca) + (f.hawb ? ' ' + f.hawb : '')).join(', '),
       faltan.map(f => '· ' + f.finca + ' — factura ' + (f.factura || '?') + ', HAWB ' + (f.hawb || '?') +
@@ -575,6 +587,7 @@ function evaluarVuelo_(awb, carpeta, semana, docs) {
     (sinMaster ? '\n\n' + sinMaster : '') +
     (notaMaster ? '\n\n' + notaMaster : '') +
     (notaFuera ? '\n\n' + notaFuera : '') +
+    (notaFarm ? '\n\n' + notaFarm : '') +
     (res.avisos.length ? '\n\nRevisa:\n· ' + res.avisos.join('\n· ') : ''));
 }
 
