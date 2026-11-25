@@ -35,6 +35,8 @@ const VUELOS = {
   AVISO_PRECIO: 0.15,
   // Precios de venta del inventario (Javier, 25-11-2026): precio para ganar ese margen SOBRE LA VENTA = coste ÷ (1 − margen)
   MARGENES: [0.17, 0.20, 0.25],
+  // Tope de transporte del clavel (Javier, 25-11-2026): flete + Vallinoto + palet como máximo 0,06 €/tallo; lo que sobra se reparte entre las demás flores
+  TOPE_CLAVEL_EUR: 0.06,
   // Modelo para leer las LÍNEAS de las facturas de fincas (más preciso que el de clasificar correos).
   // Si no estuviera disponible, se usa automáticamente CONFIG.CLAUDE_MODEL.
   MODELO_FACTURAS: 'claude-sonnet-5-5',
@@ -1189,6 +1191,22 @@ function crearInventario_(awb, carpeta, semana, m, fincas, fleteUsd, origenFlete
   }));
   if (estado === 'DEFINITIVO') guardarPrecios_(precios);
 
+  // Tope de transporte del clavel: lo que pase de VUELOS.TOPE_CLAVEL_EUR por tallo se reparte entre las demás flores
+  // en proporción a su transporte (flete + Vallinoto + palet). El total de transporte de la guía no cambia.
+  let notaTope = '';
+  (function () {
+    const tope = VUELOS.TOPE_CLAVEL_EUR; if (!(tope > 0)) return;
+    const gs = Object.values(grupos), cl = gs.filter(g => g.tipo === 'CLAVEL' && g.st > 0), resto = gs.filter(g => g.tipo !== 'CLAVEL' && g.st > 0);
+    let sobra = 0;
+    cl.forEach(g => { const flMax = Math.max(0, tope - vlT) * g.st; if (g.fl > flMax) { sobra += g.fl - flMax; g.fl = flMax; } });
+    if (!(sobra > 0)) return;
+    const base = resto.reduce((a, g) => a + g.fl + vlT * g.st, 0);
+    if (!(base > 0)) return;
+    resto.forEach(g => { g.fl += sobra * (g.fl + vlT * g.st) / base; });
+    notaTope = 'Tope clavel: transporte del clavel (flete + Vallinoto + palet) a ' + tope.toFixed(2).replace('.', ',') + ' €/tallo; ' +
+      sobra.toFixed(2).replace('.', ',') + ' € de flete pasan a las demás flores en proporción a su transporte (+' + (sobra / base * 100).toFixed(1).replace('.', ',') + ' %). Si cambias palets o Vallinoto en la fila 2, el reparto del flete no se rehace.';
+  })();
+
   // Hoja de Google en la carpeta del AWB
   // Se construye en una hoja temporal y se guarda como EXCEL (.xlsx) en la carpeta del AWB
   const nombre = 'INVENTARIO AWB ' + awb;
@@ -1284,7 +1302,7 @@ function crearInventario_(awb, carpeta, semana, m, fincas, fleteUsd, origenFlete
       es(palets * VUELOS.PALET_EUR, 2) + ' EUR ÷ ' + tallosTot + ' tallos = ' + es(paT, 4) + ' €/tallo.',
     'FOB facturas ' + es(fobUsd, 2) + ' USD (' + es(fobUsd / VUELOS.FX, 2) + ' EUR) · Master ' + es(fobMaster, 2) + ' USD. Fincas: ' +
       fincas.map(f => corto_(f.finca) + ' ' + (f.numero || '')).join(', ') + '.'
-  ]).concat(m.sin_master ? ['Sin Master Invoice: las facturas de fincas suman las ' + piezas + ' cajas de la guía; cuando llegue la Master se rehace.'] : [])
+  ]).concat(notaTope ? [notaTope] : []).concat(m.sin_master ? ['Sin Master Invoice: las facturas de fincas suman las ' + piezas + ' cajas de la guía; cuando llegue la Master se rehace.'] : [])
     .concat(avisos.map(a => 'REVISAR: ' + a));
   r++;
   notas.forEach(n => { sh.getRange(r, 1).setValue(n).setFontSize(8).setFontFamily('Arial'); r++; });
