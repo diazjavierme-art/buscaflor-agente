@@ -1931,7 +1931,7 @@ function actualizarVuelo_(sh, fila, awb, estado, url, firma, avisoMaster) {
 /** Marca en la app de pedidos (Firebase buscaflor/vuelos/<guía>) el inventario del vuelo. Solo añade/cambia esos campos. */
 function firebaseVuelo_(awb, datos) {
   try {
-    const url = 'https://stock-buscaflor-default-rtdb.europe-west1.firebasedatabase.app/buscaflor/vuelos/' + awb + '.json';
+    const url = 'https://stock-buscaflor-default-rtdb.europe-west1.firebasedatabase.app/buscaflor/vuelos/' + awb + '.json' + fbAuth_();
     const r = UrlFetchApp.fetch(url, { method: 'patch', contentType: 'application/json', muteHttpExceptions: true,
       payload: JSON.stringify(Object.assign({ actualizado: new Date().toISOString() }, datos)) });
     if (r.getResponseCode() !== 200) Logger.log('Firebase vuelo ' + awb + ': ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 200));

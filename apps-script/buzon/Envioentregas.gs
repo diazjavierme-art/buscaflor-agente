@@ -34,7 +34,7 @@ function instalarEnvioEntregas() {
 function ee_fb(metodo, ruta, datos) {
   var o = { method: metodo, muteHttpExceptions: true, contentType: 'application/json' };
   if (datos !== undefined) o.payload = JSON.stringify(datos);
-  var r = UrlFetchApp.fetch(EE_DB + ruta + '.json', o);
+  var r = UrlFetchApp.fetch(EE_DB + ruta + '.json' + fbAuth_(), o);
   if (r.getResponseCode() >= 300) throw new Error('Firebase ' + r.getResponseCode() + ': ' + r.getContentText());
   return JSON.parse(r.getContentText() || 'null');
 }
