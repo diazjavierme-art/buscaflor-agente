@@ -115,8 +115,13 @@ const VN_DESDE = '2026-11-25'; // los tickets con entrega anterior ya se grabaro
 const MESES = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12 };
 const fechaEs = t => { const m = /(\d{1,2}) de ([a-záéíóú]+) de (\d{4})/i.exec(t || ''); return m && MESES[m[2].toLowerCase()] ? m[3] + '-' + String(MESES[m[2].toLowerCase()]).padStart(2, '0') + '-' + m[1].padStart(2, '0') : null; };
 const num = t => { const v = parseFloat(String(t || '').replace(/[^\d.,-]/g, '').replace(',', '.')); return isNaN(v) ? null : v; };
+// Desde el 25-11-2026 Firebase solo responde con clave. La clave va en clave-firebase.txt, en esta carpeta
+// (la pega Javier desde su documento privado; no se sube a GitHub).
+function claveFb() { try { return fs.readFileSync(path.join(__dirname, 'clave-firebase.txt'), 'utf8').trim(); } catch (e) { return ''; } }
 async function fb(metodo, ruta, datos) {
-  const r = await fetch(DB + '/' + ruta + '.json', { signal: AbortSignal.timeout(30000), method: metodo, headers: { 'Content-Type': 'application/json' }, body: datos === undefined ? undefined : JSON.stringify(datos) });
+  const k = claveFb();
+  if (!k) log('Firebase: falta clave-firebase.txt en la carpeta del robot');
+  const r = await fetch(DB + '/' + ruta + '.json' + (k ? '?auth=' + encodeURIComponent(k) : ''), { signal: AbortSignal.timeout(30000), method: metodo, headers: { 'Content-Type': 'application/json' }, body: datos === undefined ? undefined : JSON.stringify(datos) });
   if (!r.ok) throw new Error('Firebase ' + r.status);
   return r.json();
 }
