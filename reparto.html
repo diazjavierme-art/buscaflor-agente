@@ -187,7 +187,7 @@ function claveSinPin(m){ return 'bf-rep-'+m+'-sinpin'; }
 function emailDeLogin(t){ var m=soloMovil(t); return m ? m+DOM_REP : String(t||'').trim(); }
 // Modo prueba: sin usuario ni contraseña. Cada móvil elige quién es (se recuerda en el móvil).
 function quien(){ try{ return localStorage.getItem('bf_rep_quien'); }catch(e){ return null; } }
-function nombreYo(){ var q=quien(); return q==='oficina'||!q ? 'Oficina' : nombreRep(q); }
+function nombreYo(){ return S.miCom!=null ? nombreRep(S.miCom) : 'Oficina'; }
 function hoyISO(d){ d = d || new Date(); return d.getFullYear() + '-' + p2(d.getMonth()+1) + '-' + p2(d.getDate()); }
 function p2(n){ return String(n).padStart(2,'0'); }
 function ahora(){ var d=new Date(); return hoyISO(d)+'T'+p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds()); }
@@ -694,10 +694,10 @@ function hojaRutaPdf(c){
 // ---------- menú ----------
 function menu(){
   var h='<h3>'+esc(nombreYo())+'</h3><div class="fila-btn" style="flex-direction:column">'+
-    '<button class="btn primario" onclick="elegirQuien()">Cambiar de repartidor</button>'+
-    (esOficina()?'<button class="btn" onclick="caja()">Caja del día por repartidor</button><a class="btn" style="text-align:center;text-decoration:none" href="pedidos.html">Ir a la app de pedidos</a>':'<button class="btn" onclick="pedirLectura();cerrarVelo()">'+ico('lect')+' Pedir lectura de AmbarX</button>')+
+    (S.esRep?'':'<button class="btn primario" onclick="elegirQuien()">Ver como repartidor</button>')+
+    (esOficina()?'<button class="btn" onclick="caja()">Caja del día por repartidor</button><button class="btn" onclick="verRepartidores()">Repartidores y accesos</button><a class="btn" style="text-align:center;text-decoration:none" href="pedidos.html">Ir a la app de pedidos</a>':'<button class="btn" onclick="pedirLectura();cerrarVelo()">'+ico('lect')+' Pedir lectura de AmbarX</button>')+
     (esApp()?'':'<button class="btn" onclick="try{localStorage.removeItem(\'bf_rep_noinst\')}catch(e){};cerrarVelo();pintarInstalar()">Instalar como app</button>')+
-    '<button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
+    '<button class="btn peligro" onclick="firebase.auth().signOut()">Cerrar sesión</button><button class="btn" onclick="cerrarVelo()">Cerrar</button></div>';
   velo(h);
 }
 function caja(){
@@ -789,20 +789,32 @@ function ponerQuien(c){
   aplicarQuien(); cerrarVelo();
 }
 function aplicarQuien(){
-  var q=quien();
-  S.miCom = (q && q!=='oficina') ? q : null; S.bloqueado=false;
-  document.getElementById('titulo').textContent = esOficina() ? 'Reparto · Oficina' : 'Reparto · '+nombreRep(S.miCom);
+  // Repartidor: su cuenta decide quién es. Oficina: puede elegir ver como un repartidor.
+  var u=firebase.auth().currentUser||{}, em=(u.email||'').toLowerCase(), r=reps(), mio=null;
+  Object.keys(r).forEach(function(c){ if(r[c].email && String(r[c].email).toLowerCase()===em) mio=c; });
+  S.esRep = em.slice(-DOM_REP.length)===DOM_REP;
+  if (S.esRep) { S.miCom=mio; S.bloqueado = mio==null; }
+  else { var q=quien(); S.miCom=(q && q!=='oficina') ? q : null; S.bloqueado=false; }
+  document.getElementById('titulo').textContent = S.bloqueado ? 'Reparto' : esOficina() ? 'Reparto · Oficina' : 'Reparto · '+nombreRep(S.miCom);
 }
 
-document.getElementById('bfLogin').style.display='none';
-db.ref('buscaflor/configPedidos/direccionesReparto').on('value', function(s){ S.dirs=s.val()||{}; pintar(); });
-db.ref('buscaflor/configPedidos/coords').on('value', function(s){ S.coords=s.val()||{}; pintar(); });
-var primeraVez=true;
-db.ref('buscaflor/configPedidos/repartidores').on('value', function(s){
-  S.rep=s.val()||{}; aplicarQuien(); pintar();
-  if(primeraVez){ primeraVez=false; if(!quien()) elegirQuien(); }
+var arrancado=false;
+firebase.auth().onAuthStateChanged(function(u){
+  var caja=document.getElementById('bfLogin');
+  if(!u){ if(arrancado) return location.reload(); caja.style.display='flex'; return; }
+  caja.style.display='none'; arrancado=true;
+  db.ref('buscaflor/configPedidos/direccionesReparto').on('value', function(s){ S.dirs=s.val()||{}; pintar(); });
+  db.ref('buscaflor/configPedidos/coords').on('value', function(s){ S.coords=s.val()||{}; pintar(); });
+  db.ref('buscaflor/configPedidos/repartidores').on('value', function(s){ S.rep=s.val()||{}; aplicarQuien(); pintar(); }, function(e){ pintarError(e); });
+  escuchar();
 });
-escuchar();
+document.getElementById('bfLoginForm').onsubmit=function(e){
+  e.preventDefault(); var m=document.getElementById('bfLoginMsg'); m.textContent='Entrando…';
+  (function(){ var v=document.getElementById('bfEmail').value, pw=document.getElementById('bfPass').value, mv=soloMovil(v);
+    if(!pw && !mv) return Promise.reject({code:'falta-clave'});
+    return firebase.auth().signInWithEmailAndPassword(emailDeLogin(v), pw || claveSinPin(mv)); })()
+    .then(function(){ m.textContent=''; }, function(err){ var c=err&&err.code||''; m.textContent=c==='falta-clave'?'Escribe la contraseña':/invalid|wrong-password|user-not-found/.test(c)?'Ese móvil no tiene acceso (o el PIN no es correcto). Pide acceso en la oficina.':c==='auth/too-many-requests'?'Demasiados intentos; espera un poco':'Error: '+(err.message||c); });
+};
 </script>
 </body>
 </html>
