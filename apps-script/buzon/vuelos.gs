@@ -33,8 +33,8 @@ const VUELOS = {
   MAX_LECTURAS_POR_PASADA: 6,
   MAX_BYTES_PDF: 25 * 1024 * 1024,
   AVISO_PRECIO: 0.15,
-  MARGEN: 0.25,
-  CHIPIONA: 1.17,             // precio Chipiona = coste × 1,17          // margen sobre el precio de venta de la última columna del inventario: precio = coste ÷ (1 − 0,25)
+  // Precios de venta del inventario (Javier, 25-11-2026): precio para ganar ese margen SOBRE LA VENTA = coste ÷ (1 − margen)
+  MARGENES: [0.17, 0.20, 0.25],
   // Modelo para leer las LÍNEAS de las facturas de fincas (más preciso que el de clasificar correos).
   // Si no estuviera disponible, se usa automáticamente CONFIG.CLAUDE_MODEL.
   MODELO_FACTURAS: 'claude-sonnet-5-5',
@@ -1222,6 +1222,7 @@ function crearInventario_(awb, carpeta, semana, m, fincas, fleteUsd, origenFlete
   let r = 3;
   const orden = ['ROSAS', 'PANICULATA', 'ALSTROEMERIA', 'CLAVEL', 'HORTENSIAS'];
   const tipos = [...new Set(Object.values(grupos).map(g => g.tipo))].sort((a, b) => (orden.indexOf(a) + 99) % 99 - (orden.indexOf(b) + 99) % 99);
+  const NC = 10 + VUELOS.MARGENES.length;   // columnas de la tabla
   tipos.forEach(t => {
     const items = Object.values(grupos).filter(g => g.tipo === t).sort((a, b) =>
       a.variedad.localeCompare(b.variedad) || (Number(b.medida) || 0) - (Number(a.medida) || 0));
@@ -1230,34 +1231,33 @@ function crearInventario_(awb, carpeta, semana, m, fincas, fleteUsd, origenFlete
     items.forEach(g => { pesoTp[g.tp] = (pesoTp[g.tp] || 0) + g.st; });
     const tp = Number(Object.keys(pesoTp).sort((a, b) => pesoTp[b] - pesoTp[a])[0]) || 1;
     const porTallo = tp === 1, u = porTallo ? 'TALLO' : 'PAQ';
-    sh.getRange(r, 1, 1, 12).setFontWeight('bold').setFontFamily('Arial');
-    if (color) sh.getRange(r, 1, 1, 12).setBackground('#2D5A3D').setFontColor('#FFFFFF');
-    else sh.getRange(r, 1, 1, 12).setBorder(true, true, true, true, false, false);
+    sh.getRange(r, 1, 1, NC).setFontWeight('bold').setFontFamily('Arial');
+    if (color) sh.getRange(r, 1, 1, NC).setBackground('#2D5A3D').setFontColor('#FFFFFF');
+    else sh.getRange(r, 1, 1, NC).setBorder(true, true, true, true, false, false);
     sh.getRange(r, 1).setValue(t); r++;
     const uu = porTallo ? '€/tallo' : '€/paq';
-    sh.getRange(r, 1, 1, 12).setValues([['TIPO', 'VARIEDAD', 'MEDIDA', porTallo ? 'TALLOS' : 'PAQ x' + tp, 'PROVEEDOR',
-      'FOB', 'FLETE', 'VALLINOTO', 'PALET', 'COSTE ' + uu, 'CHIPIONA ' + uu, 'VENTA ' + Math.round(VUELOS.MARGEN * 100) + '% ' + uu]])
+    sh.getRange(r, 1, 1, NC).setValues([['TIPO', 'VARIEDAD', 'MEDIDA', porTallo ? 'TALLOS' : 'PAQ x' + tp, 'PROVEEDOR',
+      'FOB', 'FLETE', 'VALLINOTO', 'PALET', 'COSTE ' + uu].concat(VUELOS.MARGENES.map(x => 'VENTA ' + Math.round(x * 100) + '% ' + uu))])
       .setFontWeight('bold').setFontSize(9).setFontFamily('Arial').setWrap(false)
       .setHorizontalAlignment('center').setBorder(true, true, true, true, true, true);
-    if (color) sh.getRange(r, 1, 1, 12).setBackground('#EFEFEF');
+    if (color) sh.getRange(r, 1, 1, NC).setBackground('#EFEFEF');
     r++;
     const vals = items.map(g => {
       const fob = g.fob / g.st, fl = g.fl / g.st;
       const coste = (fob + fl + vlT) * tp;
-      return [t, titulo_(g.variedad), g.medida, porTallo ? g.st : Math.round(g.st / tp * 100) / 100, g.prov.map(titulo_).join(', '), fob, fl, vaT, paT, coste,
-        coste * VUELOS.CHIPIONA, coste / (1 - VUELOS.MARGEN)];   // precio de venta para ganar el MARGEN sobre la venta
+      return [t, titulo_(g.variedad), g.medida, porTallo ? g.st : Math.round(g.st / tp * 100) / 100, g.prov.map(titulo_).join(', '), fob, fl, vaT, paT, coste]
+        .concat(VUELOS.MARGENES.map(x => coste / (1 - x)));   // precio de venta para ganar ese margen sobre la venta
     });
-    sh.getRange(r, 1, vals.length, 12).setValues(vals).setFontSize(9).setFontFamily('Arial').setBorder(true, true, true, true, true, true);
+    sh.getRange(r, 1, vals.length, NC).setValues(vals).setFontSize(9).setFontFamily('Arial').setBorder(true, true, true, true, true, true);
     // Vallinoto, palet, coste y precio con FÓRMULAS que dependen de la fila 2 (palets definitivos editables)
-    const mg = String(1 - VUELOS.MARGEN);
-    sh.getRange(r, 8, vals.length, 5).setFormulas(vals.map((_, i) => {
+    sh.getRange(r, 8, vals.length, NC - 7).setFormulas(vals.map((_, i) => {
       const f = r + i;
       // sin redondeos: el Excel guarda el valor exacto y solo lo MUESTRA con 4 / 2 decimales
-      return ['=$F$2/$H$2', '=$B$2*$D$2/$H$2', '=(F' + f + '+G' + f + '+H' + f + '+I' + f + ')*' + tp,
-        '=J' + f + '*' + Math.round(VUELOS.CHIPIONA * 100) + '/100', '=J' + f + '*100/' + Math.round((1 - VUELOS.MARGEN) * 100)];   // solo enteros: el visor del móvil falla con decimales
+      return ['=$F$2/$H$2', '=$B$2*$D$2/$H$2', '=(F' + f + '+G' + f + '+H' + f + '+I' + f + ')*' + tp]
+        .concat(VUELOS.MARGENES.map(x => '=J' + f + '*100/' + Math.round((1 - x) * 100)));   // solo enteros: el visor del móvil falla con decimales
     }));
     sh.getRange(r, 6, vals.length, 5).setNumberFormat('0.0000');
-    sh.getRange(r, 11, vals.length, 2).setNumberFormat('0.00').setFontWeight('bold');
+    sh.getRange(r, 11, vals.length, NC - 10).setNumberFormat('0.00').setFontWeight('bold');
     r += vals.length;
   });
 
@@ -1274,7 +1274,7 @@ function crearInventario_(awb, carpeta, semana, m, fincas, fleteUsd, origenFlete
   if (Object.values(grupos).some(g => g.medida === '?')) avisos.push('Hay rosas sin medida en la factura (marcadas "?"): complétalas.');
   const notas = [
     'Importes por tallo; FOB medio ponderado por tallos cuando hay varios proveedores.',
-    'FOB, flete, Vallinoto y palet en €/tallo. Chipiona = coste × ' + String(VUELOS.CHIPIONA).replace('.', ',') + '. Venta ' + Math.round(VUELOS.MARGEN * 100) + '% = coste ÷ ' + String(1 - VUELOS.MARGEN).replace('.', ',') + ' (margen sobre la venta, sin IVA).',
+    'FOB, flete, Vallinoto y palet en €/tallo. Venta X% = precio para ganar ese margen sobre la venta: ' + VUELOS.MARGENES.map(x => Math.round(x * 100) + '% = coste ÷ ' + String(Math.round((1 - x) * 100) / 100).replace('.', ',')).join('; ') + ' (sin IVA).',
     'Flete aéreo ' + es(fleteUsd, 2) + ' USD (' + origenFlete + ') / ' + String(VUELOS.FX).replace('.', ',') + ' = ' + es(fleteEur, 2) + ' EUR' +
       (porPeso && kgTot ? (porCajas ? ', repartido por cajas (full) de cada finca según el Consolidation Report.' : ', repartido por kg de cada finca' + (pais === 'ECU' ? ' (Master Invoice, ' + es(kgTot, 0) + ' kg).' : '.')) : ' ÷ ' + tallosTot + ' tallos = ' + es(fleteEur / tallosTot, 4) + ' €/tallo.'),
   ].concat(notaBenchmark_(bm)).concat(kgGuia ? ['Flete todo incluido: ' + es(fleteUsd / kgGuia, 2) + ' USD/kg (' + es(kgGuia, 0) + ' kg tasables).'] : []).concat([
@@ -1288,7 +1288,7 @@ function crearInventario_(awb, carpeta, semana, m, fincas, fleteUsd, origenFlete
     .concat(avisos.map(a => 'REVISAR: ' + a));
   r++;
   notas.forEach(n => { sh.getRange(r, 1).setValue(n).setFontSize(8).setFontFamily('Arial'); r++; });
-  [16, 20, 9, 9, 26, 9, 9, 11, 9, 13, 15, 15].forEach((w, i) => sh.setColumnWidth(i + 1, w * 7));
+  [16, 20, 9, 9, 26, 9, 9, 11, 9, 13].concat(VUELOS.MARGENES.map(() => 14)).forEach((w, i) => sh.setColumnWidth(i + 1, w * 7));
   SpreadsheetApp.flush();
   const xlsx = UrlFetchApp.fetch('https://docs.google.com/spreadsheets/d/' + ss.getId() + '/export?format=xlsx', {
     headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true
