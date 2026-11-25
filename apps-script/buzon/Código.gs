@@ -180,6 +180,7 @@ function setup() {
   Object.values(FOLDERS).slice(0, 8).forEach(n => getOrCreateFolder_(root, n));
   getOrCreatePath_([FOLDERS.REGISTRO, FOLDERS.PENDIENTE]);
   getOrCreatePath_([FOLDERS.PAGOS, FOLDERS.SUBIR_PAGOS]);
+  getOrCreatePath_([FOLDERS.GASTOS_ES, '_Subir pagos aquí']);
 
   const ss = getRegistro_();
   prepararHojas_(ss);
@@ -723,6 +724,7 @@ function procesarBuzon() {
     const ctx = cargarContexto_();
     // Justificantes de pago primero: son pocos y rápidos, y así no se quedan sin tiempo
     try { procesarPagosExterior_(t0, 90 * 1000); } catch (e) { Logger.log('Pagos exterior: ' + e); }
+    try { procesarPagosEspana_(t0, 60 * 1000); } catch (e) { Logger.log('Pagos España: ' + e); }
     try { recruzarPagos_(false); } catch (e) { Logger.log('Cruce de pagos: ' + e); }
     reprocesarPendientes_(ctx, t0);
     recolocarSinVuelo_(ctx, t0);

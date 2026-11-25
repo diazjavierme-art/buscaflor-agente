@@ -14,3 +14,11 @@ Archivos:
 - appsscript.json: ajustes del proyecto.
 
 Las claves (Gemini, etc.) están en Propiedades del script, nunca en el código.
+
+## GitHub es el original
+Desde el 25-11-2026 el código se cambia aquí, no en el editor de Apps Script.
+Cada cambio en esta carpeta se sube solo al buzón (acción «Subir buzón a Apps Script»).
+Si alguien cambia algo en el editor, se perderá en la siguiente subida.
+
+- PagosEspana.gs: justificantes de transferencias a proveedores españoles soltados en
+  «04 Gastos España / _Subir pagos aquí» → «04 Gastos España / Pagos / AÑO / Proveedor».

@@ -1,0 +1,32 @@
+# Sube el código de apps-script/buzon al proyecto «Buzón Buscaflor» de Apps Script
+# cada vez que cambia en GitHub. GitHub es el original: no edites en el editor de Apps Script.
+name: Subir buzón a Apps Script
+
+on:
+  push:
+    branches: [main]
+    paths: ['apps-script/buzon/**']
+  workflow_dispatch:
+
+concurrency: subir-buzon
+
+jobs:
+  subir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Comprobar credencial
+        env:
+          CLASPRC: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          if [ -z "$CLASPRC" ]; then
+            echo "::error::Falta el secreto CLASPRC_JSON (credencial de facturasbuscaflor@gmail.com). No se sube nada."
+            exit 1
+          fi
+          printf '%s' "$CLASPRC" > ~/.clasprc.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Subir con clasp
+        working-directory: apps-script/buzon
+        run: npx --yes @google/clasp@2.4.2 push --force
