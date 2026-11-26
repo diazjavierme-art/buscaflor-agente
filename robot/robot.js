@@ -510,8 +510,8 @@ async function sesion() {
       if (!vivo) { if (++fallos >= 3) { log('La página no responde: recargando'); fallos = 0; await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }).catch(() => {}); } }
       else fallos = 0;
       if (!VISIBLE) await vigilarVerdnatura(browser).catch(e => log('Verdnatura:', e.message));
-      if (!VISIBLE) vigilarCobros(browser).catch(e => log('Cobros:', e.message));
       if (!VISIBLE && !cobOcupado) await explorarVentanaEmail(browser).catch(e => log('Ventana email:', e.message));
+      if (!VISIBLE) vigilarCobros(browser).catch(e => log('Cobros:', e.message));
       if (Date.now() - ultimaRevisionScript > 30 * 60000) {
         ultimaRevisionScript = Date.now();
         if (await bajarScript()) { log('Hay versión nueva del script (' + version + '): reiniciando'); await browser.close().catch(() => {}); return; }
