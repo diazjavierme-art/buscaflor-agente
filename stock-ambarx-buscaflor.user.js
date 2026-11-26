@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.17
+// @version      0.9.18
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además lee el stock solo de lunes a sábado: cada 5 minutos de 7:00 a 15:00 y cada 45 minutos de 15:00 a 21:00. Sube también los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -290,8 +290,9 @@
     if (!para.length) { cerrarDialogo(doc); return { email: 'sinEmail', para: [] }; }
     enviar.click();
     const fin = await hastaQue(() => { const t = textoDe(doc); if (/error al enviar|no se ha podido enviar/i.test(t)) return 'error'; return !/Enviar email/.test(t) ? 'ok' : null; }, 60000, 1000);
-    if (fin !== 'ok') throw new Error(fin === 'error' ? 'AmbarX da error al enviar el email' : 'AmbarX no confirma el envío del email');
-    return { email: 'enviado', para };
+    // Ya se ha pulsado «Enviar»: si AmbarX no lo confirma a tiempo NO se reintenta (26-11: el A-12240 le llegó 4 veces al cliente)
+    if (fin === 'error') throw new Error('AmbarX da error al enviar el email');
+    return { email: fin === 'ok' ? 'enviado' : 'sinConfirmar', para };
   }
 
   // PDF oficial de AmbarX (formato aBuscaflor Normal, con la firma): Imprimir › Aceptar abre la vista previa con el PDF
@@ -423,8 +424,9 @@
     if (nombres.length !== 1 || nombres[0] !== nombre) { cerrarDialogo(doc); throw new Error('El email no lleva solo el PDF firmado (' + nombres.join(', ') + ')'); }
     enviar.click();
     const fin = await hastaQue(() => { const t = textoDe(doc); if (/error al enviar|no se ha podido enviar/i.test(t)) return 'error'; return !/Enviar email/.test(t) ? 'ok' : null; }, 60000, 1000);
-    if (fin !== 'ok') throw new Error(fin === 'error' ? 'AmbarX da error al enviar el email' : 'AmbarX no confirma el envío del email');
-    return { email: 'enviado', para };
+    // Ya se ha pulsado «Enviar»: si AmbarX no lo confirma a tiempo NO se reintenta (26-11: el A-12240 le llegó 4 veces al cliente)
+    if (fin === 'error') throw new Error('AmbarX da error al enviar el email');
+    return { email: fin === 'ok' ? 'enviado' : 'sinConfirmar', para };
   }
 
   // Cobro en AmbarX (botón € del documento › Gestión de cobros): efectivo = EF, tarjeta = TPV (Javier, 24-11-2026)
