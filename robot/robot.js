@@ -434,6 +434,41 @@ async function vigilarCobros(browser) {
   } finally { cobOcupado = false; if (page) await page.close().catch(() => {}); }
 }
 
+// UNA VEZ (26-11-2026): mira qué campos tiene la ventana «Enviar email» de AmbarX (¿CC / CCO?) para que el buzón
+// reciba copia de los albaranes enviados. Abre el A-12240, pulsa el sobre y «Siguiente», apunta los campos, hace
+// una captura (ventana-email.png) y CIERRA SIN ENVIAR. Deja ventana-email.txt para no repetirse.
+async function explorarVentanaEmail(browser) {
+  const marca = path.join(DIR, 'ventana-email.txt');
+  if (fs.existsSync(marca)) return;
+  fs.writeFileSync(marca, 'en curso ' + ahoraLocal() + '\r\n');
+  let page = null;
+  try {
+    page = await browser.newPage();
+    await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }); await espera(6000);
+    await irAmbarx(page, 'ventas/albaranes'); await irAmbarx(page, 'ventas/albaranes/editar/A-12240'); await espera(4000);
+    const sobre = await page.evaluate(new Function(HONDO + "const b=hondo(document,'vaadin-button').find(b=>{const i=b.querySelector('vaadin-icon');return vis(b)&&i&&i.getAttribute('icon')==='vaadin:envelope'}); if(!b) return false; b.click(); return true;"));
+    if (!sobre) throw new Error('no encuentro el botón de email en el A-12240');
+    let paso = false;
+    for (let i = 0; i < 20 && !paso; i++) { await espera(1000); paso = await page.evaluate(new Function(HONDO + "const b=hondo(document,'vaadin-button').find(b=>vis(b)&&/^Siguiente$/.test((b.textContent||'').trim())); if(!b) return false; b.click(); return true;")); }
+    if (!paso) throw new Error('no sale la ventana de formato');
+    let ok = false;
+    for (let i = 0; i < 30 && !ok; i++) { await espera(1000); ok = await page.evaluate(() => /Enviar email/.test(document.body.innerText || '') || true); }
+    await espera(4000);
+    const info = await page.evaluate(new Function(HONDO + `const campos=hondo(document,'vaadin-text-field,vaadin-email-field,vaadin-text-area,vaadin-combo-box,vaadin-multi-select-combo-box,vaadin-checkbox,vaadin-select,input').filter(vis)
+        .map(c=>(c.tagName.toLowerCase())+' | '+(c.label||c.getAttribute('placeholder')||c.getAttribute('aria-label')||c.name||'')+' | '+String(c.value||'').slice(0,80));
+      const botones=hondo(document,'vaadin-button').filter(vis).map(b=>(b.textContent||'').trim()||((b.querySelector('vaadin-icon')||{}).getAttribute?b.querySelector('vaadin-icon').getAttribute('icon'):'')).filter(Boolean);
+      const textos=hondo(document,'label,span,div').filter(e=>vis(e)&&e.childElementCount===0).map(e=>(e.textContent||'').trim()).filter(t=>t&&t.length<60);
+      return {campos, botones, textos:[...new Set(textos)].slice(0,120)};`));
+    await page.screenshot({ path: path.join(DIR, 'ventana-email.png') }).catch(() => {});
+    // CERRAR SIN ENVIAR: Escape y, si sigue abierta, el botón Cancelar/Cerrar (nunca «Enviar»)
+    await page.keyboard.press('Escape'); await espera(1500);
+    await page.evaluate(new Function(HONDO + "const b=hondo(document,'vaadin-button').find(b=>vis(b)&&/^(Cancelar|Cerrar|Salir)$/.test((b.textContent||'').trim())); if(b) b.click();"));
+    fs.writeFileSync(marca, 'hecho ' + ahoraLocal() + '\r\nCAMPOS:\r\n' + info.campos.join('\r\n') + '\r\nBOTONES: ' + info.botones.join(' · ') + '\r\nTEXTOS: ' + info.textos.join(' · ') + '\r\n');
+    log('Ventana email: ' + info.campos.length + ' campos (' + info.campos.map(c => c.split(' | ')[1]).join(', ') + ') · captura en ventana-email.png · cerrada sin enviar');
+  } catch (e) { log('Ventana email: error', e.message); fs.appendFileSync(marca, 'error ' + e.message + '\r\n'); }
+  finally { if (page) await page.close().catch(() => {}); }
+}
+
 async function vigilarVerdnatura(browser) {
   const h = new Date(), hoy = ahoraLocal().slice(0, 10);
   if (h.getDay() !== 0 && h.getHours() === 15 && vnUltimoDia !== hoy) { vnUltimoDia = hoy; await leerVerdnatura(browser, '15:00'); await grabarVerdnatura(browser); return; }
@@ -476,6 +511,7 @@ async function sesion() {
       else fallos = 0;
       if (!VISIBLE) await vigilarVerdnatura(browser).catch(e => log('Verdnatura:', e.message));
       if (!VISIBLE) vigilarCobros(browser).catch(e => log('Cobros:', e.message));
+      if (!VISIBLE && !cobOcupado) await explorarVentanaEmail(browser).catch(e => log('Ventana email:', e.message));
       if (Date.now() - ultimaRevisionScript > 30 * 60000) {
         ultimaRevisionScript = Date.now();
         if (await bajarScript()) { log('Hay versión nueva del script (' + version + '): reiniciando'); await browser.close().catch(() => {}); return; }
