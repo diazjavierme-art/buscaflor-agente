@@ -1358,6 +1358,9 @@ function procesarMensaje_(msg, thread, ctx) {
   const cuerpo = (msg.getPlainBody() || '').slice(0, 4000);
   const fecha = msg.getDate();
 
+  // Copia oculta de un albarán/factura que el robot manda desde AmbarX: la apunta ee_copiasAmbarx (Envioentregas.gs); aquí nada
+  if (from === 'expansion@rosasdebuscaflor.com' && /^ROSAS DE BUSCAFLOR.*(Albar[aá]n|Factura)\s+[A-Z]{1,3}-\d+/i.test(asunto)) return;
+
   // MODO VUELO: correo tuyo con asunto "VUELO 075-xxxx xxxx" → todo a la carpeta de ese AWB
   // (basta con que lo envíes desde una dirección tuya y el asunto contenga un AWB)
   if (CONFIG.PROPIOS.indexOf(from) >= 0) {

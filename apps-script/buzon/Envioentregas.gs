@@ -45,6 +45,7 @@ function ee_eur(n) { return (Math.round((+n || 0) * 100) / 100).toFixed(2).repla
 function ee_num(n) { var x = +n || 0; return (Math.round(x * 100) / 100).toString().replace('.', ','); }
 
 function enviarEntregasSinAmbarx() {
+  try { ee_copiasAmbarx(); } catch (e) { Logger.log('Copias AmbarX: ' + e); }
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(2000)) return;
   try {
@@ -120,4 +121,27 @@ function ee_pdf(d, e, k) {
     '</body></html>';
   return Utilities.newBlob(html, 'text/html', 'x.html').getAs('application/pdf')
     .setName((tipo === 'Factura' ? 'FV-' : 'AV-') + String(num).replace('-', '') + '_firmado.pdf');
+}
+
+/**
+ * Copias ocultas (CCO) que el robot pone al mandar un albarán o factura desde AmbarX (26-11-2026).
+ * Asunto de AmbarX: «ROSAS DE BUSCAFLOR LAMEJOR, S.L.. Albarán A-12240». Se apunta en
+ * buscaflor/reparto/copias/<nº> {hora, asunto, para}: con eso el robot sabe que el email salió aunque AmbarX
+ * no lo confirmara, y no lo repite. El correo se marca como leído y se archiva.
+ */
+function ee_copiasAmbarx() {
+  var hilos = GmailApp.search('newer_than:2d from:expansion@rosasdebuscaflor.com subject:"ROSAS DE BUSCAFLOR" is:unread', 0, 30);
+  if (!hilos.length) return;
+  var et = GmailApp.getUserLabelByName('Buzón/Copias-AmbarX') || GmailApp.createLabel('Buzón/Copias-AmbarX');
+  hilos.forEach(function (th) {
+    var ok = true;
+    th.getMessages().forEach(function (m) {
+      var asunto = m.getSubject() || '', mm = /(Albar[aá]n|Factura)\s+([A-Z]{1,3}-\d+)/i.exec(asunto);
+      if (!mm) { ok = false; return; }
+      try {
+        ee_fb('PATCH', 'copias/' + mm[2].toUpperCase(), { hora: Utilities.formatDate(m.getDate(), EE_ZONA, "yyyy-MM-dd'T'HH:mm:ss"), asunto: asunto, para: m.getTo() || '' });
+      } catch (e) { ok = false; Logger.log('Copia ' + mm[2] + ': ' + e); }
+    });
+    if (ok) { th.addLabel(et); th.markRead(); th.moveToArchive(); }
+  });
 }

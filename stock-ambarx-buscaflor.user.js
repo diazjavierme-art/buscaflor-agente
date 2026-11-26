@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.18
+// @version      0.9.19
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además lee el stock solo de lunes a sábado: cada 5 minutos de 7:00 a 15:00 y cada 45 minutos de 15:00 a 21:00. Sube también los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -274,6 +274,31 @@
   const reenvioAmbarx = a => a.firma === 'firmado' && a.firmaAmbarx === 'firmado' && (a.email === 'noConsta' || a.email === 'error') &&
     (String(a.firmaHora || '') >= EMAIL_REPARO_DESDE || a.reenviarAmbarx === true);
 
+  // Copia oculta al buzón (facturasbuscaflor@gmail.com): el buzón la apunta en buscaflor/reparto/copias/<nº> y así se
+  // sabe si el email salió aunque AmbarX no lo confirme. Una sola copia (no a expansion@, que se reenvía y llegaría doble).
+  const CCO_BUZON = 'facturasbuscaflor@gmail.com';
+  async function ponerCco(doc) {
+    try {
+      const yaEsta = () => hondo(doc, '*').some(e => e.childElementCount === 0 && (e.textContent || '').indexOf(CCO_BUZON) >= 0);
+      if (yaEsta()) return true;
+      const b = hondo(doc, 'vaadin-button').find(x => /^CCO/.test((x.textContent || '').trim()) && x.getBoundingClientRect().width > 0);
+      if (b) { b.click(); await espera(1200); }
+      const lab = hondo(doc, 'label,span,div').filter(e => e.childElementCount === 0 && /^CCO$/i.test((e.textContent || '').trim()) && e.getBoundingClientRect().width > 0)[0];
+      if (!lab) return false;
+      const y = lab.getBoundingClientRect().bottom;
+      const inp = hondo(doc, 'input').filter(i => { const r = i.getBoundingClientRect(); return r.width > 0 && r.top >= y - 5 && r.top < y + 60; }).sort((a, c) => a.getBoundingClientRect().top - c.getBoundingClientRect().top)[0];
+      if (!inp) return false;
+      inp.focus(); await espera(300);
+      if (typeof window.bfTeclear === 'function') await window.bfTeclear(CCO_BUZON, ['Enter', 'Tab']);   // teclado real (robot)
+      else {
+        inp.value = CCO_BUZON; inp.dispatchEvent(new Event('input', { bubbles: true }));
+        inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true, composed: true }));
+        inp.dispatchEvent(new Event('change', { bubbles: true })); inp.blur();
+      }
+      await espera(1000);
+      return yaEsta();
+    } catch (e) { console.error('[bf-reparto] CCO', e); return false; }
+  }
   // Abre el documento y lo envía por email con el formato habitual y los correos del cliente
   async function emailDesdeAmbarx(doc, esperados) {
     const env = await hastaQue(() => hondo(doc, 'vaadin-button').find(b => { const i = b.querySelector('vaadin-icon'); return i && i.getAttribute('icon') === 'vaadin:envelope'; }), 40000);
@@ -288,11 +313,12 @@
     const vistos = (txt.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).map(x => x.toLowerCase());
     const para = (esperados || []).map(x => String(x).toLowerCase()).filter(x => vistos.includes(x));
     if (!para.length) { cerrarDialogo(doc); return { email: 'sinEmail', para: [] }; }
+    const cco = await ponerCco(doc);
     enviar.click();
     const fin = await hastaQue(() => { const t = textoDe(doc); if (/error al enviar|no se ha podido enviar/i.test(t)) return 'error'; return !/Enviar email/.test(t) ? 'ok' : null; }, 60000, 1000);
     // Ya se ha pulsado «Enviar»: si AmbarX no lo confirma a tiempo NO se reintenta (26-11: el A-12240 le llegó 4 veces al cliente)
     if (fin === 'error') throw new Error('AmbarX da error al enviar el email');
-    return { email: fin === 'ok' ? 'enviado' : 'sinConfirmar', para };
+    return { email: fin === 'ok' ? 'enviado' : 'sinConfirmar', para, cco };
   }
 
   // PDF oficial de AmbarX (formato aBuscaflor Normal, con la firma): Imprimir › Aceptar abre la vista previa con el PDF
@@ -342,6 +368,17 @@
     const P = await cargarPdfLib();
     const pdf = await P.PDFDocument.load(b64aBytes(pdfDataUrl));
     const img = /image\/png/.test(String(firma).slice(0, 30)) ? await pdf.embedPng(b64aBytes(firma)) : await pdf.embedJpg(b64aBytes(firma));
+    // El formato aBuscaflor saca ORIGINAL + COPIA en el mismo PDF y la firma va en la última página: se deja solo la
+    // copia que lleva la firma (Javier, 26-11-2026: «o manda uno u otro», no el albarán sin firmar y luego el firmado)
+    try {
+      const n0 = pdf.getPageCount();
+      if (n0 >= 2 && n0 % 2 === 0) {
+        const mitad = n0 / 2, bytesPag = i => { const c = pdf.getPage(i).node.Contents(); const o = c && pdf.context.lookup(c); return o && o.contents ? o.contents.length : (o && o.size ? o.size() : -1); };
+        let iguales = true;
+        for (let i = 0; i < mitad && iguales; i++) { const a = bytesPag(i), b = bytesPag(i + mitad); if (a < 0 || b < 0 || Math.abs(a - b) > Math.max(40, a * 0.02)) iguales = false; }
+        if (iguales || n0 === 2) for (let i = mitad - 1; i >= 0; i--) pdf.removePage(i);
+      }
+    } catch (e) { console.error('[bf-reparto] no se pudo quitar la copia duplicada', e); }
     const pgs = pdf.getPages(), pg = pgs[pgs.length - 1], H = pg.getSize().height;
     const c = tipo === 'factura' ? { x: 410, y: H - 805, w: 165, h: 48 } : { x: 415, y: H - 797, w: 160, h: 45 };
     const m = 3, k = Math.min((c.w - 2 * m) / img.width, (c.h - 2 * m) / img.height), w = img.width * k, h = img.height * k;
@@ -422,11 +459,12 @@
     // Comprobación final: solo debe ir el PDF firmado, una vez
     const nombres = (up.files || []).map(x => x.name);
     if (nombres.length !== 1 || nombres[0] !== nombre) { cerrarDialogo(doc); throw new Error('El email no lleva solo el PDF firmado (' + nombres.join(', ') + ')'); }
+    const cco = await ponerCco(doc);
     enviar.click();
     const fin = await hastaQue(() => { const t = textoDe(doc); if (/error al enviar|no se ha podido enviar/i.test(t)) return 'error'; return !/Enviar email/.test(t) ? 'ok' : null; }, 60000, 1000);
     // Ya se ha pulsado «Enviar»: si AmbarX no lo confirma a tiempo NO se reintenta (26-11: el A-12240 le llegó 4 veces al cliente)
     if (fin === 'error') throw new Error('AmbarX da error al enviar el email');
-    return { email: fin === 'ok' ? 'enviado' : 'sinConfirmar', para };
+    return { email: fin === 'ok' ? 'enviado' : 'sinConfirmar', para, cco };
   }
 
   // Cobro en AmbarX (botón € del documento › Gestión de cobros): efectivo = EF, tarjeta = TPV (Javier, 24-11-2026)
@@ -499,7 +537,7 @@
       return {
         firma: !!e.firma && !a.firma && (n.firma || 0) < 3,
         cobro: !!FORMA_AMBARX[c.forma] && (+c.importe || 0) > 0 && !a.cobro && (n.cobro || 0) < 3,
-        email: (a.firma === 'adjunto' && !a.email || reenvioAmbarx(a)) && (n.email || 0) < 3,
+        email: ((a.firma === 'adjunto' && !a.email || reenvioAmbarx(a)) && (n.email || 0) < 3) || (a.email === 'sinConfirmar' && a.cco === true && !a.reintento),
         pdf: !a.pdf && (n.pdf || 0) < 3 && (a.firma === 'firmado' || a.firma === 'error' || !e.firma)
       }; };
     const yaPasados = new Set(); // documentos que ya se firmaron en AmbarX desde un día posterior: no se repiten (ni firma ni email)
@@ -572,19 +610,27 @@
           a.cobroHora = ahoraISO();
         });
         p = pasos(Object.assign({}, e, { ambarx: a }));
+        if (p.email && a.email === 'sinConfirmar') {
+          // Enviado pero AmbarX no lo confirmó: ¿ha llegado la copia oculta al buzón?
+          const cp = await fb('GET', RUTA_REP + '/copias/' + encodeURIComponent(num)).catch(() => null);
+          if (cp && String(cp.hora || '') >= String(a.emailHora || '').slice(0, 16)) { a.email = 'enviado'; a.emailVia = 'copiaBuzon'; }
+          else if (Date.now() - new Date(a.emailHora).getTime() >= 15 * 60000) { a.reintento = true; if (a.firma === 'firmado') a.email = 'error'; else delete a.email; }   // no llegó: un único reintento
+          p = pasos(Object.assign({}, e, { ambarx: a }));
+          if (a.email) p.email = false;
+        }
         if (p.email) await paso('email', async () => {
           fase = 'Enviando ' + num + ' firmado por email…'; pintar();
           if (a.firma === 'firmado') {
             if (!correos.length) { a.email = 'sinEmail'; return; }
             const r = await conMarco(doc => emailDesdeAmbarx(doc, correos), ruta);
-            a.email = r.email; a.para = r.para; a.emailHora = ahoraISO(); a.emailVia = 'robot'; delete a.reenviarAmbarx;
+            a.email = r.email; a.para = r.para; a.emailHora = ahoraISO(); a.emailVia = 'robot'; a.cco = !!r.cco; delete a.reenviarAmbarx;
             return;
           }
           const pdf = await fb('GET', RUTA_REP + '/' + f + '/pdfs/' + k);
           if (!pdf) throw new Error('No encuentro el PDF firmado');
           try {
             const r = await conMarco(doc => emailConPdf(doc, b64aBytes(pdf), nombrePdf, correos), ruta);
-            a.email = r.email; a.para = r.para; a.emailHora = ahoraISO();
+            a.email = r.email; a.para = r.para; a.emailHora = ahoraISO(); a.cco = !!r.cco;
             if (r.email === 'sinEmail') await conMarco(doc => adjuntarEnAmbarx(doc, b64aBytes(pdf), nombrePdf), ruta);
           } catch (err) {
             // Último intento fallido: que al menos quede el PDF firmado como adjunto del documento

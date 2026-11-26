@@ -572,6 +572,8 @@ async function sesion() {
   });
   NAVEGADOR = browser; ultimaVuelta = Date.now();
   const page = (await browser.pages())[0] || await browser.newPage();
+  // Teclado real para el script (p. ej. la CCO de «Enviar email», que no admite texto puesto por código)
+  await page.exposeFunction('bfTeclear', async (texto, teclas) => { await page.keyboard.type(String(texto), { delay: 40 }); for (const t of (teclas || [])) { await espera(600); await page.keyboard.press(t); } await espera(600); return true; }).catch(e => log('bfTeclear:', e.message));
   await page.evaluateOnNewDocument(c => { if (window.top === window.self) { try { (0, eval)(c); } catch (e) { console.error('[bf-robot] script', e); } } }, codigo);
   page.on('console', m => { const t = m.text(); if (/\[bf-|Error/i.test(t)) log('página:', t.slice(0, 300)); });
   page.on('dialog', d => { if (d.type() === 'beforeunload') { d.accept().catch(() => {}); return; } log('Diálogo (' + d.type() + '):', d.message().slice(0, 200)); d.dismiss().catch(() => {}); });
