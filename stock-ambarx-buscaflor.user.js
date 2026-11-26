@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.22
+// @version      0.9.23
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además lee el stock solo de lunes a sábado: cada 5 minutos de 7:00 a 15:00 y cada 45 minutos de 15:00 a 21:00. Sube también los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -39,6 +39,7 @@
   let sesion = null; try { sesion = JSON.parse(localStorage.getItem(LS_AUTH) || 'null'); } catch (e) {}
   let idToken = null, idExp = 0, errSesion = '';
   async function token() {
+    if (window.__bfClave) return window.__bfClave; // el robot del servidor pasa la clave de Firebase a su propio Chrome: así no depende de un inicio de sesión que caduca
     if (!sesion || !sesion.rt) return null;
     if (idToken && Date.now() < idExp - 60000) return idToken;
     const r = await fetch('https://securetoken.googleapis.com/v1/token?key=' + API_KEY, {
@@ -942,7 +943,7 @@
   setTimeout(mantenerAmbarx, 20000);
 
   async function vigilar() {
-    if (!sesion || ocupado) return;
+    if ((!sesion && !window.__bfClave) || ocupado) return;
     try {
       if (estaEnLogin()) estadoAmbarx = 'login';
       await fb('PUT', RUTA_AGENTE, { visto: ahoraISO(), equipo: location.host, ambarx: estadoAmbarx, version: (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '' });
@@ -991,8 +992,8 @@
       badge.onclick = menu;
       document.body.appendChild(badge);
     }
-    badge.style.background = !sesion ? '#e67e22' : (ultimoErr ? '#c0392b' : (ocupado ? '#1f3a5f' : '#2e7d32'));
-    badge.textContent = 'AmbarX → app: ' + (!sesion ? 'SIN SESIÓN (pulsa aquí)' : ocupado ? (fase || 'trabajando…') :
+    badge.style.background = (!sesion && !window.__bfClave) ? '#e67e22' : (ultimoErr ? '#c0392b' : (ocupado ? '#1f3a5f' : '#2e7d32'));
+    badge.textContent = 'AmbarX → app: ' + ((!sesion && !window.__bfClave) ? 'SIN SESIÓN (pulsa aquí)' : ocupado ? (fase || 'trabajando…') :
       ultimoErr ? 'ERROR · ' + ultimoErr : ultimo ? 'subido ' + ultimo.hora.slice(11, 16) + ' (' + ultimo.n + ' ' + (ultimo.que || 'art.') + ')' : 'esperando peticiones') + (ultimoStock ? ' · stock ' + ultimoStock.slice(11, 16) : '') + ' · v' + ((typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '?') + (errSesion && sesion ? ' · ' + errSesion : '');
   }
   function menu() {
