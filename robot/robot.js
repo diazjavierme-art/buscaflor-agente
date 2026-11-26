@@ -347,6 +347,14 @@ async function informeCobros(page, cliente) {
   const src0 = await page.evaluate(new Function(HONDO + "const s=hondo(document,'vaadin-select').find(x=>x.label==='Formato'); if(!s) return 'NOSEL'; s.value='3'; const v=hondo(document,'vcf-pdf-viewer')[0]; return v?v.src||'':'';"));
   if (src0 === 'NOSEL') throw new Error('no encuentro el formato del informe');
   await espera(800);
+  // Javier, 26-11-2026: en cobros pendientes solo FACTURAS (sin albaranes, pedidos, etc.)
+  const tipos = await page.evaluate(new Function(HONDO + `const out=[]; hondo(document,'vaadin-checkbox').filter(vis).forEach(c=>{ const t=(c.label||c.innerText||'').trim(); if(!t) return;
+      const quiero = /factura/i.test(t) ? true : (/albar|pedido|presupuesto|efecto|recibo|abono|dep[oó]sito|ticket/i.test(t) ? false : null);
+      if (quiero!==null && !!c.checked!==quiero){ const i=c.inputElement||c.querySelector('input'); if(i) i.click(); else c.checked=quiero; }
+      out.push(t+'='+(!!c.checked)); }); return out.join(', ');`));
+  log('Cobros: casillas del informe -> ' + tipos);
+  if (!/factura[^,]*=true/i.test(tipos)) log('Cobros: AVISO, no encuentro la casilla de facturas marcada; el informe sale con lo que haya marcado');
+  await espera(800);
   await page.evaluate(new Function(HONDO + "hondo(document,'vaadin-button').find(b=>/Generar informe/.test(b.innerText||'')).click();"));
   for (let i = 0; i < 60; i++) {
     await espera(1000);
