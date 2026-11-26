@@ -140,11 +140,21 @@ function tipoDeArchivo_(tipo, nombre, asunto, esEecc, leer) {
  * ¿Es un estado de cuenta / listado de facturas pendientes y no una factura?
  * Por el nombre o el asunto; si el PDF de un proveedor no tiene nombre de factura (p. ej. "listfa21.pdf"), lo mira la IA.
  */
-function esEstadoCuenta_(nombre, asunto, tipo, leer) {
+function esEstadoCuenta_(nombre, asunto, tipo, leer, cuerpo) {
   if (EECC_REGEX.test(nombre) || EECC_REGEX.test(asunto)) return true;
   if (['ESPAÑA', 'FINCA', 'TRANSITARIO'].indexOf(tipo) < 0 || !/\.pdf$/i.test(nombre) || FACTURA_NOMBRE.test(nombre)) return false;
+  // El estado de cuenta llega a veces como respuesta a otro hilo ("RE: Comunicado Precios") con un PDF de nombre aleatorio:
+  // lo que lo dice es el texto NUEVO del correo (sin la parte citada de mensajes anteriores)
+  if (cuerpo && EECC_REGEX.test(textoNuevo_(cuerpo))) return true;
   const r = leer();
   return !!(r && r.tipo === 'ESTADO_CUENTA');
+}
+
+/** Texto propio de un correo, sin lo citado de mensajes anteriores ("De: … Enviado el:", "From: … Sent:", "El … escribió:"). */
+function textoNuevo_(cuerpo) {
+  const t = String(cuerpo || '');
+  const m = t.search(/\n\s*(De|From)\s*:.*\n|\n-{2,}\s*(Original Message|Mensaje original)|\nEl .{5,80} escribi[oó]:|\nOn .{5,80} wrote:/i);
+  return (m > 0 ? t.slice(0, m) : t).slice(0, 1500);
 }
 
 /**
@@ -648,7 +658,7 @@ function redactarPeticionFacturas_(carpeta, proveedor, eecc, moneda, faltan, enP
 
 /** A MANO: comprueba un estado de cuenta que ya está en Drive. Pon su id (de la URL) y el proveedor, y ejecuta. */
 // tipo: 'FINCA' o 'TRANSITARIO' (exterior, contra "Por proveedor") o 'ESPAÑA' (contra 04 Gastos España)
-const EECC_A_REVISAR = { id: '1tCbxfEEM_NbFmooIQegxM6-_KSK0WjNm', proveedor: 'Benchmark Growers', tipo: 'FINCA' };   // Statement Benchmark (31-10)
+const EECC_A_REVISAR = { id: '1uGrqNckqmFFEVD63JNCh801u7CGdxQpb', proveedor: 'Benchmark Growers', tipo: 'FINCA' };   // Estado de cuenta Benchmark de Fredy (25-11, 85.060 $)
 function revisarEstadoCuenta() {
   if (!EECC_A_REVISAR.id) { Logger.log('Rellena EECC_A_REVISAR con el id del PDF, el proveedor y el tipo.'); return; }
   const f = DriveApp.getFileById(EECC_A_REVISAR.id);
@@ -1443,7 +1453,7 @@ function guardarAdjuntos_(msg, tipo, proveedor, from, asunto, cuerpo, fecha, ctx
       const r = leer();
       if (r && r.tipo === 'JUSTIFICANTE') { justificantes.push({ att: att, nombre: nombre, md5: md5, leer: leer }); continue; }
     }
-    const esEecc = !awb && esEstadoCuenta_(nombre, asunto, tipo, leer);
+    const esEecc = !awb && esEstadoCuenta_(nombre, asunto, tipo, leer, cuerpo);
     // Proveedores españoles: se archiva (carpeta y nombre) con la fecha de la FACTURA, no la del correo
     const tipoArch = tipoDeArchivo_(tipo, nombre, asunto, esEecc, leer);     // OTROS con factura a nombre de Buscaflor → gasto España
     const fechaDoc = (esEecc || esAlbaran_(nombre, asunto)) ? fecha : fechaFactura_(nombre, fecha, tipoArch, leer);
