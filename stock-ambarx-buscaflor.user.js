@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.19
+// @version      0.9.20
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además lee el stock solo de lunes a sábado: cada 5 minutos de 7:00 a 15:00 y cada 45 minutos de 15:00 a 21:00. Sube también los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -271,6 +271,7 @@
   // él con «Enviar por email» del documento, que ya lleva la firma. Solo firmas desde EMAIL_REPARO_DESDE, o las
   // marcadas a mano con ambarx.reenviarAmbarx = true. 'yaFirmado' no entra (lo firmó otro y pudo mandarlo).
   const EMAIL_REPARO_DESDE = '2026-11-24T14:40:00';
+  const FIRMA_MOVIL = false;   // pantalla de firma de AmbarX móvil (desactivada el 26-11-2026)
   const reenvioAmbarx = a => a.firma === 'firmado' && a.firmaAmbarx === 'firmado' && (a.email === 'noConsta' || a.email === 'error') &&
     (String(a.firmaHora || '') >= EMAIL_REPARO_DESDE || a.reenviarAmbarx === true);
 
@@ -574,7 +575,9 @@
           // Si el buzón ya mandó el email directo (AmbarX falló o el servidor estuvo parado), no se usa la pantalla móvil
           // porque AmbarX mandaría un segundo email: solo se guarda el PDF firmado como adjunto.
           const directo = e.emailDirecto && e.emailDirecto.estado === 'enviado';
-          if ((a.n.firma || 0) < 2 && !directo) {
+          // Javier, 26-11-2026: ya NO se usa la pantalla de firma móvil (fallaba todo el día y retrasaba 10-15 min; además manda
+          // su propio email sin copia al buzón y con original + copia). Siempre: PDF firmado (solo la copia firmada) + email del robot.
+          if (FIRMA_MOVIL && (a.n.firma || 0) < 2 && !directo) {
             // Vía principal: la pantalla de firma de AmbarX (deja «Firmado», mete la firma en su PDF y manda el email)
             fase = 'Firmando ' + num + ' en AmbarX…'; pintar();
             const h = String(e.hora || '');
