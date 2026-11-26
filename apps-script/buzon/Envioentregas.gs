@@ -64,6 +64,14 @@ function enviarEntregasSinAmbarx() {
             ee_fb('PATCH', f + '/entregas/' + k + '/reenviar', { hecho: ee_ahora() });
           } catch (err) { ee_fb('PATCH', f + '/entregas/' + k + '/reenviar', { error: String(err && err.message || err) }); }
         }
+        // Email del PDF firmado: el robot deja el PDF en pdfs/<nº> y ambarx.email = 'buzon'; sale desde aquí con un único adjunto
+        // (AmbarX siempre añade su propio PDF sin firmar y con dos copias, y no se puede quitar de su ventana de email)
+        if (e.estado === 'entregado' && a.email === 'buzon' && !e.emailBuzon && (+e.emailBuzonN || 0) < 3) {
+          docs = docs || (ee_fb('GET', f + '/docs') || {});
+          try { ee_enviarFirmado(docs[k] || {}, e, k, f); }
+          catch (err) { ee_fb('PATCH', f + '/entregas/' + k, { emailBuzonN: (+e.emailBuzonN || 0) + 1, emailBuzonError: String(err && err.message || err) }); }
+          return;
+        }
         if (e.estado !== 'entregado' || !e.firma || e.emailDirecto) return;
         if (a.firma === 'firmado' || a.firma === 'adjunto') return;           // AmbarX ya lo hizo (y mandó su email)
         var falla = a.firma === 'error';
@@ -93,6 +101,25 @@ function ee_enviar(d, e, k, para) {
     'Buenos días:\n\nLe adjuntamos el justificante de entrega firmado del ' + tipo.toLowerCase() + ' ' + num + ', entregado el ' + fechaE +
     ' a las ' + String(e.hora || '').slice(11, 16) + '.\n\nPara cualquier consulta, responda a este correo.\n\nUn saludo,\nRosas de Buscaflor La Mejor S.L.',
     { attachments: [pdf], name: 'Rosas de Buscaflor', replyTo: EE_RESPONDER, bcc: EE_RESPONDER });
+}
+
+// Manda el PDF oficial firmado (una sola copia, el que guardó el robot) desde esta cuenta, con el mismo asunto y texto que AmbarX
+function ee_enviarFirmado(d, e, k, f) {
+  var pdf = ee_fb('GET', f + '/pdfs/' + k);
+  if (!pdf) throw new Error('No encuentro el PDF firmado');
+  var para = ((e.ambarx || {}).para || d.emails || []).filter(function (x) { return x && /@/.test(x); });
+  if (!para.length) throw new Error('sin destinatarios');
+  var fact = (e.tipo || d.tipo) === 'factura';
+  var num = e.num || d.num || k;
+  var fecha = String(d.fecha || e.hora || '').slice(0, 10).split('-').reverse().join('/');
+  var nombre = (fact ? 'FV-' : 'AV-') + String(num).replace('-', '') + '_firmado.pdf';
+  var blob = Utilities.newBlob(Utilities.base64Decode(String(pdf).split(',').pop()), 'application/pdf', nombre);
+  GmailApp.sendEmail(para.join(','), 'ROSAS DE BUSCAFLOR LAMEJOR, S.L.. ' + (fact ? 'Factura ' : 'Albarán ') + num,
+    'Adjunto remitimos ' + (fact ? 'la factura' : 'el albarán') + ' nº ' + num + ' de fecha ' + fecha + '.\n\nUn saludo,\nRosas de Buscaflor La Mejor S.L.',
+    { attachments: [blob], name: 'Rosas de Buscaflor La Mejor SL', replyTo: EE_RESPONDER, bcc: EE_RESPONDER });
+  var hora = ee_ahora();
+  ee_fb('PATCH', f + '/entregas/' + k, { emailBuzon: { hora: hora, para: para } });
+  ee_fb('PATCH', f + '/entregas/' + k + '/ambarx', { email: 'enviado', emailHora: hora, emailVia: 'buzon', para: para });
 }
 
 // Justificante de entrega firmado (HTML → PDF)
