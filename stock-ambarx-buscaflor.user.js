@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Buscaflor - Stock y reparto de AmbarX a la app
 // @namespace    buscaflor
-// @version      0.9.20
+// @version      0.9.21
 // @description  Cuando en la app de pedidos se pulsa «Actualizar stock de AmbarX», genera en AmbarX el «Informe de stocks» (Formato base, solo stock > 0) y lo sube a Firebase (buscaflor/stockAmbarx). Además lee el stock solo de lunes a sábado: cada 5 minutos de 7:00 a 15:00 y cada 45 minutos de 15:00 a 21:00. Sube también los albaranes y facturas del día (buscaflor/reparto/<fecha>) para la app de reparto, y pasa a AmbarX las firmas de las entregas y envía el documento firmado al cliente por email desde AmbarX. Una vez al día copia a la app los clientes y artículos de AmbarX (altas, nombres, PVP y familia de las rosas). El último día de cada mes, a partir de las 20:00, factura los albaranes del mes con la «Facturación automática de albaranes» (una factura por cliente).
 // @match        *://*/AmbarX/*
 // @run-at       document-idle
@@ -365,7 +365,7 @@
   }
 
   // Recuadro «Firma» del formato aBuscaflor (A4, puntos PDF desde abajo): albarán 415-575 × 45-90; factura, bajo la palabra «Firma»
-  async function estamparFirma(pdfDataUrl, firma, tipo) {
+  async function estamparFirma(pdfDataUrl, firma, tipo, pie) {
     const P = await cargarPdfLib();
     const pdf = await P.PDFDocument.load(b64aBytes(pdfDataUrl));
     const img = /image\/png/.test(String(firma).slice(0, 30)) ? await pdf.embedPng(b64aBytes(firma)) : await pdf.embedJpg(b64aBytes(firma));
@@ -385,6 +385,15 @@
     const m = 3, k = Math.min((c.w - 2 * m) / img.width, (c.h - 2 * m) / img.height), w = img.width * k, h = img.height * k;
     pg.drawRectangle({ x: c.x + 1, y: c.y + 1, width: c.w - 2, height: c.h - 2, color: P.rgb(1, 1, 1) });
     pg.drawImage(img, { x: c.x + (c.w - w) / 2, y: c.y + (c.h - h) / 2, width: w, height: h });
+    // Hora de la firma (Javier, 26-11-2026), en letra pequeña bajo el recuadro
+    if (pie) {
+      try {
+        const f = await pdf.embedFont(P.StandardFonts.Helvetica);
+        const t = String(pie).replace(/[^\x20-\xFF]/g, '').slice(0, 90);
+        let tam = 7; while (tam > 5 && f.widthOfTextAtSize(t, tam) > c.w + 20) tam -= 0.5;
+        pg.drawText(t, { x: c.x, y: c.y - tam - 2, size: tam, font: f, color: P.rgb(0, 0, 0) });
+      } catch (e) { console.error('[bf-reparto] hora de firma', e); }
+    }
     return await pdf.save();
   }
 
@@ -593,7 +602,8 @@
           // Último intento: PDF firmado como adjunto (por si la pantalla móvil no está disponible)
           fase = 'Firmando ' + num + ' (adjunto)…'; pintar();
           const oficial = await conMarco(doc => pdfOficial(doc), ruta);
-          const firmado = await estamparFirma(oficial, e.firma, tipo);
+          const hf = String(e.hora || '');
+          const firmado = await estamparFirma(oficial, e.firma, tipo, 'Firmado el ' + hf.slice(8, 10) + '/' + hf.slice(5, 7) + '/' + hf.slice(0, 4) + ' a las ' + hf.slice(11, 16) + (e.recibe ? ' · Recibe: ' + e.recibe : ''));
           await fb('PUT', RUTA_REP + '/' + f + '/pdfs/' + k, bytesAb64(firmado));
           a.pdf = 'ok'; a.pdfHora = ahoraISO();
           // Si el cliente tiene email, NO se adjunta aquí: al subir el PDF en «Enviar por email» AmbarX ya lo guarda
