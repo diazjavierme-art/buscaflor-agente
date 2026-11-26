@@ -506,6 +506,53 @@ async function probarCcoEmail(browser) {
   finally { if (page) await page.close().catch(() => {}); }
 }
 
+// UNA VEZ (26-11-2026): (1) ventana de FORMATO previa a «Siguiente» (¿nº de copias? el PDF sale con el albarán 2 veces)
+// y (2) segunda prueba de CCO escribiendo con el ratón en el campo. Capturas ventana-formato.png / ventana-cco2.png.
+// CIERRA SIN ENVIAR. Marca: ventana-formato.txt
+async function probarFormatoEmail(browser) {
+  const marca = path.join(DIR, 'ventana-formato.txt');
+  if (fs.existsSync(marca)) return;
+  fs.writeFileSync(marca, 'en curso ' + ahoraLocal() + '\r\n');
+  let page = null;
+  const visibles = () => page.evaluate(new Function(HONDO + `const host=e=>{let n=e; while(n&&n.getRootNode&&n.getRootNode().host) n=n.getRootNode().host; return n};
+      const c=hondo(document,'vaadin-text-field,vaadin-integer-field,vaadin-number-field,vaadin-select,vaadin-combo-box,vaadin-checkbox,vaadin-radio-button,vaadin-radio-group').filter(vis).map(x=>x.tagName.toLowerCase()+' | '+(x.label||(x.textContent||'').trim().slice(0,40))+' | '+String(x.value==null?'':x.value).slice(0,60)+(x.checked!==undefined?' | checked='+x.checked:''));
+      const t=[...new Set(hondo(document,'*').filter(e=>vis(e)&&e.childElementCount===0).map(e=>(e.textContent||'').trim()).filter(x=>x&&x.length<60))].slice(-80);
+      return 'CAMPOS:\\r\\n'+c.join('\\r\\n')+'\\r\\nTEXTOS: '+t.join(' · ');`));
+  try {
+    page = await browser.newPage();
+    await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }); await espera(6000);
+    await irAmbarx(page, 'ventas/albaranes'); await irAmbarx(page, 'ventas/albaranes/editar/A-12240'); await espera(4000);
+    const clic = re => page.evaluate(new Function('re', HONDO + "const r=new RegExp(re); const b=hondo(document,'vaadin-button').find(b=>vis(b)&&r.test((b.textContent||'').trim())); if(!b) return false; b.click(); return true;"), re);
+    if (!await page.evaluate(new Function(HONDO + "const b=hondo(document,'vaadin-button').find(b=>{const i=b.querySelector('vaadin-icon');return vis(b)&&i&&i.getAttribute('icon')==='vaadin:envelope'}); if(!b) return false; b.click(); return true;"))) throw new Error('no encuentro el sobre');
+    let hay = false; for (let i = 0; i < 20 && !hay; i++) { await espera(1000); hay = await page.evaluate(new Function(HONDO + "return hondo(document,'vaadin-button').some(b=>vis(b)&&/^Siguiente$/.test((b.textContent||'').trim()));")); }
+    if (!hay) throw new Error('no sale la ventana de formato');
+    await espera(1500);
+    const formato = await visibles();
+    await page.screenshot({ path: path.join(DIR, 'ventana-formato.png') }).catch(() => {});
+    await clic('^Siguiente$');
+    let ok = false; for (let i = 0; i < 30 && !ok; i++) { await espera(1000); ok = await page.evaluate(() => /Enviar email/.test(document.body.innerText || '')); }
+    await espera(2500);
+    await clic('^CCO'); await espera(1500);
+    const pos = await page.evaluate(new Function(HONDO + `const lab=hondo(document,'label,span,div').filter(e=>vis(e)&&e.childElementCount===0&&/^CCO$/i.test((e.textContent||'').trim()))[0]; if(!lab) return null;
+      const y=lab.getBoundingClientRect().bottom; const c=hondo(document,'input').filter(vis).map(i=>i.getBoundingClientRect()).filter(r=>r.top>=y-5&&r.top<y+60).sort((a,b)=>a.top-b.top)[0];
+      return c?{x:c.x+20,y:c.y+c.height/2}:null;`));
+    let cco = 'sin campo';
+    if (pos) {
+      await page.mouse.click(pos.x, pos.y); await espera(600);
+      await page.keyboard.type('facturasbuscaflor@gmail.com', { delay: 40 }); await espera(800);
+      await page.keyboard.press('Enter'); await espera(800);
+      await page.keyboard.press('Tab'); await espera(1200);
+      cco = await page.evaluate(new Function(HONDO + "return [...new Set(hondo(document,'*').filter(e=>vis(e)&&e.childElementCount===0&&/facturasbuscaflor/.test(e.textContent||'')).map(e=>e.tagName+':'+(e.textContent||'').trim()))].join(' · ') + ' | inputs: ' + hondo(document,'input').filter(i=>vis(i)&&/facturasbuscaflor/.test(i.value||'')).length;"));
+    }
+    await page.screenshot({ path: path.join(DIR, 'ventana-cco2.png') }).catch(() => {});
+    await page.keyboard.press('Escape'); await espera(1500);
+    await clic('^(Cancelar|Cerrar|Salir)$');
+    fs.writeFileSync(marca, 'hecho ' + ahoraLocal() + '\r\nFORMATO ' + formato + '\r\n\r\nCCO: ' + cco + '\r\n');
+    log('Prueba formato/CCO: hecha (ventana-formato.txt) · cerrada sin enviar');
+  } catch (e) { log('Prueba formato/CCO: error', e.message); fs.appendFileSync(marca, 'error ' + e.message + '\r\n'); }
+  finally { if (page) await page.close().catch(() => {}); }
+}
+
 async function vigilarVerdnatura(browser) {
   const h = new Date(), hoy = ahoraLocal().slice(0, 10);
   if (h.getDay() !== 0 && h.getHours() === 15 && vnUltimoDia !== hoy) { vnUltimoDia = hoy; await leerVerdnatura(browser, '15:00'); await grabarVerdnatura(browser); return; }
@@ -549,6 +596,7 @@ async function sesion() {
       if (!VISIBLE) await vigilarVerdnatura(browser).catch(e => log('Verdnatura:', e.message));
       if (!VISIBLE && !cobOcupado) await explorarVentanaEmail(browser).catch(e => log('Ventana email:', e.message));
       if (!VISIBLE && !cobOcupado) await probarCcoEmail(browser).catch(e => log('Prueba CCO:', e.message));
+      if (!VISIBLE && !cobOcupado) await probarFormatoEmail(browser).catch(e => log('Prueba formato:', e.message));
       if (!VISIBLE) vigilarCobros(browser).catch(e => log('Cobros:', e.message));
       if (Date.now() - ultimaRevisionScript > 30 * 60000) {
         ultimaRevisionScript = Date.now();
