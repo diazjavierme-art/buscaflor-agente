@@ -469,6 +469,43 @@ async function explorarVentanaEmail(browser) {
   finally { if (page) await page.close().catch(() => {}); }
 }
 
+// UNA VEZ (26-11-2026): prueba EN SECO de la copia oculta. Abre «Enviar email» del A-12240, pulsa «CCO», escribe
+// facturasbuscaflor@gmail.com, hace captura (ventana-cco.png), apunta lo que ve y CIERRA SIN ENVIAR. Marca: ventana-cco.txt
+async function probarCcoEmail(browser) {
+  const marca = path.join(DIR, 'ventana-cco.txt');
+  if (fs.existsSync(marca)) return;
+  fs.writeFileSync(marca, 'en curso ' + ahoraLocal() + '\r\n');
+  let page = null;
+  try {
+    page = await browser.newPage();
+    await page.goto(URL_AMBARX, { waitUntil: 'domcontentloaded', timeout: 90000 }); await espera(6000);
+    await irAmbarx(page, 'ventas/albaranes'); await irAmbarx(page, 'ventas/albaranes/editar/A-12240'); await espera(4000);
+    const clic = re => page.evaluate(new Function('re', HONDO + "const r=new RegExp(re); const b=hondo(document,'vaadin-button').find(b=>vis(b)&&r.test((b.textContent||'').trim())); if(!b) return false; b.click(); return true;"), re);
+    if (!await page.evaluate(new Function(HONDO + "const b=hondo(document,'vaadin-button').find(b=>{const i=b.querySelector('vaadin-icon');return vis(b)&&i&&i.getAttribute('icon')==='vaadin:envelope'}); if(!b) return false; b.click(); return true;"))) throw new Error('no encuentro el sobre');
+    let ok = false; for (let i = 0; i < 20 && !ok; i++) { await espera(1000); ok = await clic('^Siguiente$'); }
+    if (!ok) throw new Error('no sale «Siguiente»');
+    ok = false; for (let i = 0; i < 30 && !ok; i++) { await espera(1000); ok = await page.evaluate(() => /Enviar email/.test(document.body.innerText || '')); }
+    await espera(2500);
+    const antes = await page.evaluate(new Function(HONDO + "return hondo(document,'input').filter(vis).length;"));
+    if (!await clic('^CCO')) throw new Error('no encuentro el botón CCO');
+    await espera(1500);
+    // el campo nuevo que aparece tras pulsar CCO (el último input visible que esté junto a la etiqueta CCO o, si no, el que haya aparecido)
+    const campo = await page.evaluate(new Function(HONDO + `const ins=hondo(document,'input').filter(vis);
+      const lab=hondo(document,'label,span,div').filter(e=>vis(e)&&e.childElementCount===0&&/^CCO$/i.test((e.textContent||'').trim())).map(e=>e.getBoundingClientRect().y);
+      const host=e=>{let n=e; while(n&&n.getRootNode&&n.getRootNode().host) n=n.getRootNode().host; return n};
+      let c=null; if(lab.length){ const y=Math.max(...lab); c=ins.map(i=>[i,Math.abs(i.getBoundingClientRect().y-y)]).sort((a,b)=>a[1]-b[1])[0]; c=c&&c[1]<40?c[0]:null; }
+      window.__bfCco=c; return {inputs:ins.length, etiquetaCco:lab.length, encontrado:!!c, info:c?((host(c).tagName||'')+' '+(host(c).label||'')):''};`));
+    if (campo.encontrado) { await page.evaluate(() => window.__bfCco.focus()); await page.keyboard.type('facturasbuscaflor@gmail.com'); await espera(800); await page.keyboard.press('Enter'); await espera(1500); }
+    const texto = await page.evaluate(new Function(HONDO + "return [...new Set(hondo(document,'*').filter(e=>vis(e)&&e.childElementCount===0).map(e=>(e.textContent||'').trim()).filter(t=>/@|CC/.test(t)))].join(' · ');"));
+    await page.screenshot({ path: path.join(DIR, 'ventana-cco.png') }).catch(() => {});
+    await page.keyboard.press('Escape'); await espera(1500);
+    await clic('^(Cancelar|Cerrar|Salir)$');
+    fs.writeFileSync(marca, 'hecho ' + ahoraLocal() + '\r\ninputs antes ' + antes + ' · ' + JSON.stringify(campo) + '\r\nTEXTOS: ' + texto + '\r\n');
+    log('Prueba CCO: ' + JSON.stringify(campo) + ' · ' + texto.slice(0, 200) + ' · cerrada sin enviar');
+  } catch (e) { log('Prueba CCO: error', e.message); fs.appendFileSync(marca, 'error ' + e.message + '\r\n'); }
+  finally { if (page) await page.close().catch(() => {}); }
+}
+
 async function vigilarVerdnatura(browser) {
   const h = new Date(), hoy = ahoraLocal().slice(0, 10);
   if (h.getDay() !== 0 && h.getHours() === 15 && vnUltimoDia !== hoy) { vnUltimoDia = hoy; await leerVerdnatura(browser, '15:00'); await grabarVerdnatura(browser); return; }
@@ -511,6 +548,7 @@ async function sesion() {
       else fallos = 0;
       if (!VISIBLE) await vigilarVerdnatura(browser).catch(e => log('Verdnatura:', e.message));
       if (!VISIBLE && !cobOcupado) await explorarVentanaEmail(browser).catch(e => log('Ventana email:', e.message));
+      if (!VISIBLE && !cobOcupado) await probarCcoEmail(browser).catch(e => log('Prueba CCO:', e.message));
       if (!VISIBLE) vigilarCobros(browser).catch(e => log('Cobros:', e.message));
       if (Date.now() - ultimaRevisionScript > 30 * 60000) {
         ultimaRevisionScript = Date.now();
