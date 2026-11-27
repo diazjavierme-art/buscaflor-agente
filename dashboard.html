@@ -471,6 +471,11 @@ function datosPeriodo(r){
 function variacion(a,b,t){ if(!b) return ''; var v=(a-b)/b*100; return '<span class="'+(v>=0?'up':'down')+'">'+(v>=0?'▲ ':'▼ ')+pct(Math.abs(v),0)+'</span> '+(t||'vs anterior'); }
 function pintarResumen(){
   var r=rango(PER.tipo, PER.off), ra=rango(PER.tipo, PER.tipo==='dia'?PER.off-7:PER.off-1), vsTxt=PER.tipo==='dia'?'vs mismo día semana pasada':PER.tipo==='semana'?'vs semana anterior':'vs mes anterior';
+  if(PER.tipo==='dia'){ var ds=new Date(r.desde+'T12:00:00'), dn=(ds.getDay()+6)%7, jue=new Date(ds); jue.setDate(jue.getDate()-dn+3);
+    var y1=new Date(jue.getFullYear(),0,4,12), sem=1+Math.round(((jue-y1)/864e5-3+((y1.getDay()+6)%7))/7), yIso=jue.getFullYear()-1,
+        c4=new Date(yIso,0,4,12), lun=new Date(c4); lun.setDate(c4.getDate()-((c4.getDay()+6)%7)+(Math.min(sem,52)-1)*7+dn); var fa=hoyISO(lun);
+    ra={desde:fa, hasta:fa, etq:''}; var nd=['lun','mar','mié','jue','vie','sáb','dom'][dn];
+    vsTxt='vs mismo día de la semana '+Math.min(sem,52)+' de '+yIso+' ('+nd+' '+fa.split('-').reverse().slice(0,2).join('/')+')'; }
   if(PER.tipo==='mes'){ var hoyS=hoyISO(new Date()), hastaR=r.hasta>hoyS?hoyS:r.hasta, yA=(+r.desde.slice(0,4)-1);
     ra={desde:yA+r.desde.slice(4), hasta:yA+hastaR.slice(4), etq:''};
     vsTxt=hastaR<r.hasta?'vs mismo periodo de '+yA+' (1–'+(+hastaR.slice(8))+')':'vs '+MESES[+r.desde.slice(5,7)-1]+' '+yA; }
@@ -485,7 +490,7 @@ function pintarResumen(){
   if(PER.tipo==='semana' && dash.semana && dash.semana.desde===r.desde){ mg=dash.semana.pct; mgEtq='Control semanal'+(dash.semana.parcial?' (parcial)':''); }
   if(PER.tipo==='mes'){ var mm=(dash.mensual||{})[r.desde.slice(0,7)]; if(mm){ mg=mm.pct; mgEtq='Cierre mensual'; } }
   document.getElementById('rTiles').innerHTML =
-    tile('Ventas (sin IVA)', eur(o.venta), antCompleto&&completo&&oa.venta?variacion(o.venta,oa.venta,vsTxt):(PER.tipo==='dia'?'Sin dato del mismo día de la semana pasada':'Datos desde el '+(primero?primero.split('-').reverse().slice(0,2).join('/'):'—'))) +
+    tile('Ventas (sin IVA)', eur(o.venta), antCompleto&&completo&&oa.venta?variacion(o.venta,oa.venta,vsTxt):(PER.tipo==='dia'?'Sin dato del mismo día del año anterior':'Datos desde el '+(primero?primero.split('-').reverse().slice(0,2).join('/'):'—'))) +
     tile('Albaranes y facturas', num(o.docs), ticket?'Ticket medio '+eur(ticket):'') +
     tile('Clientes que compran', num(ncli), oa.venta&&antCompleto?num(Object.keys(oa.cli).length)+' '+vsTxt.replace('vs ','en el '):'') +
     tile('Entregas firmadas', num(o.firmadas), o.entregas?'Cobrado en reparto '+eur(cob,2):'') +
