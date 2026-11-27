@@ -476,6 +476,13 @@ function pintarResumen(){
         c4=new Date(yIso,0,4,12), lun=new Date(c4); lun.setDate(c4.getDate()-((c4.getDay()+6)%7)+(Math.min(sem,52)-1)*7+dn); var fa=hoyISO(lun);
     ra={desde:fa, hasta:fa, etq:''}; var nd=['lun','mar','mié','jue','vie','sáb','dom'][dn];
     vsTxt='vs mismo día de la semana '+Math.min(sem,52)+' de '+yIso+' ('+nd+' '+fa.split('-').reverse().slice(0,2).join('/')+')'; }
+  if(PER.tipo==='semana'){ var lw=new Date(r.desde+'T12:00:00'), jw=new Date(lw); jw.setDate(jw.getDate()+3);
+    var yw=new Date(jw.getFullYear(),0,4,12), sw=1+Math.round(((jw-yw)/864e5-3+((yw.getDay()+6)%7))/7), yv=jw.getFullYear()-1, sv=Math.min(sw,52),
+        cw=new Date(yv,0,4,12), mw=new Date(cw); mw.setDate(cw.getDate()-((cw.getDay()+6)%7)+(sv-1)*7);
+    var hoyW=hoyISO(new Date()), nW=Math.min(6, Math.max(0, Math.round((new Date((r.hasta>hoyW?hoyW:r.hasta)+'T12:00:00')-lw)/864e5))), fw=new Date(mw); fw.setDate(fw.getDate()+nW);
+    var dd=function(x){ return hoyISO(x).split('-').reverse().slice(0,2).join('/'); };
+    ra={desde:hoyISO(mw), hasta:hoyISO(fw), etq:''};
+    vsTxt='vs la semana '+sv+' de '+yv+' ('+dd(mw)+(nW?' al '+dd(fw):'')+')'; }
   if(PER.tipo==='mes'){ var hoyS=hoyISO(new Date()), hastaR=r.hasta>hoyS?hoyS:r.hasta, yA=(+r.desde.slice(0,4)-1);
     ra={desde:yA+r.desde.slice(4), hasta:yA+hastaR.slice(4), etq:''};
     vsTxt=hastaR<r.hasta?'vs mismo periodo de '+yA+' (1–'+(+hastaR.slice(8))+')':'vs '+MESES[+r.desde.slice(5,7)-1]+' '+yA; }
@@ -492,7 +499,7 @@ function pintarResumen(){
   document.getElementById('rTiles').innerHTML =
     tile('Ventas (sin IVA)', eur(o.venta), antCompleto&&completo&&oa.venta?variacion(o.venta,oa.venta,vsTxt):(PER.tipo==='dia'?'Sin dato del mismo día del año anterior':'Datos desde el '+(primero?primero.split('-').reverse().slice(0,2).join('/'):'—'))) +
     tile('Albaranes y facturas', num(o.docs), ticket?'Ticket medio '+eur(ticket):'') +
-    tile('Clientes que compran', num(ncli), oa.venta&&antCompleto?num(Object.keys(oa.cli).length)+' '+vsTxt.replace('vs ','en el '):'') +
+    tile('Clientes que compran', num(ncli), oa.venta&&antCompleto?num(Object.keys(oa.cli).length)+' '+vsTxt.replace('vs la ','en la ').replace('vs ','en el '):'') +
     tile('Entregas firmadas', num(o.firmadas), o.entregas?'Cobrado en reparto '+eur(cob,2):'') +
     tile('Margen bruto', mg==null?'—':pct(mg), mg==null?(PER.tipo==='dia'?'Se calcula por semana y mes':'Aún no calculado'):mgEtq) +
     tile('Rosa 60 bajo 18 €', o.rosaBajoN?eur(o.rosaBajo):'0 €', o.rosaBajoN?num(o.rosaBajoN)+' líneas por debajo':'', o.rosaBajoN?chip('warn','revisar'):chip('ok','en tarifa'));
