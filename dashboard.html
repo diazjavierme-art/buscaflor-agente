@@ -281,6 +281,7 @@ button:disabled{cursor:not-allowed}
       <div class="card"><h3>Venta de flor por mes (€)</h3><div class="sub">Venta del informe de AmbarX.</div><div class="chart" id="cVentaMes"></div></div>
       <div class="card"><h3>Margen bruto por mes (%)</h3><div class="sub">Venta AmbarX menos flor puesta en Madrid y flor nacional, <b>sin el transporte a clientes</b> (por eso es más alto que el acumulado). Los meses sueltos bailan por el stock y por cuándo llega la factura de Vallinoto: el dato fiable es el acumulado.</div><div class="chart" id="cMargenMes"></div></div>
     </div>
+    <div class="card"><h3>Venta por mes: este año contra el anterior</h3><div class="sub" id="mvEtq"></div><div class="scroll" id="tMesVs"></div></div>
     <div class="card"><h3>Margen bruto y estructura (acumulado)</h3><div class="scroll" id="tPyG"></div></div>
     <div class="card"><h3>Última semana controlada</h3><div class="sub" id="semEtq"></div><div class="scroll" id="tSemana"></div></div>
   </section>
@@ -579,6 +580,21 @@ function pintarCobros(){
   var ba=document.getElementById('cAct'); ba.onclick=function(){ ba.disabled=true; db.ref('buscaflor/peticiones/cobros').set({estado:'pedida', pedido:new Date().toISOString(), por:'app'}); setTimeout(function(){ba.disabled=false;},10000); };
   var ib=document.getElementById('cBus'); if(!ib.__on){ ib.__on=1; ib.oninput=function(){ pintarCobros(); }; }
 }
+function pintarMesVs(){
+  var hoy=new Date(), y=hoy.getFullYear(), hoyS=hoyISO(hoy), f=[], s26=0, s25=0, par=false;
+  for(var m=0;m<12;m++){
+    var mm=('0'+(m+1)).slice(-2), fin=new Date(y,m+1,0,12).getDate(), d1=y+'-'+mm+'-01', d2=y+'-'+mm+'-'+('0'+fin).slice(-2);
+    if(d1>hoyS) break;
+    var p=d2>hoyS, h2=p?hoyS:d2; if(p) par=true;
+    var a=datosPeriodo({desde:d1,hasta:h2}).venta, b=datosPeriodo({desde:(y-1)+d1.slice(4),hasta:(y-1)+h2.slice(4)}).venta;
+    s26+=a; s25+=b; f.push([MESES[m]+(p?' (hasta el '+(+hoyS.slice(8))+')':''),a,b]);
+  }
+  var cel=function(a,b){ var d=a-b, v=b?d/b*100:null; return '<td class="'+(d<0?'down':'up')+'">'+(d>=0?'+':'')+eur(d)+'</td><td class="'+(v==null?'':v<0?'down':'up')+'">'+(v==null?'—':(v>=0?'▲ ':'▼ ')+pct(Math.abs(v),0))+'</td>'; };
+  document.getElementById('mvEtq').textContent='Venta sin IVA. Cada mes frente al mismo mes de '+(y-1)+(par?'; el mes en curso se compara con los mismos días del año anterior':'')+'.';
+  document.getElementById('tMesVs').innerHTML='<table><tr><th>Mes</th><th>'+y+'</th><th>'+(y-1)+'</th><th>Diferencia</th><th>%</th></tr>'+
+    f.map(function(r){ return '<tr><td>'+r[0]+'</td><td>'+eur(r[1])+'</td><td>'+eur(r[2])+'</td>'+cel(r[1],r[2])+'</tr>'; }).join('')+
+    '<tr style="font-weight:700"><td>Acumulado</td><td>'+eur(s26)+'</td><td>'+eur(s25)+'</td>'+cel(s26,s25)+'</tr></table>';
+}
 function pintar(){
   try{ pintarResumen(); }catch(e){ console.error(e); }
   try{ pintarCobros(); }catch(e){ console.error(e); }
@@ -641,6 +657,7 @@ function pintar(){
     tile('Estructura y resultado', contr?eur((mT||0)+(acu.otrosIngresos||0)-estr):'—', contr?'':'Faltan partidas de estructura', contr?'':chip('bad','sin contrastar'));
   var mk=Object.keys(mens).sort();
   barras('cVentaMes', mk.map(function(k){ return {l:MESES[+k.slice(5)-1], t:MESES[+k.slice(5)-1]+' '+k.slice(0,4), v:mens[k].venta, extra:'Margen '+eur(mens[k].margen)}; }), {fmt:eur, fmtEje:function(v){return num(v/1000)+'k';}, titulo:'Venta por mes'});
+  try{ pintarMesVs(); }catch(e){ console.error(e); }
   barras('cMargenMes', mk.map(function(k){ return {l:MESES[+k.slice(5)-1], t:MESES[+k.slice(5)-1]+' '+k.slice(0,4), v:mens[k].pct}; }), {fmt:pct, fmtEje:function(v){return num(v)+'%';}, ref:objMB, titulo:'Margen por mes'});
   var fila=function(t,a,b,cls){ return '<tr'+(cls?' style="'+cls+'"':'')+'><td>'+t+'</td><td class="'+(a<0?'neg':'')+'">'+(a==null?'—':eur(a))+'</td><td>'+(a==null||!vA?'—':pct(a/vA*100))+'</td><td class="'+(b<0?'neg':'')+'">'+(b==null?'—':eur(b))+'</td><td>'+(b==null||!vT?'—':pct(b/vT*100))+'</td></tr>'; };
   document.getElementById('tPyG').innerHTML='<table><tr><th>Concepto</th><th>Venta AmbarX</th><th>%</th><th>Con venta sin IVA</th><th>%</th></tr>'+
