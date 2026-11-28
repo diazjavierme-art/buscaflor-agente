@@ -329,7 +329,7 @@ button:disabled{cursor:not-allowed}
     <div><h2>Cobros pendientes de clientes</h2><div class="sub" id="cNota">Del informe de AmbarX «Cobros pendientes por cliente» (formato detallado por cliente). El robot lo lee cada mañana a las 7:00.</div></div>
     <div class="tiles" id="cTiles"></div>
     <div class="card"><h3>Por cliente</h3><div class="sub">Pulsa en un cliente para ver sus facturas y albaranes. «PDF» saca de AmbarX su estado de cuenta; «Enviar» se lo manda por email desde el buzón (unos 5 minutos).</div>
-      <div class="acc"><button class="btnF" id="cAct">Leer ahora de AmbarX</button><input id="cBus" placeholder="Buscar cliente…"><span class="sub" id="cEst"></span></div>
+      <div class="acc"><button class="btnF" id="cAct">Leer ahora de AmbarX</button><button class="btnF" id="cEnvTodos">Enviar a todos</button><input id="cBus" placeholder="Buscar cliente…"><span class="sub" id="cEst"></span></div>
       <div class="scroll" id="tCobros"></div></div>
   </section>
 </main>
@@ -578,6 +578,19 @@ function pintarCobros(){
   [].forEach.call(document.querySelectorAll('#tCobros [data-ver]'),function(b){ b.onclick=function(){ var k=b.dataset.ver, p=(C.pdf||{})[k]||{}; if(p.pdf64) abrirPdf64(p.pdf64,'Cobros pendientes '+k+'.pdf'); }; });
   [].forEach.call(document.querySelectorAll('#tCobros [data-env]'),function(b){ b.onclick=function(){ var k=b.dataset.env, c=lista.find(function(x){return String(x.codigo)===k;})||{}, em=(con[k]||{}).email||''; if(!confirm('¿Enviar a '+(c.nombre||k)+' ('+em+') su estado de cuenta con '+eur2(c.pendiente)+' pendientes?')) return; b.disabled=true; db.ref('buscaflor/cobros/envios').push({cliente:k, nombre:c.nombre||'', para:em, pendiente:c.pendiente||0, estado:'pedido', pedido:new Date().toISOString(), por:'app'}); }; });
   var ba=document.getElementById('cAct'); ba.onclick=function(){ ba.disabled=true; db.ref('buscaflor/peticiones/cobros').set({estado:'pedida', pedido:new Date().toISOString(), por:'app'}); setTimeout(function(){ba.disabled=false;},10000); };
+  var bt=document.getElementById('cEnvTodos'); bt.onclick=function(){
+    var hoyS=hoyISO(new Date()), dest=[], sinEm=0, yaEnv=0, tot=0;
+    lista.filter(function(c){ return !bus || (String(c.nombre||'').toLowerCase().indexOf(bus)>=0) || String(c.codigo)===bus; }).forEach(function(c){
+      var k=String(c.codigo), em=(con[k]||{}).email||'', e=ultEnv[k];
+      if(!(c.pendiente>0)) return; if(!em){ sinEm++; return; }
+      if(e && e.estado!=='error' && String(e.pedido||'').slice(0,10)===hoyS){ yaEnv++; return; }
+      dest.push({c:c,k:k,em:em}); tot+=c.pendiente||0; });
+    if(!dest.length){ alert('No hay clientes a los que enviar.'+(yaEnv?' '+yaEnv+' ya lo han recibido hoy.':'')+(sinEm?' '+sinEm+' no tienen email.':'')); return; }
+    if(!confirm('¿Enviar el estado de cuenta a '+dest.length+' clientes ('+eur2(tot)+' pendientes en total)?'+(bus?'\n(Solo los que salen en la búsqueda «'+bus+'».)':'')+'\n\nSe manda desde el buzón de la empresa a cada cliente y no se puede deshacer. Se saltan '+sinEm+' sin email y '+yaEnv+' que ya lo recibieron hoy.\nTarda un rato: el robot saca el PDF de cada cliente de AmbarX uno a uno.')) return;
+    bt.disabled=true; var ahora=new Date().toISOString();
+    dest.forEach(function(d){ db.ref('buscaflor/cobros/envios').push({cliente:d.k, nombre:d.c.nombre||'', para:d.em, pendiente:d.c.pendiente||0, estado:'pedido', pedido:ahora, por:'app (todos)'}); });
+    document.getElementById('cEst').textContent='Pedido el envío a '+dest.length+' clientes. Van saliendo en los próximos minutos.';
+  };
   var ib=document.getElementById('cBus'); if(!ib.__on){ ib.__on=1; ib.oninput=function(){ pintarCobros(); }; }
 }
 function pintarMesVs(){
